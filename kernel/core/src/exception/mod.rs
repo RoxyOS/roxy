@@ -4,7 +4,7 @@ use crate::e_println;
 
 pub(crate) fn handler(context: &ExceptionContext) -> ! {
     e_println!(
-        "ROXY:EXCEPTION:{:?} vector_error={:?} rip={:#x} rsp={:#x} cs={:#x} ss={:#x} rflags={:#x} cr2={:?} cpu={}",
+        "Exception: {:?} vector_error={:?} rip={:#x} rsp={:#x} cs={:#x} ss={:#x} rflags={:#x} cr2={:?} cpu={}",
         context.vector,
         context.error_code,
         context.instruction_pointer,
