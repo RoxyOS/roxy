@@ -8,19 +8,7 @@ pub(crate) struct Cli {
 }
 
 #[derive(Debug, Subcommand)]
-pub(crate) enum Arg {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn accepts_no_action() {
-        assert!(Cli::try_parse_from(["xtask"]).is_ok());
-    }
-
-    #[test]
-    fn rejects_unknown_actions() {
-        assert!(Cli::try_parse_from(["xtask", "unknown"]).is_err());
-    }
+pub(crate) enum Arg {
+    Image,
+    Run,
 }

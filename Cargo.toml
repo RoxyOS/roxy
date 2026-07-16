@@ -1,14 +1,30 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch"]
+members = ["xtask", "kernel/arch", "kernel/core"]
 
 [workspace.package]
 edition = "2024"
 license = "MIT OR Apache-2.0"
+publish = false
 
 [workspace.dependencies]
+anyhow = "1"
+cargo-image-runner = { version = "0.5", default-features = false, features = ["iso", "limine", "qemu", "uefi"] }
 clap = { version = "4", features = ["derive"] }
-x86_64 = "0.15"
+heapless = "0.9"
+limine = "0.6"
+roxy-arch.path = "kernel/arch"
+spin = { version = "0.12", default-features = false, features = ["mutex", "once", "spin_mutex"] }
+tap = "1"
+uart_16550 = "0.6"
+x86_64 = { version = "0.15", features = ["abi_x86_interrupt"] }
+xshell = "0.2"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

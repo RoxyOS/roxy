@@ -3,9 +3,11 @@ name = "roxy-arch"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
-publish = false
+publish.workspace = true
 
 [dependencies]
+spin.workspace = true
+tap.workspace = true
 x86_64.workspace = true
 
 [lints]

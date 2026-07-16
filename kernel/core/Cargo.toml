@@ -1,0 +1,27 @@
+[package]
+name = "roxy-kernel"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+kernel = []
+
+[[bin]]
+name = "roxy-kernel"
+path = "src/main.rs"
+test = false
+bench = false
+required-features = ["kernel"]
+
+[dependencies]
+heapless.workspace = true
+limine.workspace = true
+spin.workspace = true
+uart_16550.workspace = true
+
+roxy-arch.workspace = true
+
+[lints]
+workspace = true

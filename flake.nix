@@ -66,14 +66,11 @@
                 pkgs.e2fsprogs
                 pkgs.gdb
                 pkgs.git
-                pkgs.limine
                 pkgs.meson
-                pkgs.mtools
                 pkgs.ninja
-                pkgs.OVMF.fd
+                pkgs.openssl
                 pkgs.pkg-config
                 pkgs.qemu
-                pkgs.xorriso
               ]
               ++ (with pkgs.llvmPackages; [
                 clang

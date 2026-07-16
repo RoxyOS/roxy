@@ -1,4 +1,7 @@
-use crate::CpuId;
+mod exception;
+mod init;
+
+use crate::{CpuId, ExceptionHandler};
 
 use super::{Architecture, sealed};
 
@@ -7,6 +10,10 @@ pub struct X86_64;
 impl sealed::Sealed for X86_64 {}
 
 impl Architecture for X86_64 {
+    fn initialize(exception_handler: ExceptionHandler) {
+        init::initialize(exception_handler);
+    }
+
     fn current_cpu_id() -> CpuId {
         CpuId::BSP
     }

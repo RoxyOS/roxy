@@ -1,0 +1,33 @@
+[boot]
+type = "uefi"
+
+[bootloader]
+kind = "limine"
+config-file = "kernel/limine.conf"
+
+[bootloader.limine]
+version = "v11.x-binary"
+
+[image]
+format = "iso"
+output = "roxy.iso"
+volume-label = "ROXY"
+
+[runner]
+kind = "qemu"
+
+[runner.qemu]
+binary = "qemu-system-x86_64"
+machine = "q35"
+memory = 256
+cores = 1
+kvm = false
+extra-args = ["-smp", "1"]
+
+[runner.qemu.serial]
+mode = "stdio"
+separate-monitor = true
+
+[run]
+extra-args = ["-no-reboot", "-no-shutdown", "-display", "none"]
+gui = false
