@@ -1,0 +1,15 @@
+[workspace]
+resolver = "3"
+members = []
+
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
