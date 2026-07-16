@@ -91,12 +91,25 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
 - Before implementing functionality, check whether an existing crate already provides it. Prefer
   a maintained, compatible crate over a repository-local implementation.
 - Evaluate crates for `no_std` and target support, licensing, maintenance, soundness, and API fit.
-- Prefer workspace dependencies with broad compatible version requirements. Let `Cargo.lock` pin
-  exact resolved versions.
+- Declare every dependency in the root `[workspace.dependencies]` table, including repository-owned
+  `roxy-*` crates. Member crates must inherit them with `dependency.workspace = true` rather than
+  repeating versions, paths, features, or other dependency configuration locally.
+- Use broad compatible version requirements for workspace dependencies. Let `Cargo.lock` pin exact
+  resolved versions.
+- In each dependency table, keep third-party dependencies in one alphabetized group and `roxy-*`
+  dependencies in a separate alphabetized group. Put the third-party group first and separate the
+  groups with one blank line.
 - Use macros when they remove genuine repetition or enforce an invariant. Prefer functions, traits,
   and ordinary types when they offer equivalent clarity and diagnostics.
 - Keep macros small, hygienic, and narrowly scoped. They must not conceal important control flow,
   unsafe operations, allocation, locking, or I/O.
+
+## TOML Style
+
+- Prefer dotted keys over inline tables for a single nested value. Write `foo.bar = "baz"` instead
+  of `foo = { bar = "baz" }`.
+- Keep an inline table when several fields form one compact value and dotted keys would make the
+  relationship harder to scan.
 
 ## Refactoring And Incomplete Work
 
