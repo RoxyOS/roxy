@@ -57,6 +57,24 @@ pub trait Architecture: sealed::Sealed {
 
     fn enable_interrupts();
 
+    /// Enters ring 3 at the supplied instruction and stack pointers.
+    ///
+    /// # Safety
+    ///
+    /// Both addresses must be mapped as user-accessible in the active page table.
+    unsafe fn enter_user(
+        user_instruction_pointer: u64,
+        user_stack_pointer: u64,
+        kernel_stack_top: u64,
+    ) -> !;
+
+    /// Configures the architecture syscall entry point.
+    ///
+    /// # Safety
+    ///
+    /// `entry` must remain a valid syscall-compatible entry point for the rest of execution.
+    unsafe fn configure_syscall(entry: u64);
+
     fn halt();
 
     fn halt_forever() -> !;

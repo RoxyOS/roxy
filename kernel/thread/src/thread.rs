@@ -1,9 +1,14 @@
-use roxy_memory::VirtualAddress;
+use roxy_memory::{UserAddress, VirtualAddress};
 
 use crate::{SavedContext, stack::KernelStack};
 
+/// Schedulable execution state with an owned ring-0 stack.
+///
+/// Every thread needs a kernel stack for context switching and kernel entry. A user thread's user
+/// stack is a mapping owned by its address space; only its initial user stack pointer is stored in
+/// the saved context.
 pub struct Thread {
-    stack: KernelStack,
+    kernel_stack: KernelStack,
     context: SavedContext,
 }
 
@@ -14,9 +19,33 @@ impl Thread {
     ///
     /// Returns an error when the kernel stack cannot be allocated.
     pub fn new(entry: fn() -> !) -> Result<Self, ThreadCreateError> {
-        let stack = KernelStack::new().ok_or(ThreadCreateError::OutOfMemory)?;
-        let context = SavedContext::new(&stack, entry);
-        Ok(Self { stack, context })
+        let kernel_stack = KernelStack::new().ok_or(ThreadCreateError::OutOfMemory)?;
+        let context = SavedContext::new(&kernel_stack, entry);
+        Ok(Self {
+            kernel_stack,
+            context,
+        })
+    }
+
+    /// Creates a ring-3 thread with a kernel-entry stack.
+    ///
+    /// `user_stack_pointer` identifies the separately mapped user stack. The owned kernel stack is
+    /// used only while the thread executes in ring 0 after a context switch, interrupt, or syscall.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the kernel stack cannot be allocated.
+    pub fn new_user(
+        user_instruction_pointer: UserAddress,
+        user_stack_pointer: UserAddress,
+    ) -> Result<Self, ThreadCreateError> {
+        let kernel_stack = KernelStack::new().ok_or(ThreadCreateError::OutOfMemory)?;
+        let context =
+            SavedContext::new_user(&kernel_stack, user_instruction_pointer, user_stack_pointer);
+        Ok(Self {
+            kernel_stack,
+            context,
+        })
     }
 
     pub fn context(&mut self) -> &mut SavedContext {
@@ -30,7 +59,7 @@ impl Thread {
     /// Panics if the allocator returned an address outside the architecture's virtual range.
     #[must_use]
     pub fn kernel_stack_top(&self) -> VirtualAddress {
-        VirtualAddress::new(u64::try_from(self.stack.top_address()).unwrap()).unwrap()
+        VirtualAddress::new(u64::try_from(self.kernel_stack.top_address()).unwrap()).unwrap()
     }
 }
 

@@ -23,12 +23,18 @@ pub enum MappingError {
 
 /// Owns the page-table hierarchy for one independently managed address space.
 ///
-/// Unlike the active kernel mapper, this value is not installed in CR3 and does not mutate the
-/// currently running page table. It owns a separate PML4 plus all private lower-level table
-/// frames, copies the shared kernel half at creation, and only exposes lower-half user mappings.
-/// Leaf data frames remain owned separately through [`PageRef`]. Dropping this value reclaims its
-/// private page-table frames; it is therefore a lifecycle owner, not a raw page-table container.
+/// Unlike the active kernel mapper, this value is created inactive and only changes the current
+/// CR3 within an explicit activation scope. It owns a separate PML4 plus all private lower-level
+/// table frames, copies the shared kernel half at creation, and only exposes lower-half user
+/// mappings. Leaf data frames remain owned separately through [`PageRef`]. Dropping this value
+/// reclaims its private page-table frames; it is therefore a lifecycle owner, not a raw container.
 pub struct AddrSpacePageTable(CurrentAddrSpacePageTableBackend);
+
+/// Opaque state required to restore a previously active page table.
+pub struct PageTableToken {
+    pub(crate) root: PhysicalAddress,
+    pub(crate) flags: u64,
+}
 
 impl AddrSpacePageTable {
     /// Creates an empty address-space page table with the current kernel mappings.
@@ -43,6 +49,27 @@ impl AddrSpacePageTable {
     #[must_use]
     pub fn root_address(&self) -> PhysicalAddress {
         self.0.root_address()
+    }
+
+    /// Installs this address space and returns the previously active page table.
+    ///
+    /// # Safety
+    ///
+    /// The caller must keep this page table alive until the returned token has been restored.
+    #[must_use]
+    pub unsafe fn activate(&self) -> PageTableToken {
+        // SAFETY: The caller guarantees that this page table remains alive while active.
+        unsafe { self.0.activate() }
+    }
+
+    /// Restores a page table returned by [`Self::activate`].
+    ///
+    /// # Safety
+    ///
+    /// The page-table hierarchy represented by `token` must still be alive.
+    pub unsafe fn restore(token: PageTableToken) {
+        // SAFETY: The caller guarantees that the saved page table remains alive.
+        unsafe { CurrentAddrSpacePageTableBackend::restore(token) };
     }
 
     /// Maps a user page to an owned frame reference.
@@ -103,6 +130,10 @@ pub(crate) trait AddrSpacePageTableBackend: sealed::Sealed {
 
     fn root_address(&self) -> PhysicalAddress;
 
+    unsafe fn activate(&self) -> PageTableToken;
+
+    unsafe fn restore(token: PageTableToken);
+
     fn map_user_page(
         &mut self,
         page: UserPage,
@@ -162,5 +193,16 @@ mod tests {
             assert!(!table.is_user_page_mapped(page));
         }
         assert_eq!(statistics().allocated_frames, baseline);
+    });
+
+    kernel_test!("roxy-memory::addrspace-activation", addrspace_activation, {
+        let table = AddrSpacePageTable::new().unwrap();
+        assert!(!table.0.is_active());
+        // SAFETY: the table remains alive until the previous CR3 is restored below.
+        let previous = unsafe { table.activate() };
+        assert!(table.0.is_active());
+        // SAFETY: the original kernel page table remains alive for the entire boot.
+        unsafe { AddrSpacePageTable::restore(previous) };
+        assert!(!table.0.is_active());
     });
 }

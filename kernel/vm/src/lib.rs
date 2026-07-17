@@ -6,6 +6,6 @@ mod addrspace;
 mod region;
 mod stack;
 
-pub use addrspace::{AddrSpace, Permissions, VmError};
+pub use addrspace::{AddrSpace, AddrSpaceGuard, Permissions, VmError};
 pub use region::UserRegion;
 pub use stack::UserStack;

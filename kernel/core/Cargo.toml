@@ -15,7 +15,10 @@ kernel-test = [
     "roxy-arch/kernel-test",
     "roxy-boot/kernel-test",
     "roxy-cpu/kernel-test",
+    "roxy-elf/kernel-test",
     "roxy-memory/kernel-test",
+    "roxy-process/kernel-test",
+    "roxy-syscall/kernel-test",
     "roxy-vm/kernel-test",
 ]
 
@@ -35,7 +38,10 @@ uart_16550.workspace = true
 roxy-arch.workspace = true
 roxy-boot.workspace = true
 roxy-cpu.workspace = true
+roxy-elf.workspace = true
 roxy-memory.workspace = true
+roxy-process.workspace = true
+roxy-syscall.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-thread.workspace = true
 roxy-utils.workspace = true

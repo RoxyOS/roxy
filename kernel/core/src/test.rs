@@ -37,12 +37,19 @@ mod tests {
             let memory = roxy_memory::statistics();
             let addrspace = roxy_vm::AddrSpace::new().unwrap();
             let thread = roxy_thread::Thread::new(unused_thread).unwrap();
+            let invalid_process = roxy_process::Process::from_elf(&[]);
+            let _ =
+                core::hint::black_box(roxy_syscall::initialize as fn(roxy_memory::VirtualAddress));
 
             assert_eq!(cpu.id(), CpuId::BSP);
             assert!(memory.total_frames > 0);
             assert!(memory.heap_total_bytes > 0);
             assert!(memory.allocated_frames <= memory.total_frames);
             assert!(addrspace.root_address().as_u64() > 0);
+            assert!(matches!(
+                invalid_process,
+                Err(roxy_process::ProcessError::InvalidElf)
+            ));
             drop(thread);
         }
     );

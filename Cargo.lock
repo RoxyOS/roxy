@@ -204,6 +204,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "memchr"
+version = "2.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "object"
+version = "0.39.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e5a6c098c7a3b6547378093f5cc30bc54fd361ce711e05293a5cc589562739b"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -284,6 +299,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-elf"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "object",
+ "roxy-memory",
+ "roxy-test",
+ "roxy-vm",
+]
+
+[[package]]
 name = "roxy-kernel"
 version = "0.1.0"
 dependencies = [
@@ -292,7 +318,10 @@ dependencies = [
  "roxy-arch",
  "roxy-boot",
  "roxy-cpu",
+ "roxy-elf",
  "roxy-memory",
+ "roxy-process",
+ "roxy-syscall",
  "roxy-test",
  "roxy-thread",
  "roxy-utils",
@@ -314,6 +343,27 @@ dependencies = [
  "roxy-utils",
  "spin",
  "x86_64",
+]
+
+[[package]]
+name = "roxy-process"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-elf",
+ "roxy-memory",
+ "roxy-test",
+ "roxy-thread",
+ "roxy-vm",
+]
+
+[[package]]
+name = "roxy-syscall"
+version = "0.1.0"
+dependencies = [
+ "roxy-arch",
+ "roxy-memory",
+ "roxy-thread",
 ]
 
 [[package]]

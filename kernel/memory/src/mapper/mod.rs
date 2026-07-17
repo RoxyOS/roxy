@@ -1,4 +1,4 @@
-mod addrspace;
+mod pagetable;
 #[cfg(target_arch = "x86_64")]
 mod x86_64;
 
@@ -6,7 +6,7 @@ use crate::{OwnedFrame, VirtualAddress};
 
 #[cfg(target_arch = "x86_64")]
 use self::x86_64::X86_64KernelPageTableBackend;
-pub use addrspace::{AddrSpacePageTable, MappingError, PagePermissions};
+pub use pagetable::{AddrSpacePageTable, MappingError, PagePermissions, PageTableToken};
 
 #[cfg(target_arch = "x86_64")]
 pub(crate) type CurrentKernelPageTableBackend = X86_64KernelPageTableBackend;

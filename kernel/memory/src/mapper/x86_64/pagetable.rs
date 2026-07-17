@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 
 use x86_64::{
     PhysAddr, VirtAddr,
+    registers::control::{Cr3, Cr3Flags},
     structures::paging::{
         FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame,
         Size4KiB, Translate,
@@ -13,8 +14,8 @@ use crate::{
     OwnedFrame, PageRef, PhysicalAddress, UserPage, frame,
     frame::{hhdm_offset, physical_pointer},
     mapper::{
-        MappingError, PagePermissions,
-        addrspace::{AddrSpacePageTableBackend, sealed},
+        MappingError, PagePermissions, PageTableToken,
+        pagetable::{AddrSpacePageTableBackend, sealed},
     },
 };
 
@@ -42,6 +43,11 @@ impl X86_64AddrSpacePageTable {
     pub(crate) fn has_current_kernel_half(&self) -> bool {
         kernel_entries_match(self.mapper.level_4_table())
     }
+
+    #[cfg(feature = "kernel-test")]
+    pub(crate) fn is_active(&self) -> bool {
+        Cr3::read().0.start_address().as_u64() == self.root_address().as_u64()
+    }
 }
 
 impl sealed::Sealed for X86_64AddrSpacePageTable {}
@@ -64,6 +70,24 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
 
     fn root_address(&self) -> PhysicalAddress {
         self.root.start_address()
+    }
+
+    unsafe fn activate(&self) -> PageTableToken {
+        let (previous, flags) = Cr3::read();
+        let root = PhysFrame::containing_address(PhysAddr::new(self.root_address().as_u64()));
+        // SAFETY: The caller keeps the complete hierarchy rooted at `root` alive while active.
+        unsafe { Cr3::write(root, flags) };
+        PageTableToken {
+            root: PhysicalAddress::new(previous.start_address().as_u64()).unwrap(),
+            flags: flags.bits(),
+        }
+    }
+
+    unsafe fn restore(token: PageTableToken) {
+        let root = PhysFrame::containing_address(PhysAddr::new(token.root.as_u64()));
+        let flags = Cr3Flags::from_bits_truncate(token.flags);
+        // SAFETY: The caller guarantees the saved hierarchy remains alive.
+        unsafe { Cr3::write(root, flags) };
     }
 
     fn map_user_page(

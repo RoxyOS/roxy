@@ -5,7 +5,7 @@ mod types;
 
 use alloc::collections::BTreeMap;
 
-use roxy_memory::{AddrSpacePageTable, PageRef, PhysicalAddress, UserPage};
+use roxy_memory::{AddrSpacePageTable, PageRef, PageTableToken, PhysicalAddress, UserPage};
 
 pub use types::{Permissions, VmError};
 
@@ -37,12 +37,37 @@ impl AddrSpace {
         matches!(self.pages.get(&page), Some(PageState::Mapped { .. }))
     }
 
+    /// Activates this address space until the returned guard is dropped.
+    #[must_use]
+    pub fn activate(&self) -> AddrSpaceGuard<'_> {
+        // SAFETY: The guard borrows this address space and restores the previous table in Drop.
+        let previous = unsafe { self.page_table.activate() };
+        AddrSpaceGuard {
+            _addrspace: self,
+            previous: Some(previous),
+        }
+    }
+
     #[must_use]
     pub fn permissions(&self, page: UserPage) -> Option<Permissions> {
         let PageState::Mapped { permissions, .. } = self.pages.get(&page)? else {
             return None;
         };
         Some(*permissions)
+    }
+}
+
+/// Restores the previously active page table when it leaves scope.
+pub struct AddrSpaceGuard<'a> {
+    _addrspace: &'a AddrSpace,
+    previous: Option<PageTableToken>,
+}
+
+impl Drop for AddrSpaceGuard<'_> {
+    fn drop(&mut self) {
+        let previous = self.previous.take().unwrap();
+        // SAFETY: The previously active hierarchy outlives this nested activation scope.
+        unsafe { AddrSpacePageTable::restore(previous) };
     }
 }
 

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/memory", "kernel/test", "kernel/thread", "kernel/utils", "kernel/vm"]
+members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/elf", "kernel/memory", "kernel/process", "kernel/syscall", "kernel/test", "kernel/thread", "kernel/utils", "kernel/vm"]
 
 [workspace.package]
 edition = "2024"
@@ -15,6 +15,7 @@ clap = { version = "4", features = ["derive"] }
 heapless = "0.9"
 limine = "0.6"
 linkme = "0.3"
+object = { version = "0.39", default-features = false, features = ["elf", "read_core"] }
 qemu-exit = "4"
 spin = { version = "0.12", default-features = false, features = ["mutex", "once", "spin_mutex"] }
 tap = "1"
@@ -26,7 +27,10 @@ xshell = "0.2"
 roxy-arch.path = "kernel/arch"
 roxy-boot.path = "kernel/boot"
 roxy-cpu.path = "kernel/cpu"
+roxy-elf.path = "kernel/elf"
 roxy-memory.path = "kernel/memory"
+roxy-process.path = "kernel/process"
+roxy-syscall.path = "kernel/syscall"
 roxy-test.path = "kernel/test"
 roxy-thread.path = "kernel/thread"
 roxy-utils.path = "kernel/utils"

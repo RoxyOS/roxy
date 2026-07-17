@@ -18,7 +18,7 @@ use mapper::{CurrentKernelPageTableBackend, KernelPageTableBackend};
 
 pub use address::{PAGE_SIZE, PhysicalAddress, UserAddress, UserPage, VirtualAddress};
 pub use frame::{FrameAccessError, OwnedFrame, PageRef};
-pub use mapper::{AddrSpacePageTable, MappingError, PagePermissions};
+pub use mapper::{AddrSpacePageTable, MappingError, PagePermissions, PageTableToken};
 pub use stats::MemoryStats;
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);

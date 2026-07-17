@@ -38,6 +38,26 @@ impl Architecture for X86_64 {
         ::x86_64::instructions::interrupts::enable();
     }
 
+    unsafe fn enter_user(
+        user_instruction_pointer: u64,
+        user_stack_pointer: u64,
+        kernel_stack_top: u64,
+    ) -> ! {
+        // SAFETY: The caller guarantees valid user mappings and the backend supplies valid selectors.
+        unsafe {
+            init::enter_user(
+                user_instruction_pointer,
+                user_stack_pointer,
+                kernel_stack_top,
+            )
+        }
+    }
+
+    unsafe fn configure_syscall(entry: u64) {
+        // SAFETY: The caller guarantees a permanent syscall-compatible entry point.
+        unsafe { init::configure_syscall(entry) };
+    }
+
     fn halt() {
         ::x86_64::instructions::hlt();
     }

@@ -17,7 +17,7 @@ impl AddrSpace {
             let PageState::Mapped { frame, .. } = state else {
                 return Err(VmError::NotMapped);
             };
-            // SAFETY: AddrSpace has no activation API and exclusively owns every leaf frame.
+            // SAFETY: AddrSpace exclusively owns every leaf frame and this is a shared read.
             unsafe { frame.read(offset, &mut output[source.clone()]) }
                 .map_err(|_| VmError::MappingFailed)
         })
@@ -35,7 +35,7 @@ impl AddrSpace {
             let PageState::Mapped { frame, .. } = state else {
                 return Err(VmError::NotMapped);
             };
-            // SAFETY: AddrSpace has no activation API and exclusively owns every leaf frame.
+            // SAFETY: AddrSpace is mutably borrowed and exclusively owns every leaf frame.
             unsafe { frame.write(offset, &input[source]) }.map_err(|_| VmError::MappingFailed)
         })
     }
