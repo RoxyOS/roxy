@@ -1,4 +1,4 @@
-use roxy_arch::{Architecture, CpuId, CurrentArchitecture};
+use roxy_arch::{Architecture, CpuId, CurrentArchitectureBackend};
 use spin::Once;
 
 pub struct CpuLocal<T> {
@@ -17,7 +17,7 @@ impl<T> CpuLocal<T> {
     ///
     /// Panics outside the BSP or when the slot was already initialized.
     pub fn initialize_current(&self, value: T) {
-        assert_eq!(CurrentArchitecture::current_cpu_id(), CpuId::BSP);
+        assert_eq!(CurrentArchitectureBackend::current_cpu_id(), CpuId::BSP);
         assert!(
             !self.bsp.is_completed(),
             "CPU-local value initialized twice"
@@ -32,7 +32,7 @@ impl<T> CpuLocal<T> {
     /// Panics outside the BSP or before the slot is initialized.
     #[must_use]
     pub fn get(&self) -> &T {
-        assert_eq!(CurrentArchitecture::current_cpu_id(), CpuId::BSP);
+        assert_eq!(CurrentArchitectureBackend::current_cpu_id(), CpuId::BSP);
         self.bsp.get().unwrap()
     }
 }

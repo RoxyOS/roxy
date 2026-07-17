@@ -1,4 +1,4 @@
-use roxy_arch::{Architecture, CurrentArchitecture, ExceptionContext};
+use roxy_arch::{Architecture, CurrentArchitectureBackend, ExceptionContext};
 
 use crate::e_println;
 
@@ -15,5 +15,5 @@ pub(crate) fn handler(context: &ExceptionContext) -> ! {
         context.fault_address,
         context.cpu_id
     );
-    CurrentArchitecture::halt_forever()
+    CurrentArchitectureBackend::halt_forever()
 }

@@ -3,7 +3,7 @@ use x2apic::lapic::{LocalApic, LocalApicBuilder};
 
 use crate::CpuLocal;
 
-use super::{CpuArchitecture, sealed};
+use super::{CpuBackend, sealed};
 
 const TIMER_VECTOR: usize = 0xf0;
 const ERROR_VECTOR: usize = 0xfe;
@@ -22,7 +22,7 @@ unsafe impl Send for X2Apic {}
 
 impl sealed::Sealed for X86_64Cpu {}
 
-impl CpuArchitecture for X86_64Cpu {
+impl CpuBackend for X86_64Cpu {
     fn initialize() -> u32 {
         let mut builder = LocalApicBuilder::new();
         builder

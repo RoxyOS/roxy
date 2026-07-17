@@ -5,6 +5,7 @@ mod arch;
 mod cpuid;
 
 pub use arch::{
-    Architecture, CurrentArchitecture, ExceptionContext, ExceptionHandler, ExceptionVector, X86_64,
+    Architecture, CurrentArchitectureBackend, ExceptionContext, ExceptionHandler, ExceptionVector,
+    X86_64,
 };
 pub use cpuid::CpuId;

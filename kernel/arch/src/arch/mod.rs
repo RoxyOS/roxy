@@ -1,10 +1,13 @@
+#[cfg(target_arch = "x86_64")]
 mod x86_64;
 
 use crate::CpuId;
 
+#[cfg(target_arch = "x86_64")]
 pub use self::x86_64::X86_64;
 
-pub type CurrentArchitecture = X86_64;
+#[cfg(target_arch = "x86_64")]
+pub type CurrentArchitectureBackend = X86_64;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ExceptionVector {

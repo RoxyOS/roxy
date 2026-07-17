@@ -12,9 +12,9 @@ pub(crate) fn run() -> ! {
     s_println!("==> Running {} kernel tests", roxy_test::TESTS.len());
 
     for test in roxy_test::TESTS {
-        s_println!("[ RUN      ] {}", test.name());
-        test.run();
-        s_println!("[       OK ] {}", test.name());
+        s_println!("[ RUN      ] {}", test.name);
+        (test.run)();
+        s_println!("[       OK ] {}", test.name);
     }
 
     s_println!("==> Kernel tests passed: {}", roxy_test::TESTS.len());
@@ -35,11 +35,13 @@ mod tests {
         {
             let cpu = roxy_cpu::current_cpu();
             let memory = roxy_memory::statistics();
+            let addrspace = roxy_vm::AddrSpace::new().unwrap();
 
             assert_eq!(cpu.id(), CpuId::BSP);
             assert!(memory.total_frames > 0);
             assert!(memory.heap_total_bytes > 0);
             assert!(memory.allocated_frames <= memory.total_frames);
+            assert!(addrspace.root_address().as_u64() > 0);
         }
     );
 }

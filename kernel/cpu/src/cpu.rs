@@ -1,10 +1,10 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use roxy_arch::{Architecture, CpuId, CurrentArchitecture};
+use roxy_arch::{Architecture, CpuId, CurrentArchitectureBackend};
 
 use crate::{
     CpuLocal,
-    arch::{CpuArchitecture, CurrentCpuArchitecture},
+    arch::{CpuBackend, CurrentCpuBackend},
 };
 
 static CPU_STATE: CpuLocal<CpuState> = CpuLocal::new();
@@ -37,7 +37,7 @@ impl Cpu {
     pub fn initialize(self) {
         self.assert_current();
 
-        let hardware_id = CurrentCpuArchitecture::initialize();
+        let hardware_id = CurrentCpuBackend::initialize();
         CPU_STATE.initialize_current(CpuState::new(hardware_id));
     }
 
@@ -61,14 +61,14 @@ impl Cpu {
     }
 
     fn assert_current(self) {
-        assert_eq!(self.id, CurrentArchitecture::current_cpu_id());
+        assert_eq!(self.id, CurrentArchitectureBackend::current_cpu_id());
     }
 }
 
 #[must_use]
 pub fn current_cpu() -> Cpu {
     Cpu {
-        id: CurrentArchitecture::current_cpu_id(),
+        id: CurrentArchitectureBackend::current_cpu_id(),
     }
 }
 

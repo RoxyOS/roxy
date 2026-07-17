@@ -10,7 +10,7 @@ mod test;
 
 use core::{alloc::Layout, panic::PanicInfo};
 
-use roxy_arch::{Architecture, CurrentArchitecture};
+use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_boot::BootInfo;
 
 #[unsafe(no_mangle)]
@@ -21,7 +21,7 @@ pub extern "C" fn _start() -> ! {
 
     let boot_info = BootInfo::parse();
 
-    CurrentArchitecture::initialize(exception::handler);
+    CurrentArchitectureBackend::initialize(exception::handler);
     roxy_memory::initialize(&boot_info);
     roxy_cpu::current_cpu().initialize();
 
@@ -46,13 +46,13 @@ fn panic(info: &PanicInfo<'_>) -> ! {
     test::exit_failure();
 
     #[cfg(not(feature = "kernel-test"))]
-    CurrentArchitecture::halt_forever()
+    CurrentArchitectureBackend::halt_forever()
 }
 
 #[alloc_error_handler]
 fn allocation_error(layout: Layout) -> ! {
     let stats = roxy_memory::statistics();
-    let cpu = CurrentArchitecture::current_cpu_id();
+    let cpu = CurrentArchitectureBackend::current_cpu_id();
 
     e_println!(
         "Kernel heap OOM: size={}, align={}, cpu={}, stats={stats:?}, process/thread=unavailable",
