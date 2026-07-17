@@ -25,5 +25,7 @@ SECTIONS {
         *(.bss .bss.* COMMON)
         __bss_end = .;
     } :data
+    . = ALIGN(4096);
+    __kernel_end = .;
     /DISCARD/ : { *(.eh_frame*) *(.note*) }
 }

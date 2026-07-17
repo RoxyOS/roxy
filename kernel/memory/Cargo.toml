@@ -1,27 +1,18 @@
 [package]
-name = "roxy-kernel"
+name = "roxy-memory"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
-[features]
-kernel = []
-
-[[bin]]
-name = "roxy-kernel"
-path = "src/main.rs"
-test = false
-bench = false
-required-features = ["kernel"]
-
 [dependencies]
+bitflags.workspace = true
+buddy_system_allocator.workspace = true
 spin.workspace = true
-uart_16550.workspace = true
+x86_64.workspace = true
 
 roxy-arch.workspace = true
 roxy-boot.workspace = true
-roxy-memory.workspace = true
 
 [lints]
 workspace = true

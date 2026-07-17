@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core"]
+members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/memory"]
 
 [workspace.package]
 edition = "2024"
@@ -9,6 +9,8 @@ publish = false
 
 [workspace.dependencies]
 anyhow = "1"
+bitflags = "2"
+buddy_system_allocator = { version = "0.13", default-features = false, features = ["alloc"] }
 clap = { version = "4", features = ["derive"] }
 heapless = "0.9"
 limine = "0.6"
@@ -20,6 +22,7 @@ xshell = "0.2"
 
 roxy-arch.path = "kernel/arch"
 roxy-boot.path = "kernel/boot"
+roxy-memory.path = "kernel/memory"
 
 [profile.dev]
 panic = "abort"

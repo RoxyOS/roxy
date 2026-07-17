@@ -10,11 +10,11 @@ use roxy_arch::CpuId;
 
 pub use loader::{Bootloader, CurrentLoader, Limine};
 
-const MAX_FRAMEBUFFERS: usize = 8;
-const MAX_MEMORY_REGIONS: usize = 256;
+pub const MAX_FRAMEBUFFERS: usize = 8;
+pub const MAX_MEMORY_REGIONS: usize = 256;
 
-#[derive(Clone, Copy, Debug)]
-enum MemoryRegionKind {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MemoryRegionKind {
     Usable,
     Reserved,
     AcpiReclaimable,
@@ -45,37 +45,37 @@ impl fmt::Display for MemoryRegionKind {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct MemoryRegion {
-    base: u64,
-    length: u64,
-    kind: MemoryRegionKind,
+pub struct MemoryRegion {
+    pub base: u64,
+    pub length: u64,
+    pub kind: MemoryRegionKind,
 }
 
 #[derive(Clone, Copy, Debug)]
-struct KernelAddressInfo {
-    physical_base: u64,
-    virtual_base: u64,
+pub struct KernelAddressInfo {
+    pub physical_base: u64,
+    pub virtual_base: u64,
 }
 
 #[derive(Clone, Copy, Debug)]
-struct FramebufferInfo {
-    address: u64,
-    width: u64,
-    height: u64,
-    pitch: u64,
-    bits_per_pixel: u16,
+pub struct FramebufferInfo {
+    pub address: u64,
+    pub width: u64,
+    pub height: u64,
+    pub pitch: u64,
+    pub bits_per_pixel: u16,
 }
 
 pub struct BootInfo {
-    memory_regions: Vec<MemoryRegion, MAX_MEMORY_REGIONS>,
-    framebuffers: Vec<FramebufferInfo, MAX_FRAMEBUFFERS>,
-    hhdm_offset: u64,
-    kernel_address: KernelAddressInfo,
-    rsdp_address: u64,
-    command_line: String<256>,
-    bootloader_name: String<64>,
-    bootloader_version: String<64>,
-    bsp: CpuId,
+    pub memory_regions: Vec<MemoryRegion, MAX_MEMORY_REGIONS>,
+    pub framebuffers: Vec<FramebufferInfo, MAX_FRAMEBUFFERS>,
+    pub hhdm_offset: u64,
+    pub kernel_address: KernelAddressInfo,
+    pub rsdp_address: u64,
+    pub command_line: String<256>,
+    pub bootloader_name: String<64>,
+    pub bootloader_version: String<64>,
+    pub bsp: CpuId,
 }
 
 impl BootInfo {

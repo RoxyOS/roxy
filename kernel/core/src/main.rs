@@ -1,11 +1,12 @@
 #![no_std]
 #![no_main]
+#![feature(alloc_error_handler)]
 
 mod exception;
 mod misc;
 mod serial;
 
-use core::panic::PanicInfo;
+use core::{alloc::Layout, panic::PanicInfo};
 
 use roxy_arch::{Architecture, CurrentArchitecture};
 use roxy_boot::BootInfo;
@@ -19,6 +20,7 @@ pub extern "C" fn _start() -> ! {
     let boot_info = BootInfo::parse();
 
     CurrentArchitecture::initialize(exception::handler);
+    roxy_memory::initialize(&boot_info);
 
     kernel_main(boot_info)
 }
@@ -32,4 +34,18 @@ fn kernel_main(_boot_info: BootInfo) -> ! {
 fn panic(info: &PanicInfo<'_>) -> ! {
     e_println!("Kernel Panic: {info}");
     CurrentArchitecture::halt_forever()
+}
+
+#[alloc_error_handler]
+fn allocation_error(layout: Layout) -> ! {
+    let stats = roxy_memory::statistics();
+    let cpu = CurrentArchitecture::current_cpu_id();
+
+    e_println!(
+        "Kernel heap OOM: size={}, align={}, cpu={}, stats={stats:?}, process/thread=unavailable",
+        layout.size(),
+        layout.align(),
+        cpu,
+    );
+    panic!("kernel heap exhausted")
 }

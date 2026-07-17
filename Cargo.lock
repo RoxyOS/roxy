@@ -71,6 +71,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 
 [[package]]
+name = "buddy_system_allocator"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1af5a01adeeade54c9f5060300227a8ee64c05b6376f28e9b8ee3b72dd2056f"
+
+[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -213,8 +219,21 @@ version = "0.1.0"
 dependencies = [
  "roxy-arch",
  "roxy-boot",
+ "roxy-memory",
  "spin",
  "uart_16550",
+]
+
+[[package]]
+name = "roxy-memory"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "buddy_system_allocator",
+ "roxy-arch",
+ "roxy-boot",
+ "spin",
+ "x86_64",
 ]
 
 [[package]]
