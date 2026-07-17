@@ -1,15 +1,14 @@
 #![no_std]
 #![no_main]
 
-mod bootinfo;
 mod exception;
 mod misc;
 mod serial;
 
 use core::panic::PanicInfo;
 
-use bootinfo::BootInfo;
 use roxy_arch::{Architecture, CurrentArchitecture};
+use roxy_boot::BootInfo;
 
 #[unsafe(no_mangle)]
 #[allow(clippy::missing_panics_doc)]
@@ -17,7 +16,7 @@ pub extern "C" fn _start() -> ! {
     misc::clear_bss();
     serial::initialize();
 
-    let boot_info = BootInfo::from_limine();
+    let boot_info = BootInfo::parse();
 
     CurrentArchitecture::initialize(exception::handler);
 

@@ -9,7 +9,8 @@ use limine::{
 };
 use roxy_arch::CpuId;
 
-use super::{
+use super::{Bootloader, sealed};
+use crate::{
     BootInfo, FramebufferInfo, KernelAddressInfo, MAX_FRAMEBUFFERS, MAX_MEMORY_REGIONS,
     MemoryRegion, MemoryRegionKind,
 };
@@ -51,8 +52,12 @@ static RSDP: RsdpRequest = RsdpRequest::new();
 #[unsafe(link_section = ".limine_requests_end")]
 static REQUESTS_END: RequestsEndMarker = RequestsEndMarker::new();
 
-impl BootInfo {
-    pub(crate) fn from_limine() -> Self {
+pub struct Limine;
+
+impl sealed::Sealed for Limine {}
+
+impl Bootloader for Limine {
+    fn parse() -> BootInfo {
         validate_environment();
         load_boot_info()
     }
@@ -74,12 +79,12 @@ fn load_boot_info() -> BootInfo {
     BootInfo {
         memory_regions: memory_regions(),
         framebuffers: framebuffers(),
-        hhdm_offset: hhdm_offset(),
+        hhdm_offset: HHDM.response().unwrap().offset,
         kernel_address: KernelAddressInfo {
             physical_base: address.physical_base,
             virtual_base: address.virtual_base,
         },
-        rsdp_address: rsdp_address(),
+        rsdp_address: RSDP.response().unwrap().address as u64,
         command_line: copy_string(CMDLINE.response().unwrap().cmdline()),
         bootloader_name: copy_string(loader.name()),
         bootloader_version: copy_string(loader.version()),
@@ -88,47 +93,35 @@ fn load_boot_info() -> BootInfo {
 }
 
 fn memory_regions() -> Vec<MemoryRegion, MAX_MEMORY_REGIONS> {
-    let entries = MEMMAP.response().unwrap().entries();
-    let mut regions = Vec::new();
-
-    for entry in entries {
-        regions
-            .push(MemoryRegion {
-                base: entry.base,
-                length: entry.length,
-                kind: map_memory_kind(entry.type_),
-            })
-            .unwrap();
-    }
-
-    regions
+    MEMMAP
+        .response()
+        .unwrap()
+        .entries()
+        .iter()
+        .map(|entry| MemoryRegion {
+            base: entry.base,
+            length: entry.length,
+            kind: map_memory_kind(entry.type_),
+        })
+        .collect()
 }
 
 fn framebuffers() -> Vec<FramebufferInfo, MAX_FRAMEBUFFERS> {
-    let entries = FRAMEBUFFER.response().unwrap().framebuffers();
-    let mut framebuffers = Vec::new();
-
-    for framebuffer in entries {
-        framebuffers
-            .push(FramebufferInfo {
-                address: framebuffer.address() as u64,
-                width: framebuffer.width,
-                height: framebuffer.height,
-                pitch: framebuffer.pitch,
-                bits_per_pixel: framebuffer.bpp,
-            })
-            .unwrap();
-    }
+    let framebuffers: Vec<FramebufferInfo, MAX_FRAMEBUFFERS> = FRAMEBUFFER
+        .response()
+        .unwrap()
+        .framebuffers()
+        .iter()
+        .map(|framebuffer| FramebufferInfo {
+            address: framebuffer.address() as u64,
+            width: framebuffer.width,
+            height: framebuffer.height,
+            pitch: framebuffer.pitch,
+            bits_per_pixel: framebuffer.bpp,
+        })
+        .collect();
 
     (!framebuffers.is_empty()).then_some(framebuffers).unwrap()
-}
-
-fn hhdm_offset() -> u64 {
-    HHDM.response().unwrap().offset
-}
-
-fn rsdp_address() -> u64 {
-    RSDP.response().unwrap().address as u64
 }
 
 fn copy_string<const SIZE: usize>(value: &str) -> String<SIZE> {

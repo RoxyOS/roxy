@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/core"]
+members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core"]
 
 [workspace.package]
 edition = "2024"
@@ -12,12 +12,14 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 heapless = "0.9"
 limine = "0.6"
-roxy-arch.path = "kernel/arch"
 spin = { version = "0.12", default-features = false, features = ["mutex", "once", "spin_mutex"] }
 tap = "1"
 uart_16550 = "0.6"
 x86_64 = { version = "0.15", features = ["abi_x86_interrupt"] }
 xshell = "0.2"
+
+roxy-arch.path = "kernel/arch"
+roxy-boot.path = "kernel/boot"
 
 [profile.dev]
 panic = "abort"

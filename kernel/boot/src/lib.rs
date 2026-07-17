@@ -1,11 +1,14 @@
+#![no_std]
 #![allow(dead_code)]
 
-mod limine;
+mod loader;
 
 use core::fmt;
 
 use heapless::{String, Vec};
 use roxy_arch::CpuId;
+
+pub use loader::{Bootloader, CurrentLoader, Limine};
 
 const MAX_FRAMEBUFFERS: usize = 8;
 const MAX_MEMORY_REGIONS: usize = 256;
@@ -63,7 +66,7 @@ struct FramebufferInfo {
     bits_per_pixel: u16,
 }
 
-pub(crate) struct BootInfo {
+pub struct BootInfo {
     memory_regions: Vec<MemoryRegion, MAX_MEMORY_REGIONS>,
     framebuffers: Vec<FramebufferInfo, MAX_FRAMEBUFFERS>,
     hhdm_offset: u64,
@@ -73,4 +76,11 @@ pub(crate) struct BootInfo {
     bootloader_name: String<64>,
     bootloader_version: String<64>,
     bsp: CpuId,
+}
+
+impl BootInfo {
+    #[must_use]
+    pub fn parse() -> Self {
+        CurrentLoader::parse()
+    }
 }

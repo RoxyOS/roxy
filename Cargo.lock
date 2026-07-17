@@ -199,12 +199,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "roxy-kernel"
+name = "roxy-boot"
 version = "0.1.0"
 dependencies = [
  "heapless",
  "limine",
  "roxy-arch",
+]
+
+[[package]]
+name = "roxy-kernel"
+version = "0.1.0"
+dependencies = [
+ "roxy-arch",
+ "roxy-boot",
  "spin",
  "uart_16550",
 ]

@@ -16,12 +16,11 @@ bench = false
 required-features = ["kernel"]
 
 [dependencies]
-heapless.workspace = true
-limine.workspace = true
 spin.workspace = true
 uart_16550.workspace = true
 
 roxy-arch.workspace = true
+roxy-boot.workspace = true
 
 [lints]
 workspace = true
