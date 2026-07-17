@@ -21,6 +21,7 @@ uart_16550.workspace = true
 
 roxy-arch.workspace = true
 roxy-boot.workspace = true
+roxy-cpu.workspace = true
 roxy-memory.workspace = true
 
 [lints]

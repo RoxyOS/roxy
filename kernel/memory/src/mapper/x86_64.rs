@@ -8,7 +8,10 @@ use x86_64::{
     },
 };
 
-use crate::{PhysicalAddress, VirtualAddress, address::PAGE_SIZE, frame};
+use crate::{
+    OwnedFrame, VirtualAddress, frame,
+    tlb::{self, TlbInvalidation},
+};
 
 use super::{Mapper, MappingFlags, sealed};
 
@@ -32,7 +35,7 @@ impl Mapper for X86_64Mapper {
         mapper.mapper.translate_page(page).is_ok()
     }
 
-    fn map_page(address: VirtualAddress, frame: PhysicalAddress, flags: MappingFlags) {
+    fn map_page(address: VirtualAddress, frame: OwnedFrame, flags: MappingFlags) {
         MAPPER.get().unwrap().lock().map_page(address, frame, flags);
     }
 }
@@ -52,23 +55,27 @@ impl X86_64Mapper {
         Self { mapper }
     }
 
-    fn map_page(&mut self, address: VirtualAddress, frame: PhysicalAddress, flags: MappingFlags) {
+    fn map_page(&mut self, address: VirtualAddress, frame: OwnedFrame, flags: MappingFlags) {
         let page = Page::<Size4KiB>::containing_address(VirtAddr::new(address.as_u64()));
         assert!(
             self.mapper.translate_page(page).is_err(),
             "virtual page is already mapped"
         );
 
-        let frame = PhysFrame::containing_address(::x86_64::PhysAddr::new(frame.as_u64()));
+        let physical_address = frame.start_address();
+        let physical_frame =
+            PhysFrame::containing_address(::x86_64::PhysAddr::new(physical_address.as_u64()));
         let flags = page_table_flags(flags);
 
         // SAFETY: The page is unmapped and the caller transfers unique ownership of the frame.
-        unsafe {
+        let flush = unsafe {
             self.mapper
-                .map_to(page, frame, flags, &mut PageTableAllocator)
+                .map_to(page, physical_frame, flags, &mut PageTableAllocator)
         }
-        .unwrap()
-        .flush();
+        .unwrap();
+        frame.transfer_to_mapping();
+        flush.ignore();
+        tlb::invalidate(TlbInvalidation::Page(address));
     }
 }
 
@@ -94,10 +101,11 @@ struct PageTableAllocator;
 // SAFETY: Every returned frame is uniquely allocated and suitable for a 4 KiB page table.
 unsafe impl FrameAllocator<Size4KiB> for PageTableAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
-        let frame = frame::allocate_raw()?;
-        let address = u64::try_from(frame).ok()?.checked_mul(PAGE_SIZE)?;
+        let frame = frame::allocate()?;
+        let address = frame.start_address();
+        frame.transfer_to_mapping();
         Some(PhysFrame::containing_address(::x86_64::PhysAddr::new(
-            address,
+            address.as_u64(),
         )))
     }
 }

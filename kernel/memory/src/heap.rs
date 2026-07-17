@@ -149,8 +149,7 @@ fn assert_guard_pages(start: VirtualAddress) {
 
 fn map_heap_page(address: VirtualAddress) {
     let frame = frame::allocate().unwrap();
-    CurrentMapper::map_page(address, frame.start_address(), MappingFlags::WRITABLE);
-    frame.transfer_to_mapping();
+    CurrentMapper::map_page(address, frame, MappingFlags::WRITABLE);
 
     let pointer = usize::try_from(address.as_u64()).unwrap() as *mut u8;
     // SAFETY: The mapper created an exclusively owned writable page at this address.

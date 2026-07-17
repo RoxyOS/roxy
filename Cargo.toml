@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/memory"]
+members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/memory"]
 
 [workspace.package]
 edition = "2024"
@@ -18,10 +18,12 @@ spin = { version = "0.12", default-features = false, features = ["mutex", "once"
 tap = "1"
 uart_16550 = "0.6"
 x86_64 = { version = "0.15", features = ["abi_x86_interrupt"] }
+x2apic = "0.5"
 xshell = "0.2"
 
 roxy-arch.path = "kernel/arch"
 roxy-boot.path = "kernel/boot"
+roxy-cpu.path = "kernel/cpu"
 roxy-memory.path = "kernel/memory"
 
 [profile.dev]

@@ -1,0 +1,15 @@
+[package]
+name = "roxy-cpu"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+spin.workspace = true
+x2apic.workspace = true
+
+roxy-arch.workspace = true
+
+[lints]
+workspace = true

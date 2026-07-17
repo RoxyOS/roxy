@@ -21,6 +21,7 @@ pub extern "C" fn _start() -> ! {
 
     CurrentArchitecture::initialize(exception::handler);
     roxy_memory::initialize(&boot_info);
+    roxy_cpu::current_cpu().initialize();
 
     kernel_main(boot_info)
 }

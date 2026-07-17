@@ -1,6 +1,6 @@
 mod x86_64;
 
-use crate::{PhysicalAddress, VirtualAddress};
+use crate::{OwnedFrame, VirtualAddress};
 
 pub(crate) use self::x86_64::X86_64Mapper;
 
@@ -11,7 +11,7 @@ pub(crate) trait Mapper: sealed::Sealed {
 
     fn is_mapped(address: VirtualAddress) -> bool;
 
-    fn map_page(address: VirtualAddress, frame: PhysicalAddress, flags: MappingFlags);
+    fn map_page(address: VirtualAddress, frame: OwnedFrame, flags: MappingFlags);
 }
 
 bitflags::bitflags! {

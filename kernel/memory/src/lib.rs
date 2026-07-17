@@ -8,6 +8,7 @@ mod heap;
 mod mapper;
 mod memory_map;
 mod stats;
+pub mod tlb;
 
 use core::sync::atomic::{AtomicBool, Ordering};
 
