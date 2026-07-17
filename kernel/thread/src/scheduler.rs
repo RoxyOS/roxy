@@ -52,10 +52,12 @@ impl Scheduler {
     /// thread's kernel stack. `None` means no distinct runnable successor exists.
     fn next_contexts(&mut self) -> Option<(*mut SavedContext, *const SavedContext)> {
         self.reap_pending();
+
         let current = self.current?;
         if self.threads.len() < 2 {
             return None;
         }
+
         let next = ThreadIndex((current.0 + 1) % self.threads.len());
         let previous_context = ptr::from_mut(self.current_thread()?.context());
         let next_context = ptr::from_mut(self.thread_from_index(next).context());
@@ -70,6 +72,7 @@ impl Scheduler {
     /// at the next scheduler entry.
     fn exit_contexts(&mut self) -> (*mut SavedContext, *const SavedContext) {
         self.reap_pending();
+
         let current = self.current.expect("no current thread");
         let next =
             (self.threads.len() > 1).then(|| ThreadIndex((current.0 + 1) % self.threads.len()));
@@ -85,6 +88,7 @@ impl Scheduler {
                     .expect("scheduler not started"),
             ),
         };
+
         (previous, next)
     }
 
@@ -182,9 +186,11 @@ pub fn on_timer_interrupt() {
     if preemption::is_disabled() {
         return;
     }
+
     let Some((previous, next)) = SCHEDULER.lock().next_contexts() else {
         return;
     };
+
     // SAFETY: The scheduler owns both live contexts and holds no lock across the switch.
     unsafe { SavedContext::switch(previous, next) };
 }

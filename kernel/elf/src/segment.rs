@@ -39,6 +39,7 @@ impl SegmentMapping<'_> {
         if size == 0 {
             return Ok(None);
         }
+
         let address = UserAddress::new(address).ok_or(ElfError::InvalidSegment)?;
         let last = address
             .checked_add(size.checked_sub(1).ok_or(ElfError::InvalidSegment)?)
@@ -76,6 +77,7 @@ pub(super) fn segment_flags(flags: SegmentFlags) -> Result<LoadFlags, ElfError> 
     let SegmentFlags::Elf { p_flags } = flags else {
         return Err(ElfError::UnsupportedFormat);
     };
+
     let flags = LoadFlags {
         writable: p_flags & PF_W != 0,
         executable: p_flags & PF_X != 0,
@@ -83,6 +85,7 @@ pub(super) fn segment_flags(flags: SegmentFlags) -> Result<LoadFlags, ElfError> 
     if flags.writable && flags.executable {
         return Err(ElfError::WritableExecutableSegment);
     }
+
     Ok(flags)
 }
 

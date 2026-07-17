@@ -15,8 +15,10 @@ impl Process {
             roxy_elf::ElfError::OutOfMemory => ProcessError::OutOfMemory,
             _ => ProcessError::InvalidElf,
         })?;
+
         let stack = addrspace.map_stack().map_err(process_vm_error)?;
         let main_thread = Thread::new_user(loaded.entry, stack.top).map_err(thread_error)?;
+
         Ok(Self {
             _addrspace: addrspace,
             _main_thread: main_thread,

@@ -83,6 +83,7 @@ pub(super) unsafe fn enter_user(
     let tss = TSS.get().expect("architecture not initialized");
     // SAFETY: interrupts are disabled on the single supported CPU, so no concurrent TSS access exists.
     unsafe { (*tss.0.get()).privilege_stack_table[0] = VirtAddr::new(kernel_stack_top) };
+
     let selectors = &GDT.get().expect("architecture not initialized").1;
     // SAFETY: initialization installed these ring-3 descriptors and the caller validates mappings.
     unsafe {
@@ -99,6 +100,7 @@ pub(super) unsafe fn configure_syscall(entry: u64) {
     let selectors = &GDT.get().expect("architecture not initialized").1;
     // SAFETY: architecture initialization established long mode and the configured entry is valid.
     unsafe { Efer::update(|flags| flags.insert(EferFlags::SYSTEM_CALL_EXTENSIONS)) };
+
     Star::write(
         selectors.user_code,
         selectors.user_data,

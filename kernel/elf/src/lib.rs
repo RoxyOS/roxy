@@ -45,6 +45,7 @@ pub fn load(addrspace: &mut AddrSpace, image: &[u8]) -> Result<LoadedElf, ElfErr
     mappings
         .try_reserve(file.elf_program_headers().len())
         .map_err(|_| ElfError::OutOfMemory)?;
+
     let mut executable_entry = false;
     for segment in file.segments() {
         let flags = segment_flags(segment.flags())?;
@@ -52,23 +53,29 @@ pub fn load(addrspace: &mut AddrSpace, image: &[u8]) -> Result<LoadedElf, ElfErr
         else {
             continue;
         };
+
         mapping.data = segment.data().map_err(|_| ElfError::InvalidSegment)?;
         if mapping.data.len() > mapping.memory_size {
             return Err(ElfError::InvalidSegment);
         }
+
         if mappings.iter().any(|existing| mapping.overlaps(existing)) {
             return Err(ElfError::OverlappingSegments);
         }
+
         executable_entry |= mapping.contains(file.entry()) && flags.executable;
         mappings.push(mapping);
     }
+
     let entry = UserAddress::new(file.entry()).ok_or(ElfError::InvalidEntry)?;
     if !executable_entry {
         return Err(ElfError::InvalidEntry);
     }
+
     for mapping in &mappings {
         map_segment(addrspace, mapping)?;
     }
+
     Ok(LoadedElf { entry })
 }
 
@@ -79,15 +86,18 @@ fn validate_file(file: &ElfFile64<'_>) -> Result<(), ElfError> {
     {
         return Err(ElfError::UnsupportedFormat);
     }
+
     if file.section_by_name(".interp").is_some() || file.section_by_name(".dynamic").is_some() {
         return Err(ElfError::UnsupportedFormat);
     }
+
     if file
         .sections()
         .any(|section| section.relocations().next().is_some())
     {
         return Err(ElfError::UnsupportedFormat);
     }
+
     for header in file.elf_program_headers() {
         if matches!(
             header.p_type(file.endian()),
@@ -95,10 +105,12 @@ fn validate_file(file: &ElfFile64<'_>) -> Result<(), ElfError> {
         ) {
             return Err(ElfError::UnsupportedFormat);
         }
+
         if header.p_filesz(file.endian()) > header.p_memsz(file.endian()) {
             return Err(ElfError::InvalidSegment);
         }
     }
+
     Ok(())
 }
 
@@ -106,6 +118,7 @@ fn map_segment(addrspace: &mut AddrSpace, mapping: &SegmentMapping<'_>) -> Resul
     addrspace
         .map_zeroed(mapping.region, mapping.flags.permissions())
         .map_err(vm_error)?;
+
     addrspace
         .write_bytes(mapping.address, mapping.data)
         .map_err(vm_error)

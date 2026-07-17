@@ -17,6 +17,7 @@ impl AddrSpace {
             let PageState::Mapped { frame, .. } = state else {
                 return Err(VmError::NotMapped);
             };
+
             // SAFETY: AddrSpace exclusively owns every leaf frame and this is a shared read.
             unsafe { frame.read(offset, &mut output[source.clone()]) }
                 .map_err(|_| VmError::MappingFailed)
@@ -35,6 +36,7 @@ impl AddrSpace {
             let PageState::Mapped { frame, .. } = state else {
                 return Err(VmError::NotMapped);
             };
+
             // SAFETY: AddrSpace is mutably borrowed and exclusively owns every leaf frame.
             unsafe { frame.write(offset, &input[source]) }.map_err(|_| VmError::MappingFailed)
         })
@@ -44,6 +46,7 @@ impl AddrSpace {
         if length == 0 {
             return Ok(());
         }
+
         let last_offset = u64::try_from(length - 1).map_err(|_| VmError::InvalidRange)?;
         address
             .checked_add(last_offset)
