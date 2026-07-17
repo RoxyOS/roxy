@@ -3,6 +3,7 @@
 extern crate alloc;
 
 mod context;
+pub mod scheduler;
 mod stack;
 mod thread;
 

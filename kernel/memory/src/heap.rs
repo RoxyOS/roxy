@@ -6,7 +6,7 @@ use core::{
 };
 
 use buddy_system_allocator::Heap;
-use spin::Mutex;
+use roxy_utils::Lock;
 
 use crate::{
     PAGE_SIZE, VirtualAddress, frame,
@@ -36,7 +36,7 @@ static BOOTSTRAP_HEAP: BootstrapCell =
 static GLOBAL_ALLOCATOR: KernelAllocator = KernelAllocator::new();
 
 struct KernelAllocator {
-    heap: Mutex<Heap<HEAP_ORDER>>,
+    heap: Lock<Heap<HEAP_ORDER>>,
     initialized: AtomicBool,
     attempts: AtomicUsize,
 }
@@ -44,7 +44,7 @@ struct KernelAllocator {
 impl KernelAllocator {
     const fn new() -> Self {
         Self {
-            heap: Mutex::new(Heap::empty()),
+            heap: Lock::new(Heap::empty()),
             initialized: AtomicBool::new(false),
             attempts: AtomicUsize::new(0),
         }

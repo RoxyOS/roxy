@@ -1,15 +1,15 @@
 mod pit;
 
-use spin::Mutex;
 use x2apic::lapic::{LocalApic, LocalApicBuilder, TimerDivide, TimerMode};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
+use roxy_utils::Lock;
 
 use crate::{CpuLocal, clock::TIMER_HZ};
 
 use super::{CpuBackend, CpuInitResult, sealed};
 
-static LOCAL_APIC: CpuLocal<Mutex<X2Apic>> = CpuLocal::new();
+static LOCAL_APIC: CpuLocal<Lock<X2Apic>> = CpuLocal::new();
 
 pub(crate) struct X86_64Cpu;
 
@@ -42,7 +42,7 @@ impl CpuBackend for X86_64Cpu {
         }
         // SAFETY: The local controller is enabled and uniquely borrowed.
         let hardware_id = unsafe { local_apic.id() };
-        LOCAL_APIC.initialize_current(Mutex::new(X2Apic { local_apic }));
+        LOCAL_APIC.initialize_current(Lock::new(X2Apic { local_apic }));
         CpuInitResult { hardware_id }
     }
 

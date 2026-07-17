@@ -1,4 +1,5 @@
-use spin::{Mutex, Once};
+use roxy_utils::Lock;
+use spin::Once;
 use x86_64::{
     VirtAddr,
     registers::control::Cr3,
@@ -15,7 +16,7 @@ use crate::{
 
 use crate::mapper::{KernelPageTableBackend, MappingFlags, sealed};
 
-static MAPPER: Once<Mutex<X86_64KernelPageTableBackend>> = Once::new();
+static MAPPER: Once<Lock<X86_64KernelPageTableBackend>> = Once::new();
 
 pub(crate) struct X86_64KernelPageTableBackend {
     mapper: OffsetPageTable<'static>,
@@ -26,7 +27,7 @@ impl sealed::Sealed for X86_64KernelPageTableBackend {}
 impl KernelPageTableBackend for X86_64KernelPageTableBackend {
     fn initialize(hhdm_offset: u64) {
         assert!(!MAPPER.is_completed(), "kernel mapper initialized twice");
-        MAPPER.call_once(|| Mutex::new(Self::from_active_table(hhdm_offset)));
+        MAPPER.call_once(|| Lock::new(Self::from_active_table(hhdm_offset)));
     }
 
     fn is_mapped(address: VirtualAddress) -> bool {

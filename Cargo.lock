@@ -277,6 +277,7 @@ dependencies = [
  "linkme",
  "roxy-arch",
  "roxy-test",
+ "roxy-utils",
  "spin",
  "x2apic",
  "x86_64",
@@ -294,6 +295,7 @@ dependencies = [
  "roxy-memory",
  "roxy-test",
  "roxy-thread",
+ "roxy-utils",
  "roxy-vm",
  "spin",
  "uart_16550",
@@ -309,6 +311,7 @@ dependencies = [
  "roxy-arch",
  "roxy-boot",
  "roxy-test",
+ "roxy-utils",
  "spin",
  "x86_64",
 ]
@@ -324,7 +327,17 @@ dependencies = [
 name = "roxy-thread"
 version = "0.1.0"
 dependencies = [
+ "roxy-arch",
  "roxy-memory",
+ "roxy-utils",
+]
+
+[[package]]
+name = "roxy-utils"
+version = "0.1.0"
+dependencies = [
+ "roxy-arch",
+ "spin",
 ]
 
 [[package]]

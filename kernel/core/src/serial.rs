@@ -1,10 +1,11 @@
 use core::fmt::{self, Write};
 
-use spin::{Mutex, Once};
+use roxy_utils::Lock;
+use spin::Once;
 use uart_16550::{Config, Uart16550Tty, backend::PioBackend};
 
 type Com1 = Uart16550Tty<PioBackend>;
-static SERIAL: Once<Mutex<Com1>> = Once::new();
+static SERIAL: Once<Lock<Com1>> = Once::new();
 
 #[macro_export]
 macro_rules! s_println {
@@ -32,7 +33,7 @@ pub(crate) fn initialize() {
         // SAFETY: COM1 is exclusively owned by this module for the kernel lifetime.
         let uart = unsafe { Com1::new_port(0x3f8, Config::default()) }
             .expect("COM1 must be a valid UART port");
-        Mutex::new(uart)
+        Lock::new(uart)
     });
 }
 

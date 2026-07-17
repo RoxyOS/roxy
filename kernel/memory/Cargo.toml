@@ -23,6 +23,7 @@ x86_64.workspace = true
 roxy-arch.workspace = true
 roxy-boot.workspace = true
 roxy-test = { workspace = true, optional = true }
+roxy-utils.workspace = true
 
 [lints]
 workspace = true

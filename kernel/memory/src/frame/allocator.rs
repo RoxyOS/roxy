@@ -4,7 +4,8 @@ use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use buddy_system_allocator::FrameAllocator;
 use roxy_boot::MemoryRegionKind;
-use spin::{Mutex, Once};
+use roxy_utils::Lock;
+use spin::Once;
 
 use crate::{PhysicalAddress, address::PAGE_SIZE, memory_map::MemoryRegion};
 
@@ -18,7 +19,7 @@ const FREED_POISON: u8 = 0xdd;
 #[cfg(not(debug_assertions))]
 const FREED_POISON: u8 = 0;
 
-static ALLOCATOR: Once<Mutex<PhysicalFrameAllocator>> = Once::new();
+static ALLOCATOR: Once<Lock<PhysicalFrameAllocator>> = Once::new();
 static HHDM_OFFSET: AtomicU64 = AtomicU64::new(0);
 static ALLOCATION_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
 
@@ -95,7 +96,7 @@ pub(crate) fn initialize(regions: &[MemoryRegion], hhdm_offset: u64) {
         "frame allocator initialized twice"
     );
     HHDM_OFFSET.store(hhdm_offset, Ordering::Release);
-    ALLOCATOR.call_once(|| Mutex::new(PhysicalFrameAllocator::from_regions(regions)));
+    ALLOCATOR.call_once(|| Lock::new(PhysicalFrameAllocator::from_regions(regions)));
 }
 
 pub(super) fn allocate() -> Option<FrameIndex> {

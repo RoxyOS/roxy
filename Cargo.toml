@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/memory", "kernel/test", "kernel/thread", "kernel/vm"]
+members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/memory", "kernel/test", "kernel/thread", "kernel/utils", "kernel/vm"]
 
 [workspace.package]
 edition = "2024"
@@ -29,6 +29,7 @@ roxy-cpu.path = "kernel/cpu"
 roxy-memory.path = "kernel/memory"
 roxy-test.path = "kernel/test"
 roxy-thread.path = "kernel/thread"
+roxy-utils.path = "kernel/utils"
 roxy-vm.path = "kernel/vm"
 
 [profile.dev]

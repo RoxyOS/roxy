@@ -8,6 +8,9 @@ pub(crate) struct KernelStack {
     pointer: NonNull<u8>,
 }
 
+// SAFETY: KernelStack uniquely owns its allocation and exposes no direct memory access.
+unsafe impl Send for KernelStack {}
+
 impl KernelStack {
     pub(crate) fn new() -> Option<Self> {
         // SAFETY: STACK_SIZE and STACK_ALIGNMENT form a valid non-zero layout.
