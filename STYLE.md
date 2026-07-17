@@ -53,6 +53,27 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
   keep internal APIs typed; do not introduce wrappers that add no distinction or validation.
 - Use a newtype with inherent methods when a value has domain-specific invariants or behavior. Do
   not use a type alias if it would scatter validation and operations across helpers.
+- Prefer a public field when callers may read or replace it directly without validation,
+  normalization, side effects, or invariant maintenance. Do not write mechanical getters and
+  setters solely to hide such a field; use methods when access must enforce behavior or preserve
+  an invariant.
+
+## Backend Selection
+
+- When a subsystem has multiple compile-time-selectable backends, define one focused, preferably
+  sealed backend trait and select the active implementation through adjacent `#[cfg]` type aliases.
+  Keep selection in the owning adapter module; public wrappers and callers must depend on the
+  trait contract rather than repeat conditional branches or expose concrete backend types:
+
+  ```rust
+  trait PageTableBackend { /* ... */ }
+
+  #[cfg(target_arch = "x86_64")]
+  type CurrentPageTableBackend = X86_64PageTableBackend;
+
+  #[cfg(target_arch = "riscv64")]
+  type CurrentPageTableBackend = Riscv64PageTableBackend;
+  ```
 
 ## Ownership And Safety
 
