@@ -37,6 +37,7 @@ roxy-boot.workspace = true
 roxy-cpu.workspace = true
 roxy-memory.workspace = true
 roxy-test = { workspace = true, optional = true }
+roxy-thread.workspace = true
 roxy-vm.workspace = true
 
 [lints]

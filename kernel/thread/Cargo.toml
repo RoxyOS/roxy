@@ -1,0 +1,12 @@
+[package]
+name = "roxy-thread"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+roxy-memory.workspace = true
+
+[lints]
+workspace = true

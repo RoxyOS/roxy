@@ -36,12 +36,18 @@ mod tests {
             let cpu = roxy_cpu::current_cpu();
             let memory = roxy_memory::statistics();
             let addrspace = roxy_vm::AddrSpace::new().unwrap();
+            let thread = roxy_thread::Thread::new(unused_thread).unwrap();
 
             assert_eq!(cpu.id(), CpuId::BSP);
             assert!(memory.total_frames > 0);
             assert!(memory.heap_total_bytes > 0);
             assert!(memory.allocated_frames <= memory.total_frames);
             assert!(addrspace.root_address().as_u64() > 0);
+            drop(thread);
         }
     );
+
+    fn unused_thread() -> ! {
+        panic!("unused thread was started")
+    }
 }

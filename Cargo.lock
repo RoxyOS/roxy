@@ -293,6 +293,7 @@ dependencies = [
  "roxy-cpu",
  "roxy-memory",
  "roxy-test",
+ "roxy-thread",
  "roxy-vm",
  "spin",
  "uart_16550",
@@ -317,6 +318,13 @@ name = "roxy-test"
 version = "0.1.0"
 dependencies = [
  "linkme",
+]
+
+[[package]]
+name = "roxy-thread"
+version = "0.1.0"
+dependencies = [
+ "roxy-memory",
 ]
 
 [[package]]
