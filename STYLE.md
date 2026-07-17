@@ -79,6 +79,8 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
 
 - Express resource lifetimes through ownership, RAII, `Drop`, `Clone`, and lexical scopes. Avoid
   manual cleanup or reference bookkeeping when the type system can enforce the lifecycle.
+- Name RAII guard types with a `Guard` suffix so their scoped lifetime and `Drop` behavior are
+  visible at call sites.
 - Prefer a smaller lexical scope over an explicit `drop()`. Use explicit `drop()` only when the
   smaller scope would be artificial or less readable.
 - Keep unsafe code local. Document every unsafe block or implementation with an adjacent `SAFETY`
@@ -99,6 +101,10 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
   repository-owned conversions. Add a type annotation or turbofish if `.into()` hides the target.
 - Use blank lines to divide semantic steps such as validation, registration, construction, unsafe
   side effects, and finalization. Keep statements belonging to one continuous operation together.
+- Separate a multi-line block-bodied statement from the following independent statement with one
+  blank line. This applies to `if`, `match`, `for`, `while`, `loop`, `unsafe`, and standalone
+  blocks. Do not insert a blank line before `else`, between `match` arms, or when the following
+  syntax continues the same expression.
 - Prefer expressive code over explanatory comments. Comments should capture rationale,
   invariants, non-obvious constraints, or safety obligations rather than restating the code.
 
