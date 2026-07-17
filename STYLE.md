@@ -47,6 +47,10 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
   over flat names such as `allocate_frame()` and `release_frame()`.
 - Model closed value sets with enums or bitflags instead of groups of integer constants. Keep
   invalid states unrepresentable when that does not make ordinary use cumbersome.
+- Prefer strong types and domain-specific wrappers for addresses, identifiers, units, handles,
+  states, and other values with distinct semantics or invariants. Accept raw integers or external
+  representations only at the boundary that owns their validation, then convert immediately and
+  keep internal APIs typed; do not introduce wrappers that add no distinction or validation.
 - Use a newtype with inherent methods when a value has domain-specific invariants or behavior. Do
   not use a type alias if it would scatter validation and operations across helpers.
 
