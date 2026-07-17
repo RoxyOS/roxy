@@ -59,26 +59,27 @@
         in
         {
           devShells.default = pkgs.mkShell {
-            packages =
-              [
-                rustToolchain
-                jinxCommand
-                pkgs.e2fsprogs
-                pkgs.gdb
-                pkgs.git
-                pkgs.meson
-                pkgs.ninja
-                pkgs.openssl
-                pkgs.OVMF.fd
-                pkgs.pkg-config
-                pkgs.qemu
-                pkgs.xorriso
-              ]
-              ++ (with pkgs.llvmPackages; [
-                clang
-                lld
-                llvm
-              ]);
+            packages = [
+              rustToolchain
+              jinxCommand
+              pkgs.e2fsprogs
+              pkgs.jq
+              pkgs.tokei
+              pkgs.gdb
+              pkgs.git
+              pkgs.meson
+              pkgs.ninja
+              pkgs.openssl
+              pkgs.OVMF.fd
+              pkgs.pkg-config
+              pkgs.qemu
+              pkgs.xorriso
+            ]
+            ++ (with pkgs.llvmPackages; [
+              clang
+              lld
+              llvm
+            ]);
 
             OVMF_CODE = "${pkgs.OVMF.fd}/FV/OVMF_CODE.fd";
           };
