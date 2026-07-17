@@ -1,12 +1,17 @@
+mod addrspace;
+#[cfg(target_arch = "x86_64")]
 mod x86_64;
 
 use crate::{OwnedFrame, VirtualAddress};
 
-pub(crate) use self::x86_64::X86_64Mapper;
+#[cfg(target_arch = "x86_64")]
+use self::x86_64::X86_64KernelPageTableBackend;
+pub use addrspace::{AddrSpacePageTable, MappingError, PagePermissions};
 
-pub(crate) type CurrentMapper = X86_64Mapper;
+#[cfg(target_arch = "x86_64")]
+pub(crate) type CurrentKernelPageTableBackend = X86_64KernelPageTableBackend;
 
-pub(crate) trait Mapper: sealed::Sealed {
+pub(crate) trait KernelPageTableBackend: sealed::Sealed {
     fn initialize(hhdm_offset: u64);
 
     fn is_mapped(address: VirtualAddress) -> bool;

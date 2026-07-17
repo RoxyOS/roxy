@@ -1,10 +1,13 @@
+#[cfg(target_arch = "x86_64")]
 mod x86_64;
 
 use crate::{PAGE_SIZE, VirtualAddress};
 
+#[cfg(target_arch = "x86_64")]
 use self::x86_64::X86_64Tlb;
 
-type CurrentTlb = X86_64Tlb;
+#[cfg(target_arch = "x86_64")]
+type CurrentTlbBackend = X86_64Tlb;
 
 #[derive(Clone, Copy, Debug)]
 pub enum TlbInvalidation {
@@ -23,9 +26,9 @@ pub enum TlbInvalidation {
 /// Panics when a range is unaligned or its address calculation overflows.
 pub fn invalidate(request: TlbInvalidation) {
     match request {
-        TlbInvalidation::Page(address) => CurrentTlb::invalidate_page(address),
+        TlbInvalidation::Page(address) => CurrentTlbBackend::invalidate_page(address),
         TlbInvalidation::Range { start, page_count } => invalidate_range(start, page_count),
-        TlbInvalidation::All => CurrentTlb::invalidate_all(),
+        TlbInvalidation::All => CurrentTlbBackend::invalidate_all(),
     }
 }
 
@@ -38,7 +41,7 @@ fn invalidate_range(start: VirtualAddress, page_count: usize) {
 
     for page in 0..page_count {
         let offset = u64::try_from(page).unwrap().checked_mul(PAGE_SIZE).unwrap();
-        CurrentTlb::invalidate_page(start.checked_add(offset).unwrap());
+        CurrentTlbBackend::invalidate_page(start.checked_add(offset).unwrap());
     }
 }
 

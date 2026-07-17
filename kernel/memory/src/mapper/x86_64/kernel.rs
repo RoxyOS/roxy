@@ -13,17 +13,17 @@ use crate::{
     tlb::{self, TlbInvalidation},
 };
 
-use super::{Mapper, MappingFlags, sealed};
+use crate::mapper::{KernelPageTableBackend, MappingFlags, sealed};
 
-static MAPPER: Once<Mutex<X86_64Mapper>> = Once::new();
+static MAPPER: Once<Mutex<X86_64KernelPageTableBackend>> = Once::new();
 
-pub(crate) struct X86_64Mapper {
+pub(crate) struct X86_64KernelPageTableBackend {
     mapper: OffsetPageTable<'static>,
 }
 
-impl sealed::Sealed for X86_64Mapper {}
+impl sealed::Sealed for X86_64KernelPageTableBackend {}
 
-impl Mapper for X86_64Mapper {
+impl KernelPageTableBackend for X86_64KernelPageTableBackend {
     fn initialize(hhdm_offset: u64) {
         assert!(!MAPPER.is_completed(), "kernel mapper initialized twice");
         MAPPER.call_once(|| Mutex::new(Self::from_active_table(hhdm_offset)));
@@ -40,7 +40,7 @@ impl Mapper for X86_64Mapper {
     }
 }
 
-impl X86_64Mapper {
+impl X86_64KernelPageTableBackend {
     fn from_active_table(hhdm_offset: u64) -> Self {
         let (level_4_frame, _) = Cr3::read();
         let table_address = hhdm_offset
@@ -64,7 +64,7 @@ impl X86_64Mapper {
 
         let physical_address = frame.start_address();
         let physical_frame =
-            PhysFrame::containing_address(::x86_64::PhysAddr::new(physical_address.as_u64()));
+            PhysFrame::containing_address(x86_64::PhysAddr::new(physical_address.as_u64()));
         let flags = page_table_flags(flags);
 
         // SAFETY: The page is unmapped and the caller transfers unique ownership of the frame.
@@ -77,6 +77,26 @@ impl X86_64Mapper {
         flush.ignore();
         tlb::invalidate(TlbInvalidation::Page(address));
     }
+}
+
+pub(super) fn copy_kernel_entries(destination: &mut PageTable) {
+    let mapper = MAPPER.get().unwrap().lock();
+    let source = mapper.mapper.level_4_table();
+
+    for index in 256..512 {
+        destination[index] = source[index].clone();
+    }
+}
+
+#[cfg(feature = "kernel-test")]
+pub(super) fn kernel_entries_match(candidate: &PageTable) -> bool {
+    let mapper = MAPPER.get().unwrap().lock();
+    let kernel = mapper.mapper.level_4_table();
+
+    (256..512).all(|index| {
+        candidate[index].addr() == kernel[index].addr()
+            && candidate[index].flags() == kernel[index].flags()
+    })
 }
 
 fn page_table_flags(flags: MappingFlags) -> PageTableFlags {
@@ -104,7 +124,7 @@ unsafe impl FrameAllocator<Size4KiB> for PageTableAllocator {
         let frame = frame::allocate()?;
         let address = frame.start_address();
         frame.transfer_to_mapping();
-        Some(PhysFrame::containing_address(::x86_64::PhysAddr::new(
+        Some(PhysFrame::containing_address(x86_64::PhysAddr::new(
             address.as_u64(),
         )))
     }

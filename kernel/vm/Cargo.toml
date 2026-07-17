@@ -1,0 +1,18 @@
+[package]
+name = "roxy-vm"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+kernel-test = ["dep:linkme", "dep:roxy-test", "roxy-memory/kernel-test"]
+
+[dependencies]
+linkme = { workspace = true, optional = true }
+
+roxy-memory.workspace = true
+roxy-test = { workspace = true, optional = true }
+
+[lints]
+workspace = true

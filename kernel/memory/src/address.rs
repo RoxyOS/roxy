@@ -2,7 +2,7 @@ use core::fmt;
 
 pub const PAGE_SIZE: u64 = 4096;
 pub const USER_ADDRESS_MIN: u64 = 0x0000_0000_0001_0000;
-pub const USER_ADDRESS_MAX: u64 = 0x0000_7fff_ffff_f000;
+pub const USER_ADDRESS_MAX: u64 = 0x0000_7fff_ffff_ffff;
 
 macro_rules! address_type {
     ($name:ident) => {
@@ -36,6 +36,9 @@ address_type!(PhysicalAddress);
 address_type!(VirtualAddress);
 address_type!(UserAddress);
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct UserPage(UserAddress);
+
 impl PhysicalAddress {
     #[must_use]
     pub const fn new(value: u64) -> Option<Self> {
@@ -68,6 +71,33 @@ impl UserAddress {
         } else {
             None
         }
+    }
+}
+
+impl UserPage {
+    #[must_use]
+    pub const fn new(address: UserAddress) -> Option<Self> {
+        if address.as_u64().is_multiple_of(PAGE_SIZE) {
+            Some(Self(address))
+        } else {
+            None
+        }
+    }
+
+    #[must_use]
+    pub const fn containing(address: UserAddress) -> Self {
+        Self(UserAddress(align_down(address.as_u64())))
+    }
+
+    #[must_use]
+    pub const fn start_address(self) -> UserAddress {
+        self.0
+    }
+
+    #[must_use]
+    pub fn checked_add(self, page_count: usize) -> Option<Self> {
+        let byte_count = u64::try_from(page_count).ok()?.checked_mul(PAGE_SIZE)?;
+        Self::new(self.0.checked_add(byte_count)?)
     }
 }
 

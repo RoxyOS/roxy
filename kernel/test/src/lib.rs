@@ -3,24 +3,8 @@
 extern crate self as roxy_test;
 
 pub struct TestCase {
-    name: &'static str,
-    run: fn(),
-}
-
-impl TestCase {
-    #[must_use]
-    pub const fn new(name: &'static str, run: fn()) -> Self {
-        Self { name, run }
-    }
-
-    #[must_use]
-    pub const fn name(&self) -> &'static str {
-        self.name
-    }
-
-    pub fn run(&self) {
-        (self.run)();
-    }
+    pub name: &'static str,
+    pub run: fn(),
 }
 
 #[linkme::distributed_slice]
@@ -33,7 +17,10 @@ macro_rules! kernel_test {
 
         const _: () = {
             #[linkme::distributed_slice($crate::TESTS)]
-            static TEST: $crate::TestCase = $crate::TestCase::new($name, $function);
+            static TEST: $crate::TestCase = $crate::TestCase {
+                name: $name,
+                run: $function,
+            };
         };
     };
 }
@@ -55,10 +42,13 @@ mod tests {
             }
 
             CALLED.store(false, Ordering::Relaxed);
-            let test = TestCase::new("registered-name", mark_called);
+            let test = TestCase {
+                name: "registered-name",
+                run: mark_called,
+            };
 
-            assert_eq!(test.name(), "registered-name");
-            test.run();
+            assert_eq!(test.name, "registered-name");
+            (test.run)();
             assert!(CALLED.load(Ordering::Relaxed));
         }
     );

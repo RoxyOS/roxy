@@ -6,7 +6,7 @@ use buddy_system_allocator::FrameAllocator;
 use roxy_boot::MemoryRegionKind;
 use spin::{Mutex, Once};
 
-use crate::{address::PAGE_SIZE, memory_map::MemoryRegion};
+use crate::{PhysicalAddress, address::PAGE_SIZE, memory_map::MemoryRegion};
 
 const FRAME_ORDER: usize = 40;
 #[cfg(debug_assertions)]
@@ -21,6 +21,19 @@ const FREED_POISON: u8 = 0;
 static ALLOCATOR: Once<Mutex<PhysicalFrameAllocator>> = Once::new();
 static HHDM_OFFSET: AtomicU64 = AtomicU64::new(0);
 static ALLOCATION_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Clone, Copy)]
+pub(super) struct FrameIndex(usize);
+
+impl FrameIndex {
+    pub(super) fn start_address(self) -> PhysicalAddress {
+        let address = u64::try_from(self.0)
+            .unwrap()
+            .checked_mul(PAGE_SIZE)
+            .unwrap();
+        PhysicalAddress::new(address).unwrap()
+    }
+}
 
 struct PhysicalFrameAllocator {
     allocator: FrameAllocator<FRAME_ORDER>,
@@ -57,22 +70,22 @@ impl PhysicalFrameAllocator {
         self.total = self.total.checked_add(end - start).unwrap();
     }
 
-    fn allocate(&mut self) -> Option<usize> {
+    fn allocate(&mut self) -> Option<FrameIndex> {
         let frame = self.allocator.alloc(1)?;
         self.allocated = self.allocated.checked_add(1).unwrap();
 
         #[cfg(debug_assertions)]
         assert!(self.live.insert(frame), "frame allocated twice");
 
-        Some(frame)
+        Some(FrameIndex(frame))
     }
 
-    fn deallocate(&mut self, frame: usize) {
+    fn deallocate(&mut self, frame: FrameIndex) {
         #[cfg(debug_assertions)]
-        assert!(self.live.remove(&frame), "invalid frame deallocation");
+        assert!(self.live.remove(&frame.0), "invalid frame deallocation");
 
         self.allocated = self.allocated.checked_sub(1).unwrap();
-        self.allocator.dealloc(frame, 1);
+        self.allocator.dealloc(frame.0, 1);
     }
 }
 
@@ -85,16 +98,28 @@ pub(crate) fn initialize(regions: &[MemoryRegion], hhdm_offset: u64) {
     ALLOCATOR.call_once(|| Mutex::new(PhysicalFrameAllocator::from_regions(regions)));
 }
 
-pub(crate) fn allocate() -> Option<usize> {
+pub(super) fn allocate() -> Option<FrameIndex> {
     ALLOCATION_ATTEMPTS.fetch_add(1, Ordering::Relaxed);
     let frame = ALLOCATOR.get().unwrap().lock().allocate()?;
     poison(frame, ALLOCATED_POISON);
     Some(frame)
 }
 
-pub(crate) fn deallocate(frame: usize) {
+pub(super) fn deallocate(frame: FrameIndex) {
     poison(frame, FREED_POISON);
     ALLOCATOR.get().unwrap().lock().deallocate(frame);
+}
+
+pub(crate) fn physical_pointer<T>(address: PhysicalAddress) -> *mut T {
+    let virtual_address = HHDM_OFFSET
+        .load(Ordering::Acquire)
+        .checked_add(address.as_u64())
+        .unwrap();
+    usize::try_from(virtual_address).unwrap() as *mut T
+}
+
+pub(crate) fn hhdm_offset() -> u64 {
+    HHDM_OFFSET.load(Ordering::Acquire)
 }
 
 pub(crate) fn statistics() -> (usize, usize, usize) {
@@ -110,20 +135,12 @@ pub(crate) fn statistics() -> (usize, usize, usize) {
 }
 
 #[cfg(debug_assertions)]
-fn poison(frame: usize, value: u8) {
-    let physical = u64::try_from(frame)
-        .unwrap()
-        .checked_mul(PAGE_SIZE)
-        .unwrap();
-    let virtual_address = HHDM_OFFSET
-        .load(Ordering::Acquire)
-        .checked_add(physical)
-        .unwrap();
-    let pointer = usize::try_from(virtual_address).unwrap() as *mut u8;
+fn poison(frame: FrameIndex, value: u8) {
+    let pointer = physical_pointer::<u8>(frame.start_address());
 
     // SAFETY: The HHDM maps this allocated frame, and the caller serializes ownership changes.
     unsafe { pointer.write_bytes(value, usize::try_from(PAGE_SIZE).unwrap()) };
 }
 
 #[cfg(not(debug_assertions))]
-const fn poison(_frame: usize, _value: u8) {}
+const fn poison(_frame: FrameIndex, _value: u8) {}

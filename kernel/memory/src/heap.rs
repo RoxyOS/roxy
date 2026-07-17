@@ -10,7 +10,7 @@ use spin::Mutex;
 
 use crate::{
     PAGE_SIZE, VirtualAddress, frame,
-    mapper::{CurrentMapper, Mapper, MappingFlags},
+    mapper::{CurrentKernelPageTableBackend, KernelPageTableBackend, MappingFlags},
 };
 
 const BOOTSTRAP_HEAP_SIZE: usize = 256 * 1024;
@@ -138,18 +138,18 @@ fn assert_guard_pages(start: VirtualAddress) {
         .checked_add(u64::try_from(PERMANENT_HEAP_SIZE).unwrap())
         .unwrap();
     assert!(
-        !CurrentMapper::is_mapped(lower),
+        !CurrentKernelPageTableBackend::is_mapped(lower),
         "lower heap guard page is mapped"
     );
     assert!(
-        !CurrentMapper::is_mapped(upper),
+        !CurrentKernelPageTableBackend::is_mapped(upper),
         "upper heap guard page is mapped"
     );
 }
 
 fn map_heap_page(address: VirtualAddress) {
     let frame = frame::allocate().unwrap();
-    CurrentMapper::map_page(address, frame, MappingFlags::WRITABLE);
+    CurrentKernelPageTableBackend::map_page(address, frame, MappingFlags::WRITABLE);
 
     let pointer = usize::try_from(address.as_u64()).unwrap() as *mut u8;
     // SAFETY: The mapper created an exclusively owned writable page at this address.
