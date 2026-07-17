@@ -81,3 +81,53 @@ pub(crate) const fn align_up(value: u64) -> Option<u64> {
         None => None,
     }
 }
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use super::{
+        PAGE_SIZE, PhysicalAddress, USER_ADDRESS_MAX, USER_ADDRESS_MIN, UserAddress,
+        VirtualAddress, align_down, align_up,
+    };
+
+    roxy_test::kernel_test!(
+        "roxy-memory::physical-address-bounds",
+        physical_address_bounds,
+        {
+            let maximum = (1 << 52) - 1;
+
+            assert_eq!(PhysicalAddress::new(maximum).unwrap().as_u64(), maximum);
+            assert!(PhysicalAddress::new(1 << 52).is_none());
+            assert!(
+                PhysicalAddress::new(maximum)
+                    .unwrap()
+                    .checked_add(1)
+                    .is_none()
+            );
+        }
+    );
+
+    roxy_test::kernel_test!(
+        "roxy-memory::virtual-address-bounds",
+        virtual_address_bounds,
+        {
+            assert!(VirtualAddress::new(0x0000_7fff_ffff_ffff).is_some());
+            assert!(VirtualAddress::new(0x0000_8000_0000_0000).is_none());
+            assert!(VirtualAddress::new(0xffff_8000_0000_0000).is_some());
+            assert!(VirtualAddress::new(0xffff_7fff_ffff_ffff).is_none());
+        }
+    );
+
+    roxy_test::kernel_test!("roxy-memory::user-address-bounds", user_address_bounds, {
+        assert!(UserAddress::new(USER_ADDRESS_MIN).is_some());
+        assert!(UserAddress::new(USER_ADDRESS_MAX).is_some());
+        assert!(UserAddress::new(USER_ADDRESS_MIN - 1).is_none());
+        assert!(UserAddress::new(USER_ADDRESS_MAX + 1).is_none());
+    });
+
+    roxy_test::kernel_test!("roxy-memory::page-alignment", page_alignment, {
+        assert_eq!(align_down(PAGE_SIZE + 1), PAGE_SIZE);
+        assert_eq!(align_up(PAGE_SIZE + 1), Some(PAGE_SIZE * 2));
+        assert_eq!(align_up(PAGE_SIZE), Some(PAGE_SIZE));
+        assert_eq!(align_up(u64::MAX), None);
+    });
+}

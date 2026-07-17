@@ -2,9 +2,15 @@ use std::{fs, path::Path, path::PathBuf};
 
 use anyhow::{Context, Result};
 
-pub(super) fn build(root: &Path, kernel: &Path, limine: &Path) -> Result<PathBuf> {
-    let staging = root.join("iso-root");
-    let output = root.join("roxy.iso");
+use super::Mode;
+
+pub(super) fn build(root: &Path, kernel: &Path, limine: &Path, mode: Mode) -> Result<PathBuf> {
+    let (staging_name, output_name) = match mode {
+        Mode::Production => ("iso-root", "roxy.iso"),
+        Mode::Test => ("test-iso-root", "roxy-test.iso"),
+    };
+    let staging = root.join(staging_name);
+    let output = root.join(output_name);
 
     reset_directory(&staging)?;
     stage_kernel(&staging, kernel)?;

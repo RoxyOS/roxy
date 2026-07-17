@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/memory"]
+members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/memory", "kernel/test"]
 
 [workspace.package]
 edition = "2024"
@@ -14,6 +14,8 @@ buddy_system_allocator = { version = "0.13", default-features = false, features 
 clap = { version = "4", features = ["derive"] }
 heapless = "0.9"
 limine = "0.6"
+linkme = "0.3"
+qemu-exit = "4"
 spin = { version = "0.12", default-features = false, features = ["mutex", "once", "spin_mutex"] }
 tap = "1"
 uart_16550 = "0.6"
@@ -25,6 +27,7 @@ roxy-arch.path = "kernel/arch"
 roxy-boot.path = "kernel/boot"
 roxy-cpu.path = "kernel/cpu"
 roxy-memory.path = "kernel/memory"
+roxy-test.path = "kernel/test"
 
 [profile.dev]
 panic = "abort"

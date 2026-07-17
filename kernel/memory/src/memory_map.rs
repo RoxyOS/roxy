@@ -2,7 +2,10 @@ use alloc::vec::Vec;
 
 use roxy_boot::{BootInfo, MemoryRegionKind};
 
-use crate::address::{PAGE_SIZE, align_down, align_up};
+use crate::{
+    PhysicalAddress, VirtualAddress,
+    address::{PAGE_SIZE, align_down, align_up},
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct MemoryRegion {
@@ -98,20 +101,35 @@ fn region_kind_at(source: &[MemoryRegion], start: u64, end: u64) -> Option<Memor
 }
 
 fn validate_reserved_regions(boot_info: &BootInfo, regions: &[MemoryRegion]) {
-    assert_address_reserved(regions, boot_info.kernel_address.physical_base);
-    assert_address_reserved(regions, boot_info.rsdp_address);
+    let kernel = PhysicalAddress::new(boot_info.kernel_address.physical_base).unwrap();
+    assert_address_reserved(regions, kernel);
+
+    let rsdp = VirtualAddress::new(boot_info.rsdp_address).unwrap();
+    assert_address_reserved(regions, hhdm_to_physical(rsdp, boot_info.hhdm_offset));
 
     for framebuffer in &boot_info.framebuffers {
-        assert_address_reserved(regions, framebuffer.address);
+        let start = VirtualAddress::new(framebuffer.address).unwrap();
         let end = framebuffer
             .address
             .checked_add(framebuffer.pitch.checked_mul(framebuffer.height).unwrap())
             .unwrap();
-        assert_address_reserved(regions, end.saturating_sub(1));
+        let end = VirtualAddress::new(end).unwrap();
+        let start = hhdm_to_physical(start, boot_info.hhdm_offset);
+        let end = hhdm_to_physical(end, boot_info.hhdm_offset);
+        let last = PhysicalAddress::new(end.as_u64().checked_sub(1).unwrap()).unwrap();
+
+        assert_address_reserved(regions, start);
+        assert_address_reserved(regions, last);
     }
 }
 
-fn assert_address_reserved(regions: &[MemoryRegion], address: u64) {
+fn hhdm_to_physical(address: VirtualAddress, hhdm_offset: u64) -> PhysicalAddress {
+    let address = address.as_u64().checked_sub(hhdm_offset).unwrap();
+    PhysicalAddress::new(address).unwrap()
+}
+
+fn assert_address_reserved(regions: &[MemoryRegion], address: PhysicalAddress) {
+    let address = address.as_u64();
     let region = regions
         .iter()
         .find(|region| region.start <= address && address < region.end)

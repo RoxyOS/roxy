@@ -42,3 +42,20 @@ impl<T> Default for CpuLocal<T> {
         Self::new()
     }
 }
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use super::CpuLocal;
+
+    roxy_test::kernel_test!(
+        "roxy-cpu::cpu-local-stores-current-value",
+        cpu_local_stores_current_value,
+        {
+            let local = CpuLocal::new();
+
+            local.initialize_current(0x5a_u8);
+
+            assert_eq!(*local.get(), 0x5a);
+        }
+    );
+}

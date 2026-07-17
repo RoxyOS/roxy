@@ -184,6 +184,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29363c0f37e66e18575fadf7141c56ee7ea04ae5fecbeb25eff303f77af203a9"
 
 [[package]]
+name = "linkme"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e83272d46373fb8decca684579ac3e7c8f3d71d4cc3aa693df8759e260ae41cf"
+dependencies = [
+ "linkme-impl",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.3.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32d59e20403c7d08fe62b4376edfe5c7fb2ef1e6b1465379686d0f21c8df444b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -203,6 +223,12 @@ checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "qemu-exit"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8189cbf0422ac15d7d544ed5f331fbe4e5b9da88133568fd359083b186a547f3"
 
 [[package]]
 name = "quote"
@@ -226,6 +252,8 @@ dependencies = [
 name = "roxy-arch"
 version = "0.1.0"
 dependencies = [
+ "linkme",
+ "roxy-test",
  "spin",
  "tap",
  "x86_64",
@@ -237,14 +265,18 @@ version = "0.1.0"
 dependencies = [
  "heapless",
  "limine",
+ "linkme",
  "roxy-arch",
+ "roxy-test",
 ]
 
 [[package]]
 name = "roxy-cpu"
 version = "0.1.0"
 dependencies = [
+ "linkme",
  "roxy-arch",
+ "roxy-test",
  "spin",
  "x2apic",
 ]
@@ -253,10 +285,13 @@ dependencies = [
 name = "roxy-kernel"
 version = "0.1.0"
 dependencies = [
+ "linkme",
+ "qemu-exit",
  "roxy-arch",
  "roxy-boot",
  "roxy-cpu",
  "roxy-memory",
+ "roxy-test",
  "spin",
  "uart_16550",
 ]
@@ -267,10 +302,19 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.13.1",
  "buddy_system_allocator",
+ "linkme",
  "roxy-arch",
  "roxy-boot",
+ "roxy-test",
  "spin",
  "x86_64",
+]
+
+[[package]]
+name = "roxy-test"
+version = "0.1.0"
+dependencies = [
+ "linkme",
 ]
 
 [[package]]

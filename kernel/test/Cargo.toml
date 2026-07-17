@@ -1,0 +1,15 @@
+[package]
+name = "roxy-test"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+kernel-test = []
+
+[dependencies]
+linkme.workspace = true
+
+[lints]
+workspace = true

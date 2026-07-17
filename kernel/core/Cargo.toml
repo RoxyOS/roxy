@@ -7,6 +7,16 @@ publish.workspace = true
 
 [features]
 kernel = []
+kernel-test = [
+    "dep:linkme",
+    "dep:qemu-exit",
+    "dep:roxy-test",
+    "roxy-test/kernel-test",
+    "roxy-arch/kernel-test",
+    "roxy-boot/kernel-test",
+    "roxy-cpu/kernel-test",
+    "roxy-memory/kernel-test",
+]
 
 [[bin]]
 name = "roxy-kernel"
@@ -16,6 +26,8 @@ bench = false
 required-features = ["kernel"]
 
 [dependencies]
+linkme = { workspace = true, optional = true }
+qemu-exit = { workspace = true, optional = true }
 spin.workspace = true
 uart_16550.workspace = true
 
@@ -23,6 +35,7 @@ roxy-arch.workspace = true
 roxy-boot.workspace = true
 roxy-cpu.workspace = true
 roxy-memory.workspace = true
+roxy-test = { workspace = true, optional = true }
 
 [lints]
 workspace = true

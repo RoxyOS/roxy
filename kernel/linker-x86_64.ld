@@ -18,6 +18,16 @@ SECTIONS {
     .text : { *(.text .text.*) } :text
     . = ALIGN(4096);
     .rodata : { *(.rodata .rodata.*) } :rodata
+    linkme_TESTS : {
+        __start_linkme_TESTS = .;
+        KEEP(*(linkme_TESTS))
+        __stop_linkme_TESTS = .;
+    } :rodata
+    linkm2_TESTS : {
+        __start_linkm2_TESTS = .;
+        KEEP(*(linkm2_TESTS))
+        __stop_linkm2_TESTS = .;
+    } :rodata
     . = ALIGN(4096);
     .data : { *(.data .data.*) } :data
     .bss : {

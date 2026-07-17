@@ -11,4 +11,5 @@ pub(crate) struct Cli {
 pub(crate) enum Arg {
     Image,
     Run,
+    Test,
 }

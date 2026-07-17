@@ -5,6 +5,8 @@
 mod exception;
 mod misc;
 mod serial;
+#[cfg(feature = "kernel-test")]
+mod test;
 
 use core::{alloc::Layout, panic::PanicInfo};
 
@@ -23,9 +25,14 @@ pub extern "C" fn _start() -> ! {
     roxy_memory::initialize(&boot_info);
     roxy_cpu::current_cpu().initialize();
 
+    #[cfg(feature = "kernel-test")]
+    test::run();
+
+    #[cfg(not(feature = "kernel-test"))]
     kernel_main(boot_info)
 }
 
+#[cfg(not(feature = "kernel-test"))]
 fn kernel_main(_boot_info: BootInfo) -> ! {
     s_println!("Hello world");
     panic!("Reached end of kernel main");
@@ -34,6 +41,11 @@ fn kernel_main(_boot_info: BootInfo) -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo<'_>) -> ! {
     e_println!("Kernel Panic: {info}");
+
+    #[cfg(feature = "kernel-test")]
+    test::exit_failure();
+
+    #[cfg(not(feature = "kernel-test"))]
     CurrentArchitecture::halt_forever()
 }
 

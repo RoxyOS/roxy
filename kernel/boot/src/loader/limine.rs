@@ -144,3 +144,43 @@ fn map_memory_kind(value: u64) -> MemoryRegionKind {
         other => MemoryRegionKind::Unknown(other),
     }
 }
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use super::{MemoryRegionKind, map_memory_kind, memmap};
+
+    roxy_test::kernel_test!(
+        "roxy-boot::maps-limine-memory-kinds",
+        maps_limine_memory_kinds,
+        {
+            let known_kinds = [
+                (memmap::MEMMAP_USABLE, MemoryRegionKind::Usable),
+                (memmap::MEMMAP_RESERVED, MemoryRegionKind::Reserved),
+                (
+                    memmap::MEMMAP_ACPI_RECLAIMABLE,
+                    MemoryRegionKind::AcpiReclaimable,
+                ),
+                (memmap::MEMMAP_ACPI_NVS, MemoryRegionKind::AcpiNvs),
+                (memmap::MEMMAP_BAD_MEMORY, MemoryRegionKind::BadMemory),
+                (
+                    memmap::MEMMAP_BOOTLOADER_RECLAIMABLE,
+                    MemoryRegionKind::BootloaderReclaimable,
+                ),
+                (
+                    memmap::MEMMAP_EXECUTABLE_AND_MODULES,
+                    MemoryRegionKind::ExecutableAndModules,
+                ),
+                (memmap::MEMMAP_FRAMEBUFFER, MemoryRegionKind::Framebuffer),
+                (
+                    memmap::MEMMAP_MAPPED_RESERVED,
+                    MemoryRegionKind::MappedReserved,
+                ),
+            ];
+
+            for (limine_kind, expected) in known_kinds {
+                assert_eq!(map_memory_kind(limine_kind), expected);
+            }
+            assert_eq!(map_memory_kind(42), MemoryRegionKind::Unknown(42));
+        }
+    );
+}
