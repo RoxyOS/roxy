@@ -21,9 +21,10 @@ pub extern "C" fn _start() -> ! {
 
     let boot_info = BootInfo::parse();
 
-    CurrentArchitectureBackend::initialize(exception::handler);
+    CurrentArchitectureBackend::initialize(exception::handler, roxy_cpu::handle_local_interrupt);
     roxy_memory::initialize(&boot_info);
     roxy_cpu::current_cpu().initialize();
+    CurrentArchitectureBackend::enable_interrupts();
 
     #[cfg(feature = "kernel-test")]
     test::run();

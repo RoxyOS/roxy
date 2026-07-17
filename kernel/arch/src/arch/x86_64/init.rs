@@ -3,7 +3,7 @@ use tap::Tap;
 use x86_64::{
     VirtAddr,
     instructions::{
-        segmentation::{CS, Segment},
+        segmentation::{CS, DS, ES, SS, Segment},
         tables::load_tss,
     },
     structures::{
@@ -13,9 +13,9 @@ use x86_64::{
     },
 };
 
-use crate::ExceptionHandler;
+use crate::{ExceptionHandler, LocalInterruptHandler};
 
-use super::exception;
+use super::{exception, interrupt};
 
 const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 const DOUBLE_FAULT_STACK_SIZE: usize = 4096 * 5;
@@ -29,12 +29,18 @@ static mut DOUBLE_FAULT_STACK: [u8; DOUBLE_FAULT_STACK_SIZE] = [0; DOUBLE_FAULT_
 
 struct Selectors {
     code: SegmentSelector,
+    data: SegmentSelector,
     tss: SegmentSelector,
 }
 
-pub(super) fn initialize(exception_handler: ExceptionHandler) {
+pub(super) fn initialize(
+    exception_handler: ExceptionHandler,
+    local_interrupt_handler: LocalInterruptHandler,
+) {
+    x86_64::instructions::interrupts::disable();
     assert!(!IDT.is_completed(), "architecture initialized twice");
     exception::register(exception_handler);
+    interrupt::register(local_interrupt_handler);
 
     let tss = TSS.call_once(create_tss);
     let (gdt, selectors) = GDT.call_once(|| create_gdt(tss));
@@ -43,6 +49,9 @@ pub(super) fn initialize(exception_handler: ExceptionHandler) {
     // SAFETY: Both selectors reference descriptors in the loaded static GDT.
     unsafe {
         CS::set_reg(selectors.code);
+        SS::set_reg(selectors.data);
+        DS::set_reg(selectors.data);
+        ES::set_reg(selectors.data);
         load_tss(selectors.tss);
     }
 
@@ -60,8 +69,9 @@ fn create_tss() -> TaskStateSegment {
 fn create_gdt(tss: &'static TaskStateSegment) -> (GlobalDescriptorTable, Selectors) {
     let mut gdt = GlobalDescriptorTable::new();
     let code = gdt.append(Descriptor::kernel_code_segment());
+    let data = gdt.append(Descriptor::kernel_data_segment());
     let tss = gdt.append(Descriptor::tss_segment(tss));
-    (gdt, Selectors { code, tss })
+    (gdt, Selectors { code, data, tss })
 }
 
 fn create_idt() -> InterruptDescriptorTable {
@@ -71,6 +81,9 @@ fn create_idt() -> InterruptDescriptorTable {
         idt.general_protection_fault
             .set_handler_fn(exception::general_protection_fault);
         idt.page_fault.set_handler_fn(exception::page_fault);
+        idt[interrupt::TIMER_VECTOR].set_handler_fn(interrupt::timer);
+        idt[interrupt::ERROR_VECTOR].set_handler_fn(interrupt::error);
+        idt[interrupt::SPURIOUS_VECTOR].set_handler_fn(interrupt::spurious);
 
         // SAFETY: The configured IST entry points at the static double-fault stack.
         unsafe {

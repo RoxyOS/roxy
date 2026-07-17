@@ -6,6 +6,6 @@ mod cpuid;
 
 pub use arch::{
     Architecture, CurrentArchitectureBackend, ExceptionContext, ExceptionHandler, ExceptionVector,
-    X86_64,
+    LocalInterruptHandler, LocalInterruptKind, X86_64,
 };
 pub use cpuid::CpuId;

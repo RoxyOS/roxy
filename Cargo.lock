@@ -279,6 +279,7 @@ dependencies = [
  "roxy-test",
  "spin",
  "x2apic",
+ "x86_64",
 ]
 
 [[package]]

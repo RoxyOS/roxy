@@ -11,6 +11,7 @@ kernel-test = ["dep:linkme", "dep:roxy-test", "roxy-arch/kernel-test"]
 [dependencies]
 linkme = { workspace = true, optional = true }
 spin.workspace = true
+x86_64.workspace = true
 x2apic.workspace = true
 
 roxy-arch.workspace = true

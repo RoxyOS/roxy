@@ -18,6 +18,13 @@ pub enum ExceptionVector {
     PageFault,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LocalInterruptKind {
+    Timer,
+    Error,
+    Spurious,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ExceptionContext {
     pub vector: ExceptionVector,
@@ -32,15 +39,23 @@ pub struct ExceptionContext {
 }
 
 pub type ExceptionHandler = fn(&ExceptionContext) -> !;
+pub type LocalInterruptHandler = fn(LocalInterruptKind);
 
 pub trait Architecture: sealed::Sealed {
-    fn initialize(exception_handler: ExceptionHandler);
+    fn initialize(
+        exception_handler: ExceptionHandler,
+        local_interrupt_handler: LocalInterruptHandler,
+    );
+
+    fn local_interrupt_vector(kind: LocalInterruptKind) -> u8;
 
     fn current_cpu_id() -> CpuId;
 
     fn interrupts_enabled() -> bool;
 
     fn without_interrupts<T>(function: impl FnOnce() -> T) -> T;
+
+    fn enable_interrupts();
 
     fn halt();
 
