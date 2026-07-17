@@ -9,7 +9,6 @@ publish = false
 
 [workspace.dependencies]
 anyhow = "1"
-cargo-image-runner = { version = "0.5", default-features = false, features = ["iso", "limine", "qemu", "uefi"] }
 clap = { version = "4", features = ["derive"] }
 heapless = "0.9"
 limine = "0.6"

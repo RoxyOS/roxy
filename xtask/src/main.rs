@@ -1,11 +1,10 @@
 mod action;
 mod build_kernel;
 mod cli;
-mod image_runner;
+mod image;
 mod utils;
 
 pub(crate) use build_kernel::build_kernel;
-pub(crate) use image_runner::image_runner;
 
 use anyhow::Result;
 use clap::Parser;

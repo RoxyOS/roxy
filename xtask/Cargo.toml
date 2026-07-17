@@ -7,7 +7,6 @@ publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-cargo-image-runner.workspace = true
 clap.workspace = true
 xshell.workspace = true
 

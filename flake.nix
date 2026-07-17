@@ -69,14 +69,18 @@
                 pkgs.meson
                 pkgs.ninja
                 pkgs.openssl
+                pkgs.OVMF.fd
                 pkgs.pkg-config
                 pkgs.qemu
+                pkgs.xorriso
               ]
               ++ (with pkgs.llvmPackages; [
                 clang
                 lld
                 llvm
               ]);
+
+            OVMF_CODE = "${pkgs.OVMF.fd}/FV/OVMF_CODE.fd";
           };
         };
     };
