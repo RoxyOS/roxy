@@ -32,6 +32,19 @@
 
           rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
+          patchedJinx = pkgs.runCommand "jinx-roxy" { } ''
+            mkdir -p "$out"
+            cp ${jinx}/jinx "$out/jinx"
+            chmod u+w "$out/jinx"
+            substituteInPlace "$out/jinx" \
+              --replace-fail \
+                'https://snapshot.debian.org/archive/debian/''${JINX_DEBIAN_SNAPSHOT}/' \
+                'https://mirrors.aliyun.com/debian' \
+              --replace-fail \
+                '--foreign sid' \
+                '--foreign bookworm'
+          '';
+
           jinxRuntimeInputs = with pkgs; [
             bash
             coreutils
@@ -53,7 +66,7 @@
             name = "jinx";
             runtimeInputs = jinxRuntimeInputs;
             text = ''
-              exec ${pkgs.bash}/bin/bash ${jinx}/jinx "$@"
+              exec ${pkgs.bash}/bin/bash ${patchedJinx}/jinx "$@"
             '';
           };
         in
