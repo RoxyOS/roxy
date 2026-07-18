@@ -1,11 +1,7 @@
+#include <stdint.h>
+
 #ifndef ROXY_ABI_H
 #define ROXY_ABI_H
-
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdlib.h>
 
 enum Errno
 #if __STDC_VERSION__ >= 202311L
