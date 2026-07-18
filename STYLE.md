@@ -115,6 +115,9 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
 - Group consecutive operations of the same kind, such as `let` bindings, function calls, or
   assignments, together. Surround each group with blank lines when it is separated from another
   kind of operation or semantic step.
+- Surround a multi-line expression or method chain with blank lines when it is an independent
+  operation. For example, separate `addrspace.read_bytes(...).map_err(...)?;` from the statements
+  before and after it, even when rustfmt places the chain across several source lines.
 
 ## Imports And Paths
 
