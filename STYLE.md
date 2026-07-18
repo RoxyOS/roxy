@@ -99,14 +99,17 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
   clearly. Use turbofish when inference requires it or it materially improves readability.
 - At call sites, prefer `.into()` over `Target::from(value)`. Implement `From`, not `Into`, for
   repository-owned conversions. Add a type annotation or turbofish if `.into()` hides the target.
+- Prefer expressive code over explanatory comments. Comments should capture rationale,
+  invariants, non-obvious constraints, or safety obligations rather than restating the code.
+
+## Blank Lines
+
 - Use blank lines to divide semantic steps such as validation, registration, construction, unsafe
   side effects, and finalization. Keep statements belonging to one continuous operation together.
 - Separate a multi-line block-bodied statement from the following independent statement with one
   blank line. This applies to `if`, `match`, `for`, `while`, `loop`, `unsafe`, and standalone
   blocks. Do not insert a blank line before `else`, between `match` arms, or when the following
   syntax continues the same expression.
-- Prefer expressive code over explanatory comments. Comments should capture rationale,
-  invariants, non-obvious constraints, or safety obligations rather than restating the code.
 
 ## Imports And Paths
 
