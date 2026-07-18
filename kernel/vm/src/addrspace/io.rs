@@ -17,7 +17,6 @@ impl AddrSpace {
             let PageState::Mapped { frame, .. } = state else {
                 return Err(VmError::NotMapped);
             };
-
             // SAFETY: AddrSpace exclusively owns every leaf frame and this is a shared read.
             unsafe { frame.read(offset, &mut output[source.clone()]) }
                 .map_err(|_| VmError::MappingFailed)
@@ -33,9 +32,12 @@ impl AddrSpace {
         self.preflight(address, input.len())?;
         visit_chunks(address, input.len(), |page, offset, source| {
             let state = self.pages.get_mut(&page).ok_or(VmError::NotMapped)?;
-            let PageState::Mapped { frame, .. } = state else {
+            let PageState::Mapped { frame, permissions } = state else {
                 return Err(VmError::NotMapped);
             };
+            if !permissions.writable() {
+                return Err(VmError::PermissionDenied);
+            }
 
             // SAFETY: AddrSpace is mutably borrowed and exclusively owns every leaf frame.
             unsafe { frame.write(offset, &input[source]) }.map_err(|_| VmError::MappingFailed)

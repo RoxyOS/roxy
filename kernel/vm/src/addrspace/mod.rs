@@ -7,6 +7,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 
 use roxy_memory::{AddrSpacePageTable, PageRef, PageTableToken, PhysicalAddress, UserPage};
+use roxy_utils::Lock;
 
 pub use types::{Permissions, VmError};
 
@@ -16,7 +17,7 @@ pub struct AddrSpace {
 }
 
 #[derive(Clone)]
-pub struct AddrSpaceHandle(Arc<AddrSpace>);
+pub struct AddrSpaceHandle(Arc<Lock<AddrSpace>>);
 
 impl AddrSpace {
     /// Creates an empty address space.
@@ -33,7 +34,7 @@ impl AddrSpace {
 
     #[must_use]
     pub fn into_handle(self) -> AddrSpaceHandle {
-        AddrSpaceHandle(Arc::new(self))
+        AddrSpaceHandle(Arc::new(Lock::new(self)))
     }
 
     #[must_use]
@@ -70,13 +71,39 @@ impl AddrSpace {
 impl AddrSpaceHandle {
     #[must_use]
     pub fn root_address(&self) -> PhysicalAddress {
-        self.0.root_address()
+        self.0.lock().root_address()
     }
 
     /// Makes this address space active until another page table is selected.
     pub fn activate(&self) {
         // SAFETY: this strong handle keeps the complete page-table hierarchy alive while selected.
-        let _ = unsafe { self.0.page_table.activate() };
+        let _ = unsafe { self.0.lock().page_table.activate() };
+    }
+
+    /// Reads a validated mapped range through this shared handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid, unmapped, or inaccessible ranges.
+    pub fn read_bytes(
+        &self,
+        address: roxy_memory::UserAddress,
+        output: &mut [u8],
+    ) -> Result<(), VmError> {
+        self.0.lock().read_bytes(address, output)
+    }
+
+    /// Writes a validated writable range through this shared handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid, unmapped, or read-only ranges.
+    pub fn write_bytes(
+        &self,
+        address: roxy_memory::UserAddress,
+        input: &[u8],
+    ) -> Result<(), VmError> {
+        self.0.lock().write_bytes(address, input)
     }
 }
 

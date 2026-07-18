@@ -36,6 +36,7 @@ impl Process {
             id: ProcessId(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed)),
             addrspace: Some(addrspace),
             main_thread_id,
+            fds: roxy_fd::FdTable::new(),
             state: ProcessState::Running,
         }
     }
@@ -47,7 +48,8 @@ fn process_vm_error(error: VmError) -> ProcessError {
         VmError::InvalidRange
         | VmError::AddressInUse
         | VmError::NotMapped
-        | VmError::MappingFailed => ProcessError::InvalidAddressSpace,
+        | VmError::MappingFailed
+        | VmError::PermissionDenied => ProcessError::InvalidAddressSpace,
     }
 }
 

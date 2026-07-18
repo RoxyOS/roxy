@@ -128,9 +128,10 @@ fn vm_error(error: VmError) -> ElfError {
     match error {
         VmError::AddressInUse => ElfError::OverlappingSegments,
         VmError::OutOfMemory => ElfError::OutOfMemory,
-        VmError::InvalidRange | VmError::NotMapped | VmError::MappingFailed => {
-            ElfError::InvalidSegment
-        }
+        VmError::InvalidRange
+        | VmError::NotMapped
+        | VmError::MappingFailed
+        | VmError::PermissionDenied => ElfError::InvalidSegment,
     }
 }
 

@@ -13,6 +13,13 @@ pub(super) struct ProcessTable {
 }
 
 impl ProcessTable {
+    pub(super) fn current_process_id(&self) -> ProcessId {
+        let thread_id = roxy_thread::scheduler::current_thread_id();
+        *self
+            .thread_owners
+            .get(&thread_id)
+            .expect("thread has no process")
+    }
     pub(super) const fn new() -> Self {
         Self {
             processes: BTreeMap::new(),

@@ -9,6 +9,7 @@ publish.workspace = true
 kernel-test = [
     "dep:linkme",
     "dep:roxy-test",
+    "roxy-fd/kernel-test",
     "roxy-elf/kernel-test",
     "roxy-vm/kernel-test",
 ]
@@ -17,6 +18,7 @@ kernel-test = [
 linkme = { workspace = true, optional = true }
 
 roxy-elf.workspace = true
+roxy-fd.workspace = true
 roxy-memory.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-thread.workspace = true

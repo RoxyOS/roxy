@@ -310,6 +310,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-fd"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-test",
+ "roxy-utils",
+]
+
+[[package]]
 name = "roxy-kernel"
 version = "0.1.0"
 dependencies = [
@@ -351,6 +360,7 @@ version = "0.1.0"
 dependencies = [
  "linkme",
  "roxy-elf",
+ "roxy-fd",
  "roxy-memory",
  "roxy-test",
  "roxy-thread",
@@ -364,6 +374,8 @@ version = "0.1.0"
 dependencies = [
  "linkme",
  "roxy-arch",
+ "roxy-fd",
+ "roxy-memory",
  "roxy-process",
  "roxy-test",
 ]
@@ -400,6 +412,7 @@ dependencies = [
  "linkme",
  "roxy-memory",
  "roxy-test",
+ "roxy-utils",
 ]
 
 [[package]]

@@ -9,6 +9,9 @@ mod table;
 pub use creation::spawn;
 pub use lifecycle::{exit_current, initialize, take_exit_status};
 
+use alloc::sync::Arc;
+
+use roxy_fd::{Fd, FdTable, OpenFile};
 use roxy_thread::ThreadId;
 use roxy_vm::AddrSpaceHandle;
 
@@ -21,6 +24,7 @@ struct Process {
     id: ProcessId,
     addrspace: Option<AddrSpaceHandle>,
     main_thread_id: ThreadId,
+    fds: FdTable,
     state: ProcessState,
 }
 
@@ -41,4 +45,48 @@ pub enum ProcessError {
     InvalidElf,
     OutOfMemory,
     InvalidAddressSpace,
+}
+
+/// Resolves a descriptor in the currently scheduled process's FD table.
+///
+/// # Errors
+///
+/// Returns an error when the descriptor is not open.
+///
+/// # Panics
+///
+/// Panics when the current scheduled thread is not owned by a running process.
+pub fn current_open_file(fd: Fd) -> Result<Arc<OpenFile>, DescriptorError> {
+    let table = table::PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    let process = table.processes.get(&process_id).unwrap();
+    process.fds.get(fd).ok_or(DescriptorError::NotOpen)
+}
+
+/// Clones the user address space belonging to the currently scheduled process.
+///
+/// # Errors
+///
+/// Returns an error only when the current process lookup cannot resolve a descriptor context.
+///
+/// # Panics
+///
+/// Panics when the current scheduled thread is not owned by a process or its process has no
+/// address space.
+pub fn current_addrspace() -> Result<AddrSpaceHandle, DescriptorError> {
+    let table = table::PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    let process = table.processes.get(&process_id).unwrap();
+
+    let addrspace = process
+        .addrspace
+        .clone()
+        .expect("running process has no address space");
+
+    Ok(addrspace)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DescriptorError {
+    NotOpen,
 }

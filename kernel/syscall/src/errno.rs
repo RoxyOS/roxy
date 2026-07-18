@@ -2,6 +2,9 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Errno {
     NoSys = 38,
+    BadFd = 9,
+    Fault = 14,
+    Io = 5,
 }
 
 impl Errno {

@@ -5,6 +5,12 @@ pub enum Permissions {
     ReadExecute,
 }
 
+impl Permissions {
+    pub(super) const fn writable(self) -> bool {
+        matches!(self, Self::ReadWrite)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VmError {
     InvalidRange,
@@ -12,4 +18,5 @@ pub enum VmError {
     OutOfMemory,
     NotMapped,
     MappingFailed,
+    PermissionDenied,
 }
