@@ -192,6 +192,7 @@ mod tests {
             table.unmap_user_page(page).unwrap();
             assert!(!table.is_user_page_mapped(page));
         }
+
         assert_eq!(statistics().allocated_frames, baseline);
     });
 

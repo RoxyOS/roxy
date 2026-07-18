@@ -114,6 +114,7 @@ fn write_frame(frame: FrameIndex, offset: usize, input: &[u8]) -> Result<(), Fra
             .as_ptr()
             .copy_to_nonoverlapping(destination, input.len());
     };
+
     Ok(())
 }
 

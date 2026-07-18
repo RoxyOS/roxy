@@ -14,6 +14,7 @@ kernel_test!(
             let _process = Process::from_elf(&image()).unwrap();
             assert!(statistics().allocated_frames > baseline);
         }
+
         assert_eq!(statistics().allocated_frames, baseline);
     }
 );

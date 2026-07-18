@@ -108,6 +108,7 @@ impl Scheduler {
         let Some(pending_reap) = self.pending_reap.take() else {
             return;
         };
+
         assert!(
             self.current != Some(pending_reap),
             "cannot reap the active thread"

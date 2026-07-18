@@ -32,6 +32,7 @@ fn dispatch(
         fault_address,
         cpu_id: CpuId::BSP,
     };
+
     let address = HANDLER.load(Ordering::Acquire);
     if address == 0 {
         X86_64::halt_forever();

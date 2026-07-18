@@ -53,6 +53,7 @@ impl AddrSpace {
         let PageState::Mapped { permissions, .. } = self.pages.get(&page)? else {
             return None;
         };
+
         Some(*permissions)
     }
 }
@@ -109,6 +110,7 @@ mod tests {
             space.map_stack().unwrap();
             assert!(statistics().allocated_frames > baseline);
         }
+
         assert_eq!(statistics().allocated_frames, baseline);
     });
 

@@ -45,6 +45,7 @@ fn collect_regions(boot_info: &BootInfo) -> Vec<MemoryRegion> {
             } else {
                 align_down(region.base)
             };
+
             let end = if usable {
                 align_down(end)
             } else {

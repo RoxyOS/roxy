@@ -145,6 +145,7 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
         let TranslateResult::Mapped { flags, .. } = self.mapper.translate(address) else {
             return Err(MappingError::NotMapped);
         };
+
         decode_user_permissions(flags)
     }
 }
@@ -181,6 +182,7 @@ fn decode_user_permissions(flags: PageTableFlags) -> Result<PagePermissions, Map
     {
         return Err(MappingError::InvalidHierarchy);
     }
+
     if flags.contains(PageTableFlags::WRITABLE) {
         Ok(PagePermissions::ReadWrite)
     } else if flags.contains(PageTableFlags::NO_EXECUTE) {

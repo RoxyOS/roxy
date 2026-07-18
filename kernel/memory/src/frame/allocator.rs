@@ -127,6 +127,7 @@ pub(crate) fn statistics() -> (usize, usize, usize) {
     let Some(allocator) = ALLOCATOR.get() else {
         return (0, 0, ALLOCATION_ATTEMPTS.load(Ordering::Relaxed));
     };
+
     let allocator = allocator.lock();
     (
         allocator.total,

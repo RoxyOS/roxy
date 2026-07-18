@@ -82,6 +82,7 @@ pub(super) fn segment_flags(flags: SegmentFlags) -> Result<LoadFlags, ElfError> 
         writable: p_flags & PF_W != 0,
         executable: p_flags & PF_X != 0,
     };
+
     if flags.writable && flags.executable {
         return Err(ElfError::WritableExecutableSegment);
     }

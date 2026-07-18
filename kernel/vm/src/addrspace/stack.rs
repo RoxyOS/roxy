@@ -41,6 +41,7 @@ impl AddrSpace {
             self.pages.remove(&guard);
             return Err(error);
         }
+
         Ok(UserStack::new(bottom, top, guard))
     }
 }

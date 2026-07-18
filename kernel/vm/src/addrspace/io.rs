@@ -76,6 +76,7 @@ fn visit_chunks(
         visitor(page, offset, consumed..consumed + chunk)?;
         consumed += chunk;
     }
+
     Ok(())
 }
 
