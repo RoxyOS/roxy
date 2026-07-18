@@ -1,5 +1,6 @@
 [alias]
 abi = "run -p xtask -- abi"
 xtask = "run -p xtask --"
+xcheck = "run -p xtask -- check"
 xtest = "run -p xtask -- test"
 xrun = "run -p xtask -- run"
