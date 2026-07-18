@@ -1,0 +1,20 @@
+[binaries]
+c = ['clang', '--target=x86_64-unknown-none-elf']
+cpp = ['clang++', '--target=x86_64-unknown-none-elf']
+ar = 'llvm-ar'
+strip = 'llvm-strip'
+
+[built-in options]
+c_args = ['-ffreestanding', '-mno-red-zone', '-fno-stack-protector', '-fno-pic', '-fno-pie']
+cpp_args = ['-D_GNU_SOURCE', '-ffreestanding', '-mno-red-zone', '-fno-stack-protector', '-fno-pic', '-fno-pie', '-fno-exceptions', '-fno-rtti']
+c_link_args = ['-fuse-ld=lld', '-nostdlib', '-static', '-no-pie']
+cpp_link_args = ['-fuse-ld=lld', '-nostdlib', '-static', '-no-pie']
+
+[properties]
+needs_exe_wrapper = true
+
+[host_machine]
+system = 'roxy'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'

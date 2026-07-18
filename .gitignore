@@ -1,4 +1,7 @@
 /target/
+/distro/.jinx-cache/
+/distro/host-sources/
+/distro/sources/
 /result
 /result-*
 /.direnv/
