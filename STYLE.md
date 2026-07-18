@@ -106,10 +106,10 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
 
 - Use blank lines to divide semantic steps such as validation, registration, construction, unsafe
   side effects, and finalization. Keep statements belonging to one continuous operation together.
-- Separate a multi-line block-bodied statement from the following independent statement with one
-  blank line. This applies to `if`, `match`, `for`, `while`, `loop`, `unsafe`, and standalone
-  blocks. Do not insert a blank line before `else`, between `match` arms, or when the following
-  syntax continues the same expression.
+- Separate a multi-line block-bodied statement from surrounding independent statements with one
+  blank line before and after it. This applies to `if`, `match`, `for`, `while`, `loop`, `unsafe`,
+  and standalone blocks. Do not require a blank line at the beginning or end of a function body,
+  before `else`, between `match` arms, or when the following syntax continues the same expression.
 - Separate the final independent statement from a function's return expression with one blank
   line. For example, write `foo();` followed by a blank line before `Ok(())`.
 
