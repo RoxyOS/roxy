@@ -1,71 +1,29 @@
 use roxy_abi::{Errno, SyscallNumber};
 use roxy_arch::RawSyscall;
 
-use crate::exit;
-
-pub(super) type SyscallResult = Result<u64, Errno>;
-type SyscallHandler = fn([u64; 6]) -> SyscallResult;
-
-const SYSCALLS: [Syscall; 1] = [exit::SYSCALL];
-const REGISTRY: Registry = Registry::new(&SYSCALLS);
-
-pub(super) struct Syscall {
-    number: SyscallNumber,
-    handler: SyscallHandler,
-}
-
-struct Registry {
-    syscalls: &'static [Syscall],
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum RegistryError {
-    DuplicateNumber(SyscallNumber),
-}
-
-impl Syscall {
-    pub(super) const fn new(number: SyscallNumber, handler: SyscallHandler) -> Self {
-        Self { number, handler }
-    }
-}
+use crate::{
+    SyscallResult,
+    registry::{REGISTRY, Registry},
+};
 
 impl Registry {
-    const fn new(syscalls: &'static [Syscall]) -> Self {
-        Self { syscalls }
-    }
-
-    fn validate(&self) -> Result<(), RegistryError> {
-        for (index, syscall) in self.syscalls.iter().enumerate() {
-            if self.syscalls[index + 1..]
-                .iter()
-                .any(|candidate| candidate.number == syscall.number)
-            {
-                return Err(RegistryError::DuplicateNumber(syscall.number));
-            }
-        }
-
-        Ok(())
-    }
-
-    fn find(&self, number: SyscallNumber) -> Option<&Syscall> {
-        self.syscalls
+    pub(super) fn dispatch(&self, number: SyscallNumber, arguments: [u64; 6]) -> SyscallResult {
+        let syscall = self
+            .syscalls
             .iter()
             .find(|syscall| syscall.number == number)
-    }
+            .ok_or(Errno::NoSys)?;
 
-    fn dispatch(&self, request: RawSyscall) -> SyscallResult {
-        let number = SyscallNumber::try_from(request.number).map_err(|()| Errno::NoSys)?;
-        let syscall = self.find(number).ok_or(Errno::NoSys)?;
-        (syscall.handler)(request.arguments)
+        (syscall.handler)(arguments)
     }
-}
-
-pub(super) fn validate_registry() {
-    assert_eq!(REGISTRY.validate(), Ok(()), "invalid syscall registry");
 }
 
 pub(super) fn dispatch(request: RawSyscall) -> u64 {
-    match REGISTRY.dispatch(request) {
+    let result = SyscallNumber::try_from(request.number)
+        .map_err(|()| Errno::NoSys)
+        .and_then(|number| REGISTRY.dispatch(number, request.arguments));
+
+    match result {
         Ok(value) => value,
         Err(error) => error.encode(),
     }
@@ -77,26 +35,18 @@ mod tests {
     use roxy_arch::RawSyscall;
     use roxy_test::kernel_test;
 
-    use super::{REGISTRY, Registry, RegistryError, Syscall, dispatch};
+    use super::dispatch;
+    use crate::{Syscall, registry::Registry};
 
-    const DUPLICATES: [Syscall; 2] = [
-        Syscall::new(SyscallNumber::Exit, return_first_argument),
-        Syscall::new(SyscallNumber::Exit, return_first_argument),
-    ];
     const RETURNING: [Syscall; 1] = [Syscall::new(SyscallNumber::Exit, return_first_argument)];
-
-    kernel_test!("roxy-syscall::exit-registered", exit_registered, {
-        assert!(REGISTRY.find(SyscallNumber::Exit).is_some());
-    });
 
     kernel_test!("roxy-syscall::return-value", return_value, {
         let registry = Registry::new(&RETURNING);
-        let result = registry.dispatch(RawSyscall {
-            number: SyscallNumber::Exit as u64,
-            arguments: [42, 0, 0, 0, 0, 0],
-        });
 
-        assert_eq!(result, Ok(42));
+        assert_eq!(
+            registry.dispatch(SyscallNumber::Exit, [42, 0, 0, 0, 0, 0]),
+            Ok(42)
+        );
     });
 
     kernel_test!("roxy-syscall::unknown-number", unknown_number, {
@@ -106,15 +56,6 @@ mod tests {
         });
 
         assert_eq!(result, Errno::NoSys.encode());
-    });
-
-    kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {
-        let registry = Registry::new(&DUPLICATES);
-
-        assert_eq!(
-            registry.validate(),
-            Err(RegistryError::DuplicateNumber(SyscallNumber::Exit))
-        );
     });
 
     fn return_first_argument(arguments: [u64; 6]) -> Result<u64, Errno> {
