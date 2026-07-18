@@ -1,4 +1,7 @@
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    arch::asm,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use x86_64::structures::idt::InterruptStackFrame;
 
@@ -20,6 +23,11 @@ pub(super) const fn vector(kind: LocalInterruptKind) -> u8 {
 
 pub(super) fn register(handler: LocalInterruptHandler) {
     HANDLER.store(handler as usize, Ordering::Release);
+}
+
+pub(super) fn wait() {
+    // SAFETY: STI takes effect after HLT, and CLI restores the scheduler's interrupt invariant.
+    unsafe { asm!("sti", "hlt", "cli", options(nomem, nostack)) };
 }
 
 fn dispatch(kind: LocalInterruptKind) {

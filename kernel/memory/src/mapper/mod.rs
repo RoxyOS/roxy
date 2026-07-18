@@ -6,7 +6,11 @@ use crate::{OwnedFrame, VirtualAddress};
 
 #[cfg(target_arch = "x86_64")]
 use self::x86_64::X86_64KernelPageTableBackend;
-pub use pagetable::{AddrSpacePageTable, MappingError, PagePermissions, PageTableToken};
+pub(crate) use pagetable::initialize_kernel_page_table;
+pub use pagetable::{
+    AddrSpacePageTable, MappingError, PagePermissions, PageTableToken, activate_kernel_page_table,
+    kernel_page_table_root,
+};
 
 #[cfg(target_arch = "x86_64")]
 pub(crate) type CurrentKernelPageTableBackend = X86_64KernelPageTableBackend;

@@ -1,4 +1,5 @@
 use crate::{PageRef, PhysicalAddress, UserPage};
+use spin::Once;
 
 #[cfg(target_arch = "x86_64")]
 use super::x86_64::X86_64AddrSpacePageTable;
@@ -31,9 +32,40 @@ pub enum MappingError {
 pub struct AddrSpacePageTable(CurrentAddrSpacePageTableBackend);
 
 /// Opaque state required to restore a previously active page table.
+#[derive(Clone, Copy)]
 pub struct PageTableToken {
     pub(crate) root: PhysicalAddress,
     pub(crate) flags: u64,
+}
+
+static KERNEL_PAGE_TABLE: Once<PageTableToken> = Once::new();
+
+pub(crate) fn initialize_kernel_page_table() {
+    KERNEL_PAGE_TABLE.call_once(CurrentAddrSpacePageTableBackend::current);
+}
+
+/// Selects the boot-owned kernel page table.
+///
+/// # Panics
+///
+/// Panics when memory initialization has not completed.
+pub fn activate_kernel_page_table() {
+    let token = *KERNEL_PAGE_TABLE.get().expect("memory not initialized");
+    // SAFETY: the boot-owned kernel page table remains alive for the entire kernel lifetime.
+    unsafe { AddrSpacePageTable::restore(token) };
+}
+
+#[must_use]
+/// Returns the boot-owned kernel page-table root.
+///
+/// # Panics
+///
+/// Panics when memory initialization has not completed.
+pub fn kernel_page_table_root() -> PhysicalAddress {
+    KERNEL_PAGE_TABLE
+        .get()
+        .expect("memory not initialized")
+        .root
 }
 
 impl AddrSpacePageTable {
@@ -129,6 +161,8 @@ pub(crate) trait AddrSpacePageTableBackend: sealed::Sealed {
         Self: Sized;
 
     fn root_address(&self) -> PhysicalAddress;
+
+    fn current() -> PageTableToken;
 
     unsafe fn activate(&self) -> PageTableToken;
 

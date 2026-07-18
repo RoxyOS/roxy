@@ -4,6 +4,7 @@ mod stack;
 mod types;
 
 use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
 
 use roxy_memory::{AddrSpacePageTable, PageRef, PageTableToken, PhysicalAddress, UserPage};
 
@@ -13,6 +14,9 @@ pub struct AddrSpace {
     pub(super) pages: BTreeMap<UserPage, PageState>,
     page_table: AddrSpacePageTable,
 }
+
+#[derive(Clone)]
+pub struct AddrSpaceHandle(Arc<AddrSpace>);
 
 impl AddrSpace {
     /// Creates an empty address space.
@@ -25,6 +29,11 @@ impl AddrSpace {
             pages: BTreeMap::new(),
             page_table: AddrSpacePageTable::new().map_err(|_| VmError::OutOfMemory)?,
         })
+    }
+
+    #[must_use]
+    pub fn into_handle(self) -> AddrSpaceHandle {
+        AddrSpaceHandle(Arc::new(self))
     }
 
     #[must_use]
@@ -55,6 +64,19 @@ impl AddrSpace {
         };
 
         Some(*permissions)
+    }
+}
+
+impl AddrSpaceHandle {
+    #[must_use]
+    pub fn root_address(&self) -> PhysicalAddress {
+        self.0.root_address()
+    }
+
+    /// Makes this address space active until another page table is selected.
+    pub fn activate(&self) {
+        // SAFETY: this strong handle keeps the complete page-table hierarchy alive while selected.
+        let _ = unsafe { self.0.page_table.activate() };
     }
 }
 
@@ -113,6 +135,23 @@ mod tests {
 
         assert_eq!(statistics().allocated_frames, baseline);
     });
+
+    kernel_test!(
+        "roxy-vm::addrspace-handle-lifetime",
+        addrspace_handle_lifetime,
+        {
+            let baseline = statistics().allocated_frames;
+            let handle = AddrSpace::new().unwrap().into_handle();
+            let clone = handle.clone();
+            assert!(statistics().allocated_frames > baseline);
+
+            drop(handle);
+            assert!(statistics().allocated_frames > baseline);
+
+            drop(clone);
+            assert_eq!(statistics().allocated_frames, baseline);
+        }
+    );
 
     fn region_at(address: u64, pages: usize) -> UserRegion {
         let address = UserAddress::new(address).unwrap();

@@ -354,6 +354,7 @@ dependencies = [
  "roxy-memory",
  "roxy-test",
  "roxy-thread",
+ "roxy-utils",
  "roxy-vm",
 ]
 
@@ -362,8 +363,7 @@ name = "roxy-syscall"
 version = "0.1.0"
 dependencies = [
  "roxy-arch",
- "roxy-memory",
- "roxy-thread",
+ "roxy-process",
 ]
 
 [[package]]
@@ -380,6 +380,7 @@ dependencies = [
  "roxy-arch",
  "roxy-memory",
  "roxy-utils",
+ "roxy-vm",
 ]
 
 [[package]]

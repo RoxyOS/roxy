@@ -72,15 +72,21 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
         self.root.start_address()
     }
 
+    fn current() -> PageTableToken {
+        let (root, flags) = Cr3::read();
+        PageTableToken {
+            root: PhysicalAddress::new(root.start_address().as_u64()).unwrap(),
+            flags: flags.bits(),
+        }
+    }
+
     unsafe fn activate(&self) -> PageTableToken {
-        let (previous, flags) = Cr3::read();
+        let previous = Self::current();
+        let flags = Cr3Flags::from_bits_truncate(previous.flags);
         let root = PhysFrame::containing_address(PhysAddr::new(self.root_address().as_u64()));
         // SAFETY: The caller keeps the complete hierarchy rooted at `root` alive while active.
         unsafe { Cr3::write(root, flags) };
-        PageTableToken {
-            root: PhysicalAddress::new(previous.start_address().as_u64()).unwrap(),
-            flags: flags.bits(),
-        }
+        previous
     }
 
     unsafe fn restore(token: PageTableToken) {

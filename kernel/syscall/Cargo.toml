@@ -10,8 +10,7 @@ kernel-test = ["roxy-arch/kernel-test"]
 
 [dependencies]
 roxy-arch.workspace = true
-roxy-memory.workspace = true
-roxy-thread.workspace = true
+roxy-process.workspace = true
 
 [lints]
 workspace = true

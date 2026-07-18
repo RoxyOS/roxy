@@ -1,3 +1,5 @@
+use core::sync::atomic::{AtomicU64, Ordering};
+
 use roxy_memory::{UserAddress, VirtualAddress};
 
 use crate::{SavedContext, stack::KernelStack};
@@ -8,9 +10,15 @@ use crate::{SavedContext, stack::KernelStack};
 /// stack is a mapping owned by its address space; only its initial user stack pointer is stored in
 /// the saved context.
 pub struct Thread {
+    id: ThreadId,
     kernel_stack: KernelStack,
     context: SavedContext,
 }
+
+static NEXT_THREAD_ID: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct ThreadId(u64);
 
 impl Thread {
     /// Creates a thread with an independent kernel stack.
@@ -22,6 +30,7 @@ impl Thread {
         let kernel_stack = KernelStack::new().ok_or(ThreadCreateError::OutOfMemory)?;
         let context = SavedContext::new(&kernel_stack, entry);
         Ok(Self {
+            id: ThreadId::new(),
             kernel_stack,
             context,
         })
@@ -43,6 +52,7 @@ impl Thread {
         let context =
             SavedContext::new_user(&kernel_stack, user_instruction_pointer, user_stack_pointer);
         Ok(Self {
+            id: ThreadId::new(),
             kernel_stack,
             context,
         })
@@ -50,6 +60,11 @@ impl Thread {
 
     pub fn context(&mut self) -> &mut SavedContext {
         &mut self.context
+    }
+
+    #[must_use]
+    pub const fn id(&self) -> ThreadId {
+        self.id
     }
 
     /// Returns the exclusive upper bound of the kernel stack.
@@ -60,6 +75,12 @@ impl Thread {
     #[must_use]
     pub fn kernel_stack_top(&self) -> VirtualAddress {
         VirtualAddress::new(u64::try_from(self.kernel_stack.top_address()).unwrap()).unwrap()
+    }
+}
+
+impl ThreadId {
+    fn new() -> Self {
+        Self(NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed))
     }
 }
 

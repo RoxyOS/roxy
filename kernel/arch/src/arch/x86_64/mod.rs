@@ -1,8 +1,10 @@
 mod exception;
 mod init;
 mod interrupt;
+mod syscall;
+mod user;
 
-use crate::{CpuId, ExceptionHandler, LocalInterruptHandler, LocalInterruptKind};
+use crate::{CpuId, ExceptionHandler, LocalInterruptHandler, LocalInterruptKind, SyscallHandler};
 
 use super::{Architecture, sealed};
 
@@ -45,7 +47,7 @@ impl Architecture for X86_64 {
     ) -> ! {
         // SAFETY: The caller guarantees valid user mappings and the backend supplies valid selectors.
         unsafe {
-            init::enter_user(
+            user::enter(
                 user_instruction_pointer,
                 user_stack_pointer,
                 kernel_stack_top,
@@ -53,9 +55,16 @@ impl Architecture for X86_64 {
         }
     }
 
-    unsafe fn configure_syscall(entry: u64) {
-        // SAFETY: The caller guarantees a permanent syscall-compatible entry point.
-        unsafe { init::configure_syscall(entry) };
+    fn configure_syscall(handler: SyscallHandler) {
+        syscall::configure(handler);
+    }
+
+    fn set_kernel_stack_top(kernel_stack_top: u64) {
+        syscall::set_kernel_stack_top(kernel_stack_top);
+    }
+
+    fn wait_for_interrupt() {
+        interrupt::wait();
     }
 
     fn halt() {

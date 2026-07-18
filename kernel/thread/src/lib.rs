@@ -8,4 +8,4 @@ mod stack;
 mod thread;
 
 pub use context::SavedContext;
-pub use thread::{Thread, ThreadCreateError};
+pub use thread::{Thread, ThreadCreateError, ThreadId};

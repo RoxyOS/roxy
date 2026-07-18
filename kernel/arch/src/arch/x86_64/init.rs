@@ -1,4 +1,4 @@
-use core::{arch::naked_asm, cell::UnsafeCell};
+use core::cell::UnsafeCell;
 
 use spin::Once;
 use tap::Tap;
@@ -7,10 +7,6 @@ use x86_64::{
     instructions::{
         segmentation::{CS, DS, ES, SS, Segment},
         tables::load_tss,
-    },
-    registers::{
-        model_specific::{Efer, EferFlags, LStar, SFMask, Star},
-        rflags::RFlags,
     },
     structures::{
         gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector},
@@ -74,61 +70,30 @@ pub(super) fn initialize(
     IDT.call_once(create_idt).load();
 }
 
-pub(super) unsafe fn enter_user(
-    user_instruction_pointer: u64,
-    user_stack_pointer: u64,
-    kernel_stack_top: u64,
-) -> ! {
-    assert!(!x86_64::instructions::interrupts::are_enabled());
-    let tss = TSS.get().expect("architecture not initialized");
-    // SAFETY: interrupts are disabled on the single supported CPU, so no concurrent TSS access exists.
-    unsafe { (*tss.0.get()).privilege_stack_table[0] = VirtAddr::new(kernel_stack_top) };
-
-    let selectors = &GDT.get().expect("architecture not initialized").1;
-    // SAFETY: initialization installed these ring-3 descriptors and the caller validates mappings.
-    unsafe {
-        iret_to_user(
-            user_instruction_pointer,
-            user_stack_pointer,
-            u64::from(selectors.user_code.0),
-            u64::from(selectors.user_data.0),
-        )
-    }
+pub(super) fn tss_pointer() -> *mut TaskStateSegment {
+    TSS.get().expect("architecture not initialized").0.get()
 }
 
-pub(super) unsafe fn configure_syscall(entry: u64) {
+pub(super) fn user_selectors() -> (u64, u64) {
     let selectors = &GDT.get().expect("architecture not initialized").1;
-    // SAFETY: architecture initialization established long mode and the configured entry is valid.
-    unsafe { Efer::update(|flags| flags.insert(EferFlags::SYSTEM_CALL_EXTENSIONS)) };
+    (
+        u64::from(selectors.user_code.0),
+        u64::from(selectors.user_data.0),
+    )
+}
 
-    Star::write(
+pub(super) fn syscall_selectors() -> (
+    SegmentSelector,
+    SegmentSelector,
+    SegmentSelector,
+    SegmentSelector,
+) {
+    let selectors = &GDT.get().expect("architecture not initialized").1;
+    (
         selectors.user_code,
         selectors.user_data,
         selectors.code,
         selectors.data,
-    )
-    .expect("invalid syscall segment layout");
-    LStar::write(VirtAddr::new(entry));
-    SFMask::write(RFlags::INTERRUPT_FLAG);
-}
-
-#[unsafe(naked)]
-unsafe extern "C" fn iret_to_user(
-    _user_instruction_pointer: u64,
-    _user_stack_pointer: u64,
-    _code_selector: u64,
-    _data_selector: u64,
-) -> ! {
-    naked_asm!(
-        "mov ax, cx",
-        "mov ds, ax",
-        "mov es, ax",
-        "push rcx",
-        "push rsi",
-        "push 0x202",
-        "push rdx",
-        "push rdi",
-        "iretq",
     )
 }
 

@@ -9,6 +9,7 @@ publish.workspace = true
 roxy-arch.workspace = true
 roxy-memory.workspace = true
 roxy-utils.workspace = true
+roxy-vm.workspace = true
 
 [lints]
 workspace = true

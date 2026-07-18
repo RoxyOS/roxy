@@ -37,9 +37,8 @@ mod tests {
             let memory = roxy_memory::statistics();
             let addrspace = roxy_vm::AddrSpace::new().unwrap();
             let thread = roxy_thread::Thread::new(unused_thread).unwrap();
-            let invalid_process = roxy_process::Process::from_elf(&[]);
-            let _ =
-                core::hint::black_box(roxy_syscall::initialize as fn(roxy_memory::VirtualAddress));
+            let invalid_process = roxy_process::spawn(&[]);
+            let _ = core::hint::black_box(roxy_syscall::initialize as fn());
 
             assert_eq!(cpu.id(), CpuId::BSP);
             assert!(memory.total_frames > 0);

@@ -40,6 +40,7 @@ pub struct ExceptionContext {
 
 pub type ExceptionHandler = fn(&ExceptionContext) -> !;
 pub type LocalInterruptHandler = fn(LocalInterruptKind);
+pub type SyscallHandler = fn(u64, u64) -> !;
 
 pub trait Architecture: sealed::Sealed {
     fn initialize(
@@ -68,12 +69,11 @@ pub trait Architecture: sealed::Sealed {
         kernel_stack_top: u64,
     ) -> !;
 
-    /// Configures the architecture syscall entry point.
-    ///
-    /// # Safety
-    ///
-    /// `entry` must remain a valid syscall-compatible entry point for the rest of execution.
-    unsafe fn configure_syscall(entry: u64);
+    fn configure_syscall(handler: SyscallHandler);
+
+    fn set_kernel_stack_top(kernel_stack_top: u64);
+
+    fn wait_for_interrupt();
 
     fn halt();
 

@@ -14,11 +14,14 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use roxy_boot::BootInfo;
 
-use mapper::{CurrentKernelPageTableBackend, KernelPageTableBackend};
+use mapper::{CurrentKernelPageTableBackend, KernelPageTableBackend, initialize_kernel_page_table};
 
 pub use address::{PAGE_SIZE, PhysicalAddress, UserAddress, UserPage, VirtualAddress};
 pub use frame::{FrameAccessError, OwnedFrame, PageRef};
-pub use mapper::{AddrSpacePageTable, MappingError, PagePermissions, PageTableToken};
+pub use mapper::{
+    AddrSpacePageTable, MappingError, PagePermissions, PageTableToken, activate_kernel_page_table,
+    kernel_page_table_root,
+};
 pub use stats::MemoryStats;
 
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
@@ -38,6 +41,7 @@ pub fn initialize(boot_info: &BootInfo) {
     let memory_map = memory_map::MemoryMap::from_boot_info(boot_info);
     frame::initialize(&memory_map.regions, boot_info.hhdm_offset);
     CurrentKernelPageTableBackend::initialize(boot_info.hhdm_offset);
+    initialize_kernel_page_table();
     heap::initialize_permanent();
 }
 
