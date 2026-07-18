@@ -112,6 +112,9 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
   before `else`, between `match` arms, or when the following syntax continues the same expression.
 - Separate the final independent statement from a function's return expression with one blank
   line. For example, write `foo();` followed by a blank line before `Ok(())`.
+- Group consecutive operations of the same kind, such as `let` bindings, function calls, or
+  assignments, together. Surround each group with blank lines when it is separated from another
+  kind of operation or semantic step.
 
 ## Imports And Paths
 
