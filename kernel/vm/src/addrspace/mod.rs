@@ -5,6 +5,7 @@ mod types;
 
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use roxy_memory::{AddrSpacePageTable, PageRef, PageTableToken, PhysicalAddress, UserPage};
 use roxy_utils::Lock;
@@ -14,10 +15,16 @@ pub use types::{Permissions, VmError};
 pub struct AddrSpace {
     pub(super) pages: BTreeMap<UserPage, PageState>,
     page_table: AddrSpacePageTable,
+    id: AddrSpaceId,
 }
 
 #[derive(Clone)]
 pub struct AddrSpaceHandle(Arc<Lock<AddrSpace>>);
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct AddrSpaceId(u64);
+
+static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 impl AddrSpace {
     /// Creates an empty address space.
@@ -29,6 +36,7 @@ impl AddrSpace {
         Ok(Self {
             pages: BTreeMap::new(),
             page_table: AddrSpacePageTable::new().map_err(|_| VmError::OutOfMemory)?,
+            id: AddrSpaceId(NEXT_ID.fetch_add(1, Ordering::Relaxed)),
         })
     }
 
@@ -69,6 +77,11 @@ impl AddrSpace {
 }
 
 impl AddrSpaceHandle {
+    #[must_use]
+    pub fn id(&self) -> AddrSpaceId {
+        self.0.lock().id
+    }
+
     #[must_use]
     pub fn root_address(&self) -> PhysicalAddress {
         self.0.lock().root_address()
