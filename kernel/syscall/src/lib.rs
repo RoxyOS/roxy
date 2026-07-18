@@ -1,11 +1,14 @@
 #![no_std]
 
 mod dispatch;
+mod errno;
+mod numbers;
 mod registry;
 mod syscalls;
 
-use roxy_abi::{Errno, SyscallNumber};
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
+
+use crate::{errno::Errno, numbers::SyscallNumber};
 
 type SyscallHandler = fn([u64; 6]) -> SyscallResult;
 type SyscallResult = Result<u64, Errno>;

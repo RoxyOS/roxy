@@ -1,8 +1,9 @@
-use roxy_abi::{Errno, SyscallNumber};
 use roxy_arch::RawSyscall;
 
 use crate::{
     SyscallResult,
+    errno::Errno,
+    numbers::SyscallNumber,
     registry::{REGISTRY, Registry},
 };
 
@@ -31,12 +32,11 @@ pub(super) fn dispatch(request: RawSyscall) -> u64 {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use roxy_abi::{Errno, SyscallNumber};
     use roxy_arch::RawSyscall;
     use roxy_test::kernel_test;
 
     use super::dispatch;
-    use crate::{Syscall, registry::Registry};
+    use crate::{Syscall, errno::Errno, numbers::SyscallNumber, registry::Registry};
 
     const RETURNING: [Syscall; 1] = [Syscall::new(SyscallNumber::Exit, return_first_argument)];
 

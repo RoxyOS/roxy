@@ -1,7 +1,6 @@
-use roxy_abi::SyscallNumber;
 use roxy_process::ExitStatus;
 
-use crate::{Syscall, SyscallResult};
+use crate::{Syscall, SyscallResult, numbers::SyscallNumber};
 
 pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Exit, handle);
 

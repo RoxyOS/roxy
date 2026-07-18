@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["abi", "xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/elf", "kernel/memory", "kernel/process", "kernel/syscall", "kernel/test", "kernel/thread", "kernel/utils", "kernel/vm"]
+members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/elf", "kernel/memory", "kernel/process", "kernel/syscall", "kernel/test", "kernel/thread", "kernel/utils", "kernel/vm"]
 
 [workspace.package]
 edition = "2024"
@@ -11,7 +11,6 @@ publish = false
 anyhow = "1"
 bitflags = "2"
 buddy_system_allocator = { version = "0.13", default-features = false, features = ["alloc"] }
-cbindgen = { version = "0.29", default-features = false }
 clap = { version = "4", features = ["derive"] }
 heapless = "0.9"
 limine = "0.6"
@@ -25,7 +24,6 @@ x86_64 = { version = "0.15", features = ["abi_x86_interrupt"] }
 x2apic = "0.5"
 xshell = "0.2"
 
-roxy-abi.path = "abi"
 roxy-arch.path = "kernel/arch"
 roxy-boot.path = "kernel/boot"
 roxy-cpu.path = "kernel/cpu"

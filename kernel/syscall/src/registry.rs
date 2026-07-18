@@ -1,6 +1,4 @@
-use roxy_abi::SyscallNumber;
-
-use crate::{Syscall, syscalls};
+use crate::{Syscall, numbers::SyscallNumber, syscalls};
 
 pub(super) const REGISTRY: Registry = Registry::new(&syscalls::SYSCALLS);
 
@@ -34,11 +32,10 @@ impl Registry {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use roxy_abi::{Errno, SyscallNumber};
     use roxy_test::kernel_test;
 
     use super::{REGISTRY, Registry, RegistryError};
-    use crate::Syscall;
+    use crate::{Syscall, errno::Errno, numbers::SyscallNumber};
 
     const DUPLICATES: [Syscall; 2] = [
         Syscall::new(SyscallNumber::Exit, return_first_argument),

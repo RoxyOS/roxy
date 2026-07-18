@@ -1,4 +1,3 @@
-mod abi;
 mod action;
 mod build_kernel;
 mod check;
@@ -10,18 +9,13 @@ pub(crate) use build_kernel::{build_kernel, build_test_kernel};
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{AbiArg, Arg, Cli};
+use cli::{Arg, Cli};
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     if let Some(arg) = cli.arg {
         match arg {
-            Arg::Abi { arg: AbiArg::Build } => abi::build(),
-            Arg::Abi { arg: AbiArg::Check } => abi::check(),
-            Arg::Abi {
-                arg: AbiArg::Generate,
-            } => abi::generate(),
             Arg::Check => check::run(),
             Arg::Image => action::image(),
             Arg::Run => action::run(),

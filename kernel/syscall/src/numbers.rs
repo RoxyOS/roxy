@@ -1,8 +1,6 @@
-use core::mem::{align_of, size_of};
-
 #[repr(u64)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SyscallNumber {
+pub(crate) enum SyscallNumber {
     Exit = 0,
 }
 
@@ -16,11 +14,6 @@ impl TryFrom<u64> for SyscallNumber {
         }
     }
 }
-
-const _: () = {
-    assert!(size_of::<SyscallNumber>() == 8);
-    assert!(align_of::<SyscallNumber>() == 8);
-};
 
 #[cfg(test)]
 mod tests {

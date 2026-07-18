@@ -4,14 +4,11 @@ pub(crate) fn run() -> Result<()> {
     println!("==> Checking formatting");
     crate::cmd!("cargo fmt --all --check")?;
 
-    println!("==> Checking ABI artifacts");
-    crate::abi::check()?;
-
     println!("==> Checking workspace");
     crate::cmd!("cargo check --workspace --all-targets")?;
 
-    println!("==> Testing ABI definitions");
-    crate::cmd!("cargo test --package roxy-abi")?;
+    println!("==> Testing syscall definitions");
+    crate::cmd!("cargo test --package roxy-syscall")?;
 
     println!("==> Linting workspace");
     crate::cmd!("cargo clippy --workspace --all-targets -- -D warnings")?;
