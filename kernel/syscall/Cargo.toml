@@ -6,11 +6,15 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-kernel-test = ["roxy-arch/kernel-test"]
+kernel-test = ["dep:linkme", "dep:roxy-test", "roxy-arch/kernel-test"]
 
 [dependencies]
+linkme = { workspace = true, optional = true }
+
+roxy-abi.workspace = true
 roxy-arch.workspace = true
 roxy-process.workspace = true
+roxy-test = { workspace = true, optional = true }
 
 [lints]
 workspace = true

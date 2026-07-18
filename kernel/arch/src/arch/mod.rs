@@ -40,7 +40,21 @@ pub struct ExceptionContext {
 
 pub type ExceptionHandler = fn(&ExceptionContext) -> !;
 pub type LocalInterruptHandler = fn(LocalInterruptKind);
-pub type SyscallHandler = fn(u64, u64) -> !;
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Architecture-normalized syscall registers without ABI-level interpretation.
+pub struct RawSyscall {
+    pub number: u64,
+    pub arguments: [u64; 6],
+}
+
+const _: () = {
+    assert!(core::mem::offset_of!(RawSyscall, number) == 0);
+    assert!(core::mem::offset_of!(RawSyscall, arguments) == 8);
+    assert!(core::mem::size_of::<RawSyscall>() == 56);
+};
+
+pub type SyscallHandler = fn(RawSyscall) -> u64;
 
 pub trait Architecture: sealed::Sealed {
     fn initialize(

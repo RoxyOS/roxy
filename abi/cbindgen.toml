@@ -1,0 +1,16 @@
+language = "C"
+include_guard = "ROXY_ABI_H"
+pragma_once = false
+usize_is_size_t = true
+documentation = true
+style = "both"
+
+[parse]
+parse_deps = false
+
+[export]
+include = ["Errno", "SyscallNumber", "roxy_syscall_exit"]
+item_types = ["enums", "functions", "structs"]
+
+[enum]
+prefix_with_name = true
