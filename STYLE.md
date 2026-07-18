@@ -110,6 +110,8 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
   blank line. This applies to `if`, `match`, `for`, `while`, `loop`, `unsafe`, and standalone
   blocks. Do not insert a blank line before `else`, between `match` arms, or when the following
   syntax continues the same expression.
+- Separate the final independent statement from a function's return expression with one blank
+  line. For example, write `foo();` followed by a blank line before `Ok(())`.
 
 ## Imports And Paths
 
