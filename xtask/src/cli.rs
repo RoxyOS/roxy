@@ -13,6 +13,7 @@ pub(crate) enum Arg {
         #[command(subcommand)]
         arg: AbiArg,
     },
+    Check,
     Image,
     Run,
     Test,

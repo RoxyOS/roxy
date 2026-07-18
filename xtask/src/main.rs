@@ -1,6 +1,7 @@
 mod abi;
 mod action;
 mod build_kernel;
+mod check;
 mod cli;
 mod image;
 mod utils;
@@ -21,6 +22,7 @@ fn main() -> Result<()> {
             Arg::Abi {
                 arg: AbiArg::Generate,
             } => abi::generate(),
+            Arg::Check => check::run(),
             Arg::Image => action::image(),
             Arg::Run => action::run(),
             Arg::Test => action::test(),
