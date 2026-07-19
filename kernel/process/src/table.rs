@@ -2,6 +2,7 @@ use alloc::collections::BTreeMap;
 
 use roxy_thread::ThreadId;
 use roxy_utils::Lock;
+use roxy_vm::AddrSpaceHandle;
 
 use crate::{Process, ProcessId};
 
@@ -34,6 +35,27 @@ impl ProcessTable {
         assert!(previous.is_none(), "thread already belongs to a process");
         let previous = self.processes.insert(process.id, process);
         assert!(previous.is_none(), "process id reused");
+    }
+
+    pub(super) fn replace_addrspace(
+        &mut self,
+        thread_id: ThreadId,
+        addrspace: AddrSpaceHandle,
+    ) -> AddrSpaceHandle {
+        let process_id = self.thread_owners[&thread_id];
+        let process = self.processes.get_mut(&process_id).unwrap();
+
+        process.addrspace.replace(addrspace).unwrap()
+    }
+
+    pub(super) fn activate_addrspace(&self, thread_id: ThreadId) {
+        let process_id = self.thread_owners[&thread_id];
+        let addrspace = self.processes[&process_id]
+            .addrspace
+            .as_ref()
+            .expect("running process has no address space");
+
+        addrspace.activate();
     }
 }
 

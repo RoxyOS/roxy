@@ -3,13 +3,16 @@
 extern crate alloc;
 
 mod creation;
+mod execve;
 mod fork;
+mod image;
 mod lifecycle;
 mod memory;
 mod startup_stack;
 mod table;
 
 pub use creation::spawn;
+pub use execve::execve_current;
 pub use fork::{ForkError, fork_current};
 pub use lifecycle::{exit_current, initialize, take_exit_status};
 pub use memory::{
@@ -26,9 +29,8 @@ use roxy_vm::AddrSpaceHandle;
 
 /// Long-lived process metadata owned by the process table.
 ///
-/// The scheduler separately owns the runnable thread and an address-space handle needed by the
-/// context-switch path. This process retains its own handle until that thread has been safely
-/// reaped on another kernel stack.
+/// The scheduler resolves this process-owned address space only while preparing a context switch.
+/// The process retains it until its thread has been safely reaped on another kernel stack.
 struct Process {
     id: ProcessId,
     addrspace: Option<AddrSpaceHandle>,
@@ -58,9 +60,13 @@ pub struct ExitStatus(pub u64);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProcessError {
+    ArgumentsTooLarge,
+    FileNotFound,
     InvalidElf,
-    OutOfMemory,
     InvalidAddressSpace,
+    OutOfMemory,
+    UnsupportedElf,
+    UnsupportedFile,
 }
 
 /// Resolves a descriptor in the currently scheduled process's FD table.

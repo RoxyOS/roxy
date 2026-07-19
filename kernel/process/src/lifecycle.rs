@@ -6,7 +6,12 @@ use crate::{
 };
 
 pub fn initialize() {
+    scheduler::register_user_dispatch_hook(activate_addrspace);
     scheduler::register_reaped_handler(on_thread_reaped);
+}
+
+fn activate_addrspace(thread_id: ThreadId) {
+    PROCESS_TABLE.lock().activate_addrspace(thread_id);
 }
 
 pub fn exit_current(status: ExitStatus) -> ! {
@@ -84,6 +89,36 @@ mod tests {
         drop(addrspace);
         assert_eq!(statistics().allocated_frames, baseline);
     });
+
+    kernel_test!(
+        "roxy-process::replace-address-space",
+        replace_address_space,
+        {
+            let old = AddrSpace::new().unwrap().into_handle();
+            let new = AddrSpace::new().unwrap().into_handle();
+            let thread = Thread::new(unused_thread).unwrap();
+            let thread_id = thread.id();
+            let mut table = ProcessTable::new();
+            let process = Process::new(thread_id, old.clone());
+            let process_id = process.id;
+
+            table.insert(process);
+
+            let replaced = table.replace_addrspace(thread_id, new.clone());
+
+            assert_eq!(replaced.id(), old.id());
+            assert_eq!(
+                table.processes[&process_id]
+                    .addrspace
+                    .as_ref()
+                    .unwrap()
+                    .id(),
+                new.id()
+            );
+            assert_eq!(table.processes[&process_id].main_thread_id, thread_id);
+            assert_eq!(table.processes[&process_id].id, process_id);
+        }
+    );
 
     fn unused_thread() -> ! {
         panic!("unused process test thread started")

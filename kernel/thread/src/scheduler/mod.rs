@@ -1,4 +1,3 @@
-mod addrspace;
 mod control;
 mod reap;
 mod state;
@@ -6,14 +5,13 @@ mod switch;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_utils::Lock;
-use roxy_vm::AddrSpaceHandle;
 
 pub use control::{exit_current, on_timer_interrupt, start};
 pub use reap::{
     ThreadExitHandler, ThreadReapedHandler, register_exit_handler, register_reaped_handler,
 };
 
-use self::{addrspace::ScheduledAddrSpace, state::Scheduler};
+use self::state::{Scheduler, ThreadKind};
 use crate::{Thread, ThreadCreateError, ThreadId};
 
 static SCHEDULER: Lock<Scheduler> = Lock::new(Scheduler::new());
@@ -30,11 +28,11 @@ pub fn spawn(entry: fn() -> !) -> Result<(), ThreadCreateError> {
 }
 
 pub fn enqueue_kernel(thread: Thread) {
-    enqueue(thread, ScheduledAddrSpace::Kernel);
+    enqueue(thread, ThreadKind::Kernel);
 }
 
-pub fn enqueue_user(thread: Thread, addrspace: AddrSpaceHandle) {
-    enqueue(thread, ScheduledAddrSpace::User(addrspace));
+pub fn enqueue_user(thread: Thread) {
+    enqueue(thread, ThreadKind::User);
 }
 
 /// Returns the currently running thread's identifier.
@@ -44,6 +42,17 @@ pub fn enqueue_user(thread: Thread, addrspace: AddrSpaceHandle) {
 /// Panics when called outside a scheduled thread.
 pub fn current_thread_id() -> ThreadId {
     SCHEDULER.lock().current_thread_id()
+}
+
+/// Registers the hook responsible for activating the next user thread's address space.
+///
+/// The scheduler invokes the hook with the target thread immediately before switching to it.
+///
+/// # Panics
+///
+/// Panics when a hook was already registered.
+pub fn register_user_dispatch_hook(hook: fn(ThreadId)) {
+    switch::register_user_dispatch_hook(hook);
 }
 
 #[must_use = "a prepared block must be performed"]
@@ -74,8 +83,8 @@ pub fn wake(thread_id: ThreadId) -> bool {
     CurrentArchitectureBackend::without_interrupts(|| SCHEDULER.lock().wake(thread_id))
 }
 
-fn enqueue(thread: Thread, addrspace: ScheduledAddrSpace) {
+fn enqueue(thread: Thread, kind: ThreadKind) {
     CurrentArchitectureBackend::without_interrupts(|| {
-        SCHEDULER.lock().enqueue(thread, addrspace);
+        SCHEDULER.lock().enqueue(thread, kind);
     });
 }

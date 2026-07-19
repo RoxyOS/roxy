@@ -1,6 +1,6 @@
 use core::{
     arch::naked_asm,
-    mem::{offset_of, size_of},
+    mem::{offset_of, size_of, transmute},
     sync::atomic::{AtomicU64, AtomicUsize, Ordering},
 };
 
@@ -12,11 +12,12 @@ use x86_64::{
     },
 };
 
-use crate::{Architecture, RawSyscall, SyscallHandler};
+use crate::{Architecture, CurrentArchitectureBackend, RawSyscall, SyscallHandler};
 
 use super::init;
 
 static KERNEL_STACK_TOP: AtomicU64 = AtomicU64::new(0);
+static USER_STACK_POINTER: AtomicU64 = AtomicU64::new(0);
 static HANDLER: AtomicUsize = AtomicUsize::new(0);
 
 #[repr(C)]
@@ -99,8 +100,9 @@ pub(super) fn set_kernel_stack_top(kernel_stack_top: u64) {
 #[unsafe(naked)]
 unsafe extern "C" fn entry() -> ! {
     naked_asm!(
-        "xchg rsp, [rip + {kernel_stack_top}]",
-        "push qword ptr [rip + {kernel_stack_top}]",
+        "mov [rip + {user_stack_pointer}], rsp",
+        "mov rsp, [rip + {kernel_stack_top}]",
+        "push qword ptr [rip + {user_stack_pointer}]",
         "push r11",
         "push rcx",
         "push r9",
@@ -120,16 +122,14 @@ unsafe extern "C" fn entry() -> ! {
         "call {dispatch}",
         "mov rcx, [rsp + {user_instruction_pointer}]",
         "mov r11, [rsp + {user_flags}]",
-        "lea rdx, [rsp + {frame_size}]",
-        "mov [rip + {kernel_stack_top}], rdx",
-        "mov rsp, [rsp + {user_stack_pointer}]",
+        "mov rsp, [rsp + {saved_user_stack_pointer}]",
         "sysretq",
         kernel_stack_top = sym KERNEL_STACK_TOP,
+        user_stack_pointer = sym USER_STACK_POINTER,
         dispatch = sym dispatch,
         user_instruction_pointer = const offset_of!(EntryFrame, user_instruction_pointer),
         user_flags = const offset_of!(EntryFrame, user_flags),
-        user_stack_pointer = const offset_of!(EntryFrame, user_stack_pointer),
-        frame_size = const size_of::<EntryFrame>(),
+        saved_user_stack_pointer = const offset_of!(EntryFrame, user_stack_pointer),
     )
 }
 
@@ -137,7 +137,7 @@ extern "C" fn dispatch(frame: *const EntryFrame) -> u64 {
     let address = HANDLER.load(Ordering::Acquire);
     assert_ne!(address, 0, "syscall handler not initialized");
 
-    // SAFETY: entry passes a pointer to its complete, live EntryFrame on the kernel stack.
+    // SAFETY: entry passes a pointer to its complete, live frame on the kernel stack.
     let frame = unsafe { &*frame };
     let request = RawSyscall {
         number: frame.rax,
@@ -161,10 +161,40 @@ extern "C" fn dispatch(frame: *const EntryFrame) -> u64 {
             instruction_pointer: frame.user_instruction_pointer,
             flags: frame.user_flags,
             stack_pointer: frame.user_stack_pointer,
-            fs_base: super::super::CurrentArchitectureBackend::user_thread_pointer(),
+            fs_base: CurrentArchitectureBackend::user_thread_pointer(),
         },
     };
     // SAFETY: configure stores one permanent SyscallHandler function pointer.
-    let handler: SyscallHandler = unsafe { core::mem::transmute(address) };
+    let handler: SyscallHandler = unsafe { transmute(address) };
     handler(request)
+}
+
+pub(super) unsafe fn resume_user(instruction_pointer: u64, stack_pointer: u64) -> ! {
+    CurrentArchitectureBackend::set_user_thread_pointer(0);
+
+    // SAFETY: the caller guarantees valid user mappings and this function resets user state.
+    unsafe { sysret_fresh(instruction_pointer, stack_pointer) }
+}
+
+#[unsafe(naked)]
+unsafe extern "C" fn sysret_fresh(_instruction_pointer: u64, _stack_pointer: u64) -> ! {
+    naked_asm!(
+        "mov rcx, rdi",
+        "mov rsp, rsi",
+        "mov r11, 0x202",
+        "xor r15, r15",
+        "xor r14, r14",
+        "xor r13, r13",
+        "xor r12, r12",
+        "xor rbp, rbp",
+        "xor rbx, rbx",
+        "xor rax, rax",
+        "xor rdi, rdi",
+        "xor rsi, rsi",
+        "xor rdx, rdx",
+        "xor r10, r10",
+        "xor r8, r8",
+        "xor r9, r9",
+        "sysretq",
+    )
 }

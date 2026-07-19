@@ -1,14 +1,17 @@
 use roxy_arch::RawSyscall;
 
 use crate::{
-    SyscallResult,
     errno::Errno,
     numbers::SyscallNumber,
     registry::{REGISTRY, Registry},
 };
 
 impl Registry {
-    pub(super) fn dispatch(&self, number: SyscallNumber, request: RawSyscall) -> SyscallResult {
+    pub(super) fn dispatch(
+        &self,
+        number: SyscallNumber,
+        request: RawSyscall,
+    ) -> crate::SyscallResult {
         let syscall = self
             .syscalls
             .iter()

@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
 
-use super::addrspace::ScheduledAddrSpace;
 use crate::{SavedContext, Thread, ThreadId};
 
 pub(super) struct Scheduler {
@@ -12,8 +11,14 @@ pub(super) struct Scheduler {
 
 pub(super) struct SchedulerEntry {
     pub(super) thread: Thread,
-    pub(super) addrspace: ScheduledAddrSpace,
+    pub(super) kind: ThreadKind,
     pub(super) state: ThreadState,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum ThreadKind {
+    Kernel,
+    User,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -36,10 +41,10 @@ impl Scheduler {
         }
     }
 
-    pub(super) fn enqueue(&mut self, thread: Thread, addrspace: ScheduledAddrSpace) {
+    pub(super) fn enqueue(&mut self, thread: Thread, kind: ThreadKind) {
         self.entries.push(SchedulerEntry {
             thread,
-            addrspace,
+            kind,
             state: ThreadState::Runnable,
         });
     }

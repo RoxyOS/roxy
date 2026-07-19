@@ -63,6 +63,11 @@ impl Architecture for X86_64 {
         syscall::configure(handler);
     }
 
+    unsafe fn resume_user(instruction_pointer: u64, stack_pointer: u64) -> ! {
+        // SAFETY: the caller guarantees that both addresses are valid in the active user image.
+        unsafe { syscall::resume_user(instruction_pointer, stack_pointer) }
+    }
+
     fn set_kernel_stack_top(kernel_stack_top: u64) {
         syscall::set_kernel_stack_top(kernel_stack_top);
     }

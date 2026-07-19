@@ -36,11 +36,11 @@ pub fn fork_current(context: UserContext) -> Result<ProcessId, ForkError> {
     let child_addrspace = addrspace.fork_copy().map_err(map_vm_error)?;
     let child_context = context.with_syscall_result(0);
     let child_thread = Thread::new_user_resume(child_context).map_err(map_thread_error)?;
-    let child_process = Process::from_fork(child_thread.id(), child_addrspace.clone(), fds);
+    let child_process = Process::from_fork(child_thread.id(), child_addrspace, fds);
     let child_id = child_process.id;
 
     PROCESS_TABLE.lock().insert(child_process);
-    scheduler::enqueue_user(child_thread, child_addrspace);
+    scheduler::enqueue_user(child_thread);
 
     Ok(child_id)
 }

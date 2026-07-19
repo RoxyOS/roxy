@@ -3,7 +3,11 @@ use roxy_thread::scheduler::current_thread_id;
 
 use crate::errno::Errno;
 
-pub(crate) fn unsupported_argument(operation: &str, argument: u64, errno: Errno) -> Errno {
+pub(crate) fn unsupported_argument(
+    operation: &str,
+    argument: impl core::fmt::Display,
+    errno: Errno,
+) -> Errno {
     roxy_utils::unsupported::report(
         operation,
         argument,

@@ -19,6 +19,7 @@ pub(crate) enum SyscallNumber {
     VmProtect = 15,
     Stat = 16,
     Fork = 17,
+    Execve = 18,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -44,6 +45,7 @@ impl TryFrom<u64> for SyscallNumber {
             15 => Ok(Self::VmProtect),
             16 => Ok(Self::Stat),
             17 => Ok(Self::Fork),
+            18 => Ok(Self::Execve),
             _ => Err(()),
         }
     }
@@ -73,6 +75,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(15), Ok(SyscallNumber::VmProtect));
         assert_eq!(SyscallNumber::try_from(16), Ok(SyscallNumber::Stat));
         assert_eq!(SyscallNumber::try_from(17), Ok(SyscallNumber::Fork));
-        assert!(SyscallNumber::try_from(18).is_err());
+        assert_eq!(SyscallNumber::try_from(18), Ok(SyscallNumber::Execve));
+        assert!(SyscallNumber::try_from(19).is_err());
     });
 }

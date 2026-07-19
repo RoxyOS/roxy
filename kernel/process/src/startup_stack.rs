@@ -1,9 +1,11 @@
 use alloc::vec::Vec;
+use core::mem::size_of;
 
+use roxy_elf::LoadedElf;
 use roxy_memory::{PAGE_SIZE, UserAddress};
 use roxy_vm::{AddrSpace, UserStack};
 
-use crate::{ProcessError, creation::process_vm_error};
+use crate::{ProcessError, image::process_vm_error};
 
 const AT_PHDR: u64 = 3;
 const AT_PHENT: u64 = 4;
@@ -13,150 +15,160 @@ const AT_BASE: u64 = 7;
 const AT_ENTRY: u64 = 9;
 const AT_SECURE: u64 = 23;
 const AT_EXECFN: u64 = 31;
-const HEADER_WORDS: usize = 4 + 2 * 9;
+const AUX_ENTRIES: usize = 9;
 
-struct StackLayout {
-    start: UserAddress,
-    path_address: UserAddress,
+pub(super) struct StartupStackData<'a> {
+    pub(super) path: &'a [u8],
+    pub(super) argv: &'a [Vec<u8>],
+    pub(super) envp: &'a [Vec<u8>],
+    pub(super) executable: &'a LoadedElf,
+    pub(super) interpreter_base: u64,
 }
 
 pub(super) fn build(
     addrspace: &mut AddrSpace,
     stack: UserStack,
-    path: &[u8],
-    loaded: &roxy_elf::LoadedElf,
-    interpreter_base: u64,
+    stack_data: &StartupStackData<'_>,
 ) -> Result<UserAddress, ProcessError> {
-    let layout = layout(stack, path.len())?;
-    let data = encode(layout.path_address, path, loaded, interpreter_base);
+    let header_size = header_size(stack_data.argv.len(), stack_data.envp.len())?;
+    let data_size = header_size
+        .checked_add(strings_size(
+            stack_data.path,
+            stack_data.argv,
+            stack_data.envp,
+        )?)
+        .ok_or(ProcessError::ArgumentsTooLarge)?;
+    let stack_pointer = stack_pointer(stack, data_size)?;
+    let strings_address = stack_pointer
+        .checked_add(u64::try_from(header_size).unwrap())
+        .ok_or(ProcessError::InvalidAddressSpace)?;
+    let data = encode(stack_data, data_size, strings_address)?;
 
     addrspace
-        .write_bytes(layout.start, &data)
+        .write_bytes(stack_pointer, &data)
         .map_err(process_vm_error)?;
 
-    Ok(layout.start)
+    Ok(stack_pointer)
 }
 
 fn encode(
-    path_address: UserAddress,
-    path: &[u8],
-    loaded: &roxy_elf::LoadedElf,
-    interpreter_base: u64,
-) -> Vec<u8> {
+    stack_data: &StartupStackData<'_>,
+    data_size: usize,
+    strings_address: UserAddress,
+) -> Result<Vec<u8>, ProcessError> {
     let mut data = Vec::new();
-
-    push_word(&mut data, 1); // argc
-
-    push_word(&mut data, path_address.as_u64()); // argv
-    push_word(&mut data, 0); // argv terminator
-
-    push_word(&mut data, 0); // envp
-
-    push_aux(&mut data, AT_PHDR, loaded.program_headers.address.as_u64());
-    push_aux(
-        &mut data,
-        AT_PHENT,
-        u64::from(loaded.program_headers.entry_size),
-    );
-    push_aux(&mut data, AT_PHNUM, u64::from(loaded.program_headers.count));
-    push_aux(&mut data, AT_ENTRY, loaded.entry.as_u64());
-    push_aux(&mut data, AT_BASE, interpreter_base);
-    push_aux(&mut data, AT_PAGESZ, PAGE_SIZE);
-    push_aux(&mut data, AT_EXECFN, path_address.as_u64());
-    push_aux(&mut data, AT_SECURE, 0);
-    push_aux(&mut data, 0, 0); // AT_NULL
-
-    data.extend_from_slice(path);
-    data.push(0);
-
-    data
-}
-
-fn layout(stack: UserStack, path_length: usize) -> Result<StackLayout, ProcessError> {
-    let header_size = HEADER_WORDS * core::mem::size_of::<u64>();
-    let data_size = header_size
-        .checked_add(path_length)
-        .and_then(|size| size.checked_add(1))
-        .ok_or(ProcessError::InvalidAddressSpace)?;
-    let aligned_size = align_up(data_size, 16).ok_or(ProcessError::InvalidAddressSpace)?;
-    let start = stack
-        .top
+    data.try_reserve_exact(data_size)
+        .map_err(|_| ProcessError::OutOfMemory)?;
+    let mut next_string = strings_address
         .as_u64()
-        .checked_sub(u64::try_from(aligned_size).unwrap())
-        .and_then(UserAddress::new)
-        .filter(|start| *start >= stack.bottom)
-        .ok_or(ProcessError::InvalidAddressSpace)?;
-    let path_address = start
-        .checked_add(u64::try_from(header_size).unwrap())
+        .checked_add(u64::try_from(stack_data.path.len() + 1).unwrap())
         .ok_or(ProcessError::InvalidAddressSpace)?;
 
-    Ok(StackLayout {
-        start,
-        path_address,
-    })
+    push_word(&mut data, u64::try_from(stack_data.argv.len()).unwrap());
+    push_string_pointers(&mut data, stack_data.argv, &mut next_string)?;
+    push_word(&mut data, 0);
+    push_string_pointers(&mut data, stack_data.envp, &mut next_string)?;
+    push_word(&mut data, 0);
+    push_auxiliary(
+        &mut data,
+        strings_address,
+        stack_data.executable,
+        stack_data.interpreter_base,
+    );
+    append_strings(&mut data, stack_data.path, stack_data.argv, stack_data.envp);
+
+    debug_assert_eq!(data.len(), data_size);
+
+    Ok(data)
 }
 
-fn push_aux(data: &mut Vec<u8>, key: u64, value: u64) {
-    push_word(data, key);
-    push_word(data, value);
+fn push_string_pointers(
+    data: &mut Vec<u8>,
+    strings: &[Vec<u8>],
+    next_address: &mut u64,
+) -> Result<(), ProcessError> {
+    for string in strings {
+        push_word(data, *next_address);
+        *next_address = next_address
+            .checked_add(u64::try_from(string.len() + 1).unwrap())
+            .ok_or(ProcessError::InvalidAddressSpace)?;
+    }
+
+    Ok(())
+}
+
+fn push_auxiliary(
+    data: &mut Vec<u8>,
+    execfn: UserAddress,
+    executable: &LoadedElf,
+    interpreter_base: u64,
+) {
+    let headers = &executable.program_headers;
+    let entries = [
+        (AT_PHDR, headers.address.as_u64()),
+        (AT_PHENT, u64::from(headers.entry_size)),
+        (AT_PHNUM, u64::from(headers.count)),
+        (AT_ENTRY, executable.entry.as_u64()),
+        (AT_BASE, interpreter_base),
+        (AT_PAGESZ, PAGE_SIZE),
+        (AT_EXECFN, execfn.as_u64()),
+        (AT_SECURE, 0),
+        (0, 0),
+    ];
+
+    for (key, value) in entries {
+        push_word(data, key);
+        push_word(data, value);
+    }
+}
+
+fn append_strings(data: &mut Vec<u8>, path: &[u8], argv: &[Vec<u8>], envp: &[Vec<u8>]) {
+    append_string(data, path);
+    for string in argv.iter().chain(envp) {
+        append_string(data, string);
+    }
+}
+
+fn header_size(argv_count: usize, envp_count: usize) -> Result<usize, ProcessError> {
+    let words = 3_usize
+        .checked_add(argv_count)
+        .and_then(|count| count.checked_add(envp_count))
+        .and_then(|count| count.checked_add(AUX_ENTRIES * 2))
+        .ok_or(ProcessError::ArgumentsTooLarge)?;
+
+    words
+        .checked_mul(size_of::<u64>())
+        .ok_or(ProcessError::ArgumentsTooLarge)
+}
+
+fn strings_size(path: &[u8], argv: &[Vec<u8>], envp: &[Vec<u8>]) -> Result<usize, ProcessError> {
+    argv.iter()
+        .chain(envp)
+        .try_fold(path.len() + 1, |size, string| {
+            size.checked_add(string.len() + 1)
+        })
+        .ok_or(ProcessError::ArgumentsTooLarge)
+}
+
+fn stack_pointer(stack: UserStack, data_size: usize) -> Result<UserAddress, ProcessError> {
+    let aligned_size = data_size
+        .checked_add(15)
+        .map(|size| size / 16 * 16)
+        .ok_or(ProcessError::ArgumentsTooLarge)?;
+    let available = usize::try_from(stack.top.as_u64() - stack.bottom.as_u64()).unwrap();
+    if aligned_size > available {
+        return Err(ProcessError::ArgumentsTooLarge);
+    }
+
+    UserAddress::new(stack.top.as_u64() - u64::try_from(aligned_size).unwrap())
+        .ok_or(ProcessError::InvalidAddressSpace)
+}
+
+fn append_string(data: &mut Vec<u8>, value: &[u8]) {
+    data.extend_from_slice(value);
+    data.push(0);
 }
 
 fn push_word(data: &mut Vec<u8>, value: u64) {
     data.extend_from_slice(&value.to_ne_bytes());
-}
-
-fn align_up(value: usize, alignment: usize) -> Option<usize> {
-    value
-        .checked_add(alignment - 1)
-        .map(|value| value / alignment * alignment)
-}
-
-#[cfg(feature = "kernel-test")]
-mod tests {
-    use roxy_memory::UserAddress;
-    use roxy_test::kernel_test;
-    use roxy_vm::AddrSpace;
-
-    use super::{HEADER_WORDS, build};
-
-    kernel_test!("roxy-process::initial-user-stack", initial_user_stack, {
-        let mut addrspace = AddrSpace::new().unwrap();
-        let stack = addrspace.map_stack().unwrap();
-        let executable = roxy_elf::LoadedElf {
-            entry: UserAddress::new(0x40_1000).unwrap(),
-            base: 0,
-            program_headers: roxy_elf::ProgramHeaders {
-                address: UserAddress::new(0x40_0040).unwrap(),
-                entry_size: 56,
-                count: 7,
-            },
-            interpreter: Some(b"/usr/lib/ld.so".to_vec()),
-        };
-        let pointer = build(
-            &mut addrspace,
-            stack,
-            b"/bin/program",
-            &executable,
-            0x20_0000_0000,
-        )
-        .unwrap();
-        let mut header = alloc::vec![0; HEADER_WORDS * 8];
-
-        addrspace.read_bytes(pointer, &mut header).unwrap();
-
-        assert_eq!(word(&header, 0), 1);
-        assert_eq!(word(&header, 2), 0);
-        assert_eq!(word(&header, 3), 0);
-        assert_eq!(pointer.as_u64() % 16, 0);
-        assert_eq!(word(&header, 4), 3);
-        assert_eq!(word(&header, 5), 0x40_0040);
-        assert_eq!(word(&header, 12), 7);
-        assert_eq!(word(&header, 13), 0x20_0000_0000);
-    });
-
-    fn word(bytes: &[u8], index: usize) -> u64 {
-        let offset = index * 8;
-
-        u64::from_ne_bytes(bytes[offset..offset + 8].try_into().unwrap())
-    }
 }

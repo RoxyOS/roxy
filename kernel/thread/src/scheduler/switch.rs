@@ -1,18 +1,22 @@
 use core::ptr;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
+use roxy_memory::activate_kernel_page_table;
+use spin::Once;
 
-use super::{
-    addrspace::ScheduledAddrSpace,
-    state::{Scheduler, ThreadIndex, ThreadState},
-};
+use super::state::{Scheduler, ThreadIndex, ThreadKind, ThreadState};
 use crate::{SavedContext, ThreadId};
+
+/// Activates the target user thread's address space immediately before switching to it.
+type UserDispatchHook = fn(ThreadId);
+
+static USER_DISPATCH_HOOK: Once<UserDispatchHook> = Once::new();
 
 #[must_use = "a pending context switch must be performed"]
 pub(super) struct PendingContextSwitch {
     pub(super) previous: *mut SavedContext,
     pub(super) next: *const SavedContext,
-    pub(super) next_addrspace: ScheduledAddrSpace,
+    pub(super) next_user_thread: Option<ThreadId>,
     pub(super) next_kernel_stack_top: Option<u64>,
 }
 
@@ -24,7 +28,7 @@ pub(super) struct ScheduleResult {
 
 impl PendingContextSwitch {
     pub(super) fn perform(&self) {
-        self.next_addrspace.activate_if_needed();
+        prepare_dispatch(self.next_user_thread);
 
         if let Some(kernel_stack_top) = self.next_kernel_stack_top {
             CurrentArchitectureBackend::set_kernel_stack_top(kernel_stack_top);
@@ -125,7 +129,7 @@ impl Scheduler {
             None => PendingContextSwitch {
                 previous,
                 next: ptr::from_ref(self.control_context.get_or_insert_with(SavedContext::empty)),
-                next_addrspace: ScheduledAddrSpace::Kernel,
+                next_user_thread: None,
                 next_kernel_stack_top: None,
             },
         }
@@ -166,7 +170,7 @@ impl Scheduler {
                         .as_ref()
                         .expect("scheduler not started"),
                 ),
-                next_addrspace: ScheduledAddrSpace::Kernel,
+                next_user_thread: None,
                 next_kernel_stack_top: None,
             },
         };
@@ -184,11 +188,18 @@ impl Scheduler {
         next: ThreadIndex,
     ) -> PendingContextSwitch {
         let entry = self.entry(next);
+        let next_user_thread = match entry.kind {
+            ThreadKind::Kernel => None,
+            ThreadKind::User => Some(entry.thread.id()),
+        };
+        let next_kernel_stack_top = entry.thread.kernel_stack_top().as_u64();
+        let next_context = ptr::from_mut(entry.thread.context());
+
         PendingContextSwitch {
             previous,
-            next: ptr::from_mut(entry.thread.context()),
-            next_addrspace: entry.addrspace.clone(),
-            next_kernel_stack_top: Some(entry.thread.kernel_stack_top().as_u64()),
+            next: next_context,
+            next_user_thread,
+            next_kernel_stack_top: Some(next_kernel_stack_top),
         }
     }
 
@@ -200,11 +211,32 @@ impl Scheduler {
     }
 }
 
+pub(super) fn register_user_dispatch_hook(hook: UserDispatchHook) {
+    assert!(
+        USER_DISPATCH_HOOK.get().is_none(),
+        "user dispatch hook registered twice"
+    );
+    USER_DISPATCH_HOOK.call_once(|| hook);
+}
+
+fn prepare_dispatch(user_thread: Option<ThreadId>) {
+    let Some(thread_id) = user_thread else {
+        activate_kernel_page_table();
+        return;
+    };
+    let hook = USER_DISPATCH_HOOK
+        .get()
+        .expect("user dispatch hook is not registered");
+
+    hook(thread_id);
+}
+
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_test::kernel_test;
 
-    use super::{ScheduledAddrSpace, Scheduler, ThreadIndex, ThreadState};
+    use super::ThreadKind;
+    use super::{Scheduler, ThreadIndex, ThreadState};
     use crate::Thread;
 
     kernel_test!("roxy-thread::scheduler-block-wake", scheduler_block_wake, {
@@ -212,8 +244,8 @@ mod tests {
         let first_id = first.id();
         let second = Thread::new(unused_thread).unwrap();
         let mut scheduler = Scheduler::new();
-        scheduler.enqueue(first, ScheduledAddrSpace::Kernel);
-        scheduler.enqueue(second, ScheduledAddrSpace::Kernel);
+        scheduler.enqueue(first, ThreadKind::Kernel);
+        scheduler.enqueue(second, ThreadKind::Kernel);
         scheduler.current = Some(ThreadIndex(0));
 
         let _pending = scheduler.prepare_block();

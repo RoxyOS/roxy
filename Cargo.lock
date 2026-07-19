@@ -560,6 +560,7 @@ dependencies = [
  "roxy-test",
  "roxy-utils",
  "roxy-vm",
+ "spin 0.12.2",
 ]
 
 [[package]]

@@ -89,6 +89,13 @@ pub trait Architecture: sealed::Sealed {
 
     fn configure_syscall(handler: SyscallHandler);
 
+    /// Returns directly from a syscall into a fresh user image.
+    ///
+    /// # Safety
+    ///
+    /// Both addresses must be mapped as user-accessible in the active page table.
+    unsafe fn resume_user(instruction_pointer: u64, stack_pointer: u64) -> !;
+
     fn set_kernel_stack_top(kernel_stack_top: u64);
 
     fn user_thread_pointer() -> u64;
