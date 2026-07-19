@@ -2,7 +2,7 @@ use core::num::NonZeroUsize;
 
 use object::SegmentFlags;
 use roxy_memory::{PAGE_SIZE, UserAddress, UserPage};
-use roxy_vm::{Permissions, UserRegion};
+use roxy_vm::{AddrSpace, Permissions, UserRegion, VmError};
 
 use crate::ElfError;
 
@@ -90,10 +90,68 @@ pub(super) fn segment_flags(flags: SegmentFlags) -> Result<LoadFlags, ElfError> 
     Ok(flags)
 }
 
+pub(super) fn map_segment(
+    addrspace: &mut AddrSpace,
+    mapping: &SegmentMapping<'_>,
+) -> Result<(), ElfError> {
+    addrspace
+        .map_zeroed(mapping.region, Permissions::ReadWrite)
+        .map_err(vm_error)?;
+
+    addrspace
+        .write_bytes(mapping.address, mapping.data)
+        .map_err(vm_error)?;
+
+    addrspace
+        .protect(
+            mapping.region.start.start_address(),
+            mapping.region.byte_len(),
+            mapping.flags.permissions(),
+        )
+        .map_err(vm_error)
+}
+
+fn vm_error(error: VmError) -> ElfError {
+    match error {
+        VmError::AddressInUse => ElfError::OverlappingSegments,
+        VmError::OutOfMemory => ElfError::OutOfMemory,
+        VmError::InvalidRange
+        | VmError::PartialUnmap
+        | VmError::NotMapped
+        | VmError::MappingFailed
+        | VmError::PermissionDenied => ElfError::InvalidSegment,
+    }
+}
+
 fn page_count(start: UserPage, end: UserPage) -> Result<NonZeroUsize, ElfError> {
     ((end.start_address().as_u64() - start.start_address().as_u64()) / PAGE_SIZE)
         .checked_add(1)
         .and_then(|count| usize::try_from(count).ok())
         .and_then(NonZeroUsize::new)
         .ok_or(ElfError::InvalidSegment)
+}
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use object::SegmentFlags;
+    use roxy_test::kernel_test;
+
+    use super::{SegmentMapping, segment_flags};
+    use crate::ElfError;
+
+    kernel_test!("roxy-elf::reject-segment-overflow", reject_overflow, {
+        let flags = segment_flags(SegmentFlags::Elf { p_flags: 4 }).unwrap();
+
+        assert!(matches!(
+            SegmentMapping::new(0x7fff_ffff_f000, 0x2000, flags),
+            Err(ElfError::InvalidSegment)
+        ));
+    });
+
+    kernel_test!("roxy-elf::reject-writable-code", reject_writable_code, {
+        assert!(matches!(
+            segment_flags(SegmentFlags::Elf { p_flags: 7 }),
+            Err(ElfError::WritableExecutableSegment)
+        ));
+    });
 }

@@ -1,4 +1,4 @@
-use crate::{Vfs, VfsError, VfsPath};
+use crate::{FilePermissions, Vfs, VfsError, VfsPath};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileType {
@@ -16,6 +16,7 @@ pub enum FileType {
 pub struct Metadata {
     pub file_id: u64,
     pub file_type: FileType,
+    pub permissions: FilePermissions,
     pub size: u64,
     pub hard_links: u32,
 }

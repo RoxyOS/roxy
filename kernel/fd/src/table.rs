@@ -64,6 +64,10 @@ mod tests {
             false
         }
 
+        fn metadata(&self) -> Result<crate::FileMetadata, FileError> {
+            Err(FileError::BadOperation)
+        }
+
         fn read(&mut self, _position: &mut u64, _output: &mut [u8]) -> Result<usize, FileError> {
             Err(FileError::BadOperation)
         }

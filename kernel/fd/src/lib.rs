@@ -9,6 +9,6 @@ mod table;
 mod vfs;
 
 pub use fd::Fd;
-pub use file::{File, FileError, SeekError, SeekFrom};
+pub use file::{File, FileError, FileMetadata, FileType, SeekError, SeekFrom};
 pub use open::OpenFile;
 pub use table::FdTable;

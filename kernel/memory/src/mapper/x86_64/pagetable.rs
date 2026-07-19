@@ -135,6 +135,7 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
         &mut self,
         page: UserPage,
         permissions: PagePermissions,
+        flush_active: bool,
     ) -> Result<(), MappingError> {
         // SAFETY: permissions only select user W^X access for this owned page table.
         let flush = unsafe {
@@ -142,7 +143,11 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
                 .update_flags(page_from(page), user_page_flags(permissions))
         }
         .map_err(|error| flag_error(&error))?;
-        flush.ignore();
+        if flush_active {
+            flush.flush();
+        } else {
+            flush.ignore();
+        }
         Ok(())
     }
 

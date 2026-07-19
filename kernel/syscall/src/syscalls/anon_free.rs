@@ -20,7 +20,9 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
 
 fn map_memory_error(error: MemoryError) -> Errno {
     match error {
-        MemoryError::InvalidRange | MemoryError::PartialUnmap => Errno::Invalid,
+        MemoryError::InvalidRange | MemoryError::PartialUnmap | MemoryError::AddressInUse => {
+            Errno::Invalid
+        }
         MemoryError::OutOfMemory => Errno::NoMem,
         MemoryError::Fault => Errno::Fault,
     }

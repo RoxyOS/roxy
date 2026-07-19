@@ -1,5 +1,5 @@
 use ext4plus::{FileType as Ext4FileType, inode::Inode};
-use roxy_vfs::{FileType, Metadata};
+use roxy_vfs::{FilePermissions, FileType, Metadata};
 
 pub(crate) fn from_inode(inode: &Inode) -> Metadata {
     let metadata = inode.metadata();
@@ -7,6 +7,7 @@ pub(crate) fn from_inode(inode: &Inode) -> Metadata {
     Metadata {
         file_id: u64::from(inode.index.get()),
         file_type: map_file_type(metadata.file_type),
+        permissions: FilePermissions::new(metadata.mode.bits() & 0o777).unwrap(),
         size: metadata.size_in_bytes,
         hard_links: u32::from(metadata.links_count),
     }

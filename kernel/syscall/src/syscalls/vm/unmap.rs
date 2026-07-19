@@ -39,7 +39,7 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
 
 fn map_memory_error(address: UserAddress, error: MemoryError) -> Errno {
     match error {
-        MemoryError::InvalidRange => Errno::Invalid,
+        MemoryError::InvalidRange | MemoryError::AddressInUse => Errno::Invalid,
         MemoryError::PartialUnmap => crate::unsupported::unsupported_argument(
             "vm_unmap.partial",
             address.as_u64(),

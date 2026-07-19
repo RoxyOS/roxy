@@ -16,6 +16,11 @@ impl UserRegion {
     }
 
     #[must_use]
+    /// Returns the page-rounded byte length.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the target's page size cannot be represented by `usize`.
     pub fn byte_len(self) -> usize {
         self.page_count.get() * usize::try_from(roxy_memory::PAGE_SIZE).unwrap()
     }

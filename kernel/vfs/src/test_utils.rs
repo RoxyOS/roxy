@@ -34,6 +34,7 @@ impl MockFileSystem {
         Metadata {
             file_id: self.file_id,
             file_type: FileType::Regular,
+            permissions: crate::FilePermissions::DEFAULT_FILE,
             size: 0,
             hard_links: 1,
         }

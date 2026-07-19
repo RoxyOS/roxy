@@ -142,7 +142,9 @@ impl AddrSpacePageTable {
         page: UserPage,
         permissions: PagePermissions,
     ) -> Result<(), MappingError> {
-        self.0.protect_user_page(page, permissions)
+        let flush_active = self.is_active();
+
+        self.0.protect_user_page(page, permissions, flush_active)
     }
 
     #[must_use]
@@ -186,6 +188,7 @@ pub(crate) trait AddrSpacePageTableBackend: sealed::Sealed {
         &mut self,
         page: UserPage,
         permissions: PagePermissions,
+        flush_active: bool,
     ) -> Result<(), MappingError>;
 
     fn is_user_page_mapped(&self, page: UserPage) -> bool;

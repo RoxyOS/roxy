@@ -24,6 +24,7 @@ roxy-test = { workspace = true, optional = true }
 roxy-thread.workspace = true
 roxy-utils.workspace = true
 roxy-vm.workspace = true
+roxy-vfs.workspace = true
 
 [lints]
 workspace = true

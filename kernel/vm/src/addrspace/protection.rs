@@ -6,6 +6,11 @@ use super::{AddrSpace, PageState, Permissions, VmError, anonymous::page_count};
 use crate::UserRegion;
 
 impl AddrSpace {
+    /// Changes permissions across a page-aligned mapped range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unaligned, invalid, or unmapped ranges.
     pub fn protect(
         &mut self,
         address: UserAddress,
@@ -83,7 +88,10 @@ mod tests {
             space.permissions(UserPage::containing(address)),
             Some(Permissions::ReadExecute)
         );
-        assert_eq!(space.write_bytes(address, &[1]), Err(VmError::PermissionDenied));
+        assert_eq!(
+            space.write_bytes(address, &[1]),
+            Err(VmError::PermissionDenied)
+        );
     });
 
     kernel_test!("roxy-vm::fixed-anonymous-conflict", fixed_conflict, {

@@ -3,7 +3,7 @@ use alloc::{boxed::Box, sync::Arc};
 use roxy_utils::Lock;
 
 use crate::file::File;
-use crate::{FileError, SeekError, SeekFrom};
+use crate::{FileError, FileMetadata, SeekError, SeekFrom};
 
 struct OpenFileState {
     object: Box<dyn File>,
@@ -28,6 +28,15 @@ impl OpenFile {
     #[must_use]
     pub fn is_terminal(&self) -> bool {
         self.state.lock().object.is_terminal()
+    }
+
+    /// Returns metadata for the underlying open object.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying object's error.
+    pub fn metadata(&self) -> Result<FileMetadata, FileError> {
+        self.state.lock().object.metadata()
     }
 
     /// Reads through the serialized open-file state.
@@ -94,6 +103,10 @@ mod tests {
             self.terminal
         }
 
+        fn metadata(&self) -> Result<crate::FileMetadata, FileError> {
+            Err(FileError::BadOperation)
+        }
+
         fn read(&mut self, _position: &mut u64, _output: &mut [u8]) -> Result<usize, FileError> {
             Err(FileError::BadOperation)
         }
@@ -110,6 +123,16 @@ mod tests {
     impl File for Cursor {
         fn is_terminal(&self) -> bool {
             false
+        }
+
+        fn metadata(&self) -> Result<crate::FileMetadata, FileError> {
+            Ok(crate::FileMetadata {
+                file_id: 1,
+                file_type: crate::FileType::Regular,
+                permissions: 0o644,
+                size: self.length,
+                hard_links: 1,
+            })
         }
 
         fn read(&mut self, position: &mut u64, output: &mut [u8]) -> Result<usize, FileError> {

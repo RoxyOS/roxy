@@ -519,6 +519,7 @@ dependencies = [
  "roxy-test",
  "roxy-thread",
  "roxy-utils",
+ "roxy-vfs",
  "roxy-vm",
 ]
 

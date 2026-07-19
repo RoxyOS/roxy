@@ -9,14 +9,14 @@ mod isatty;
 mod open;
 mod read;
 mod seek;
+mod stat;
 mod tcb_set;
-mod vm_map;
-mod vm_unmap;
+mod vm;
 mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 15] = [
+pub(super) const SYSCALLS: [Syscall; 17] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -26,10 +26,12 @@ pub(super) const SYSCALLS: [Syscall; 15] = [
     anon_free::SYSCALL,
     tcb_set::SYSCALL,
     clock_get::SYSCALL,
-    vm_map::SYSCALL,
-    vm_unmap::SYSCALL,
+    vm::MAP_SYSCALL,
+    vm::UNMAP_SYSCALL,
     close::SYSCALL,
     seek::SYSCALL,
     isatty::SYSCALL,
     open::SYSCALL,
+    vm::PROTECT_SYSCALL,
+    stat::SYSCALL,
 ];

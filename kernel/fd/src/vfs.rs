@@ -2,7 +2,7 @@ use alloc::{boxed::Box, sync::Arc};
 
 use roxy_vfs::{SeekFrom as VfsSeekFrom, VfsError, VfsFile};
 
-use crate::{File, FileError, OpenFile, SeekError, SeekFrom};
+use crate::{File, FileError, FileMetadata, FileType, OpenFile, SeekError, SeekFrom};
 
 struct VfsFileObject {
     file: VfsFile,
@@ -18,6 +18,18 @@ impl OpenFile {
 impl File for VfsFileObject {
     fn is_terminal(&self) -> bool {
         false
+    }
+
+    fn metadata(&self) -> Result<FileMetadata, FileError> {
+        let metadata = self.file.metadata().map_err(map_file_error)?;
+
+        Ok(FileMetadata {
+            file_id: metadata.file_id,
+            file_type: map_file_type(metadata.file_type),
+            permissions: metadata.permissions.bits(),
+            size: metadata.size,
+            hard_links: metadata.hard_links,
+        })
     }
 
     fn read(&mut self, position: &mut u64, output: &mut [u8]) -> Result<usize, FileError> {
@@ -83,6 +95,19 @@ fn map_seek_error(error: VfsError) -> SeekError {
             SeekError::NotSeekable
         }
         _ => SeekError::Io,
+    }
+}
+
+fn map_file_type(file_type: roxy_vfs::FileType) -> FileType {
+    match file_type {
+        roxy_vfs::FileType::Regular => FileType::Regular,
+        roxy_vfs::FileType::Directory => FileType::Directory,
+        roxy_vfs::FileType::Symlink => FileType::Symlink,
+        roxy_vfs::FileType::BlockDevice => FileType::BlockDevice,
+        roxy_vfs::FileType::CharacterDevice => FileType::CharacterDevice,
+        roxy_vfs::FileType::Fifo => FileType::Fifo,
+        roxy_vfs::FileType::Socket => FileType::Socket,
+        roxy_vfs::FileType::Unknown => FileType::Unknown,
     }
 }
 
@@ -219,6 +244,7 @@ mod tests {
         Metadata {
             file_id: 1,
             file_type: FileType::Regular,
+            permissions: roxy_vfs::FilePermissions::DEFAULT_FILE,
             size: 5,
             hard_links: 1,
         }
@@ -254,5 +280,7 @@ mod tests {
         assert_eq!(file.seek(SeekFrom::Start(0)), Ok(0));
         assert_eq!(file.read(&mut output), Ok(5));
         assert_eq!(&output, b"helXo");
+        assert_eq!(file.metadata().unwrap().size, 5);
+        assert_eq!(file.metadata().unwrap().permissions, 0o644);
     });
 }

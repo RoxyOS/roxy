@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=0.0.0.20260718
-revision=1
+revision=2
 
 git_url="https://github.com/RoxyOS/mlibc"
 commit="8713f9dddc0810892e34e5f59729b6c50fcceafb"
@@ -13,7 +13,7 @@ source_allow_network=yes
 cross_compile=yes
 clean_workdirs=no
 
-imagedeps="clang lld llvm meson ninja-build pkg-config"
+imagedeps="clang compiler-rt lld llvm meson ninja-build pkg-config"
 
 source "${base_dir}/build-systems/meson.sh"
 
@@ -27,8 +27,9 @@ prepare() {
 
 configure() {
 	meson_configure \
-		-Ddefault_library=static \
-		-Dlibgcc_dependency=false \
+		-Ddefault_library=both \
+		-Dcpp_link_args=-fuse-ld=lld,--rtlib=compiler-rt \
+		-Dlibgcc_dependency=true \
 		-Duse_freestnd_hdrs=enabled
 }
 

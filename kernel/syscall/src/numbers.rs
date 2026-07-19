@@ -16,6 +16,8 @@ pub(crate) enum SyscallNumber {
     Seek = 12,
     Isatty = 13,
     Open = 14,
+    VmProtect = 15,
+    Stat = 16,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -38,17 +40,19 @@ impl TryFrom<u64> for SyscallNumber {
             12 => Ok(Self::Seek),
             13 => Ok(Self::Isatty),
             14 => Ok(Self::Open),
+            15 => Ok(Self::VmProtect),
+            16 => Ok(Self::Stat),
             _ => Err(()),
         }
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "kernel-test")]
 mod tests {
     use super::SyscallNumber;
+    use roxy_test::kernel_test;
 
-    #[test]
-    fn syscall_number_rejects_unknown_value() {
+    kernel_test!("roxy-syscall::number-conversion", number_conversion, {
         assert_eq!(SyscallNumber::try_from(0), Ok(SyscallNumber::Exit));
         assert_eq!(SyscallNumber::try_from(1), Ok(SyscallNumber::Read));
         assert_eq!(SyscallNumber::try_from(2), Ok(SyscallNumber::Write));
@@ -64,6 +68,8 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(12), Ok(SyscallNumber::Seek));
         assert_eq!(SyscallNumber::try_from(13), Ok(SyscallNumber::Isatty));
         assert_eq!(SyscallNumber::try_from(14), Ok(SyscallNumber::Open));
-        assert!(SyscallNumber::try_from(15).is_err());
-    }
+        assert_eq!(SyscallNumber::try_from(15), Ok(SyscallNumber::VmProtect));
+        assert_eq!(SyscallNumber::try_from(16), Ok(SyscallNumber::Stat));
+        assert!(SyscallNumber::try_from(17).is_err());
+    });
 }
