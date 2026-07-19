@@ -7,7 +7,46 @@ use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
 
 pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::VmMap, handle);
 
-const ANONYMOUS_FD: u64 = u64::MAX;
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MapPlacement {
+    Anywhere,
+    Fixed(UserAddress),
+}
+
+struct VmMapRequest {
+    placement: MapPlacement,
+    size: usize,
+}
+
+fn handle(arguments: [u64; 6]) -> SyscallResult {
+    let arguments = VmMapArguments::parse(arguments)?;
+
+    let request = arguments.validate()?;
+
+    let address = request.execute()?;
+
+    Ok(address.as_u64())
+}
+
+impl VmMapRequest {
+    fn execute(self) -> Result<UserAddress, Errno> {
+        match self.placement {
+            MapPlacement::Anywhere => roxy_process::allocate_anonymous(self.size)
+                .map_err(|error| map_memory_error(error, 0)),
+            MapPlacement::Fixed(address) => roxy_process::allocate_anonymous_at(address, self.size)
+                .map_err(|error| map_memory_error(error, address.as_u64())),
+        }
+    }
+}
+
+struct VmMapArguments {
+    address: Option<UserAddress>,
+    size: usize,
+    protection: u64,
+    flags: u64,
+    file_descriptor: u64,
+    offset: u64,
+}
 
 bitflags! {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -19,87 +58,74 @@ bitflags! {
     }
 }
 
+const ANONYMOUS_FD: u64 = u64::MAX;
 const REQUIRED_FLAGS: MapFlags = MapFlags::PRIVATE.union(MapFlags::ANONYMOUS);
 const SUPPORTED_FLAGS: MapFlags = REQUIRED_FLAGS.union(MapFlags::FIXED);
 
-struct VmMapRequest {
-    address: Option<UserAddress>,
-    size: usize,
-    protection: u64,
-    flags: MapFlags,
-    file_descriptor: u64,
-    offset: u64,
-}
-
-impl VmMapRequest {
+impl VmMapArguments {
     fn parse(arguments: [u64; 6]) -> Result<Self, Errno> {
-        let address = match arguments[0] {
-            0 => None,
-            value => Some(UserAddress::new(value).ok_or(Errno::Invalid)?),
-        };
-        let size = usize::try_from(arguments[1]).map_err(|_| Errno::Invalid)?;
-
         Ok(Self {
-            address,
-            size,
+            address: parse_address(arguments[0])?,
+            size: usize::try_from(arguments[1]).map_err(|_| Errno::Invalid)?,
             protection: arguments[2],
-            flags: MapFlags::from_bits_retain(arguments[3]),
+            flags: arguments[3],
             file_descriptor: arguments[4],
             offset: arguments[5],
         })
     }
 
-    fn validate(&self) -> Result<(), Errno> {
+    fn validate(self) -> Result<VmMapRequest, Errno> {
         if self.size == 0 {
             return Err(Errno::Invalid);
         }
 
-        MemoryProtection::for_mapping(self.protection)?;
-        validate_flags(self.flags)?;
-        validate_file(self.file_descriptor, self.offset)?;
+        MemoryProtection::validate_mapping(self.protection)?;
+        let flags = parse_flags(self.flags)?;
 
-        if self.flags.contains(MapFlags::FIXED) != self.address.is_some() {
-            return Err(unsupported("vm_map.fixed-address", self.flags.bits()));
-        }
+        validate_anonymous_source(self.file_descriptor, self.offset)?;
 
-        Ok(())
+        let placement = parse_placement(self.address, flags)?;
+
+        Ok(VmMapRequest {
+            placement,
+            size: self.size,
+        })
     }
 }
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let request = VmMapRequest::parse(arguments)?;
-
-    request.validate()?;
-
-    let requested_address = request.address.map_or(0, UserAddress::as_u64);
-    let address = match request.address {
-        Some(address) => roxy_process::allocate_anonymous_at(address, request.size),
-        None => roxy_process::allocate_anonymous(request.size),
+fn parse_address(address: u64) -> Result<Option<UserAddress>, Errno> {
+    match address {
+        0 => Ok(None),
+        value => UserAddress::new(value).map(Some).ok_or(Errno::Invalid),
     }
-    .map_err(|error| map_memory_error(error, requested_address))?;
-
-    Ok(address.as_u64())
 }
 
-fn validate_file(file_descriptor: u64, offset: u64) -> Result<(), Errno> {
-    if file_descriptor != ANONYMOUS_FD || offset != 0 {
-        return Err(unsupported("vm_map.file", file_descriptor));
-    }
-
-    Ok(())
-}
-
-fn validate_flags(flags: MapFlags) -> Result<(), Errno> {
-    let unknown = flags.bits() & !MapFlags::all().bits();
+fn parse_flags(bits: u64) -> Result<MapFlags, Errno> {
+    let flags = MapFlags::from_bits_retain(bits);
+    let unknown = bits & !MapFlags::all().bits();
 
     if unknown != 0 {
         return Err(unsupported("vm_map.flags.unknown", unknown));
     }
 
-    let unsupported_flags = flags.difference(SUPPORTED_FLAGS);
-
-    if !unsupported_flags.is_empty() || !flags.contains(REQUIRED_FLAGS) {
+    if flags != REQUIRED_FLAGS && flags != SUPPORTED_FLAGS {
         return Err(unsupported("vm_map.flags", flags.bits()));
+    }
+
+    Ok(flags)
+}
+
+fn parse_placement(address: Option<UserAddress>, flags: MapFlags) -> Result<MapPlacement, Errno> {
+    match (flags.contains(MapFlags::FIXED), address) {
+        (false, None) => Ok(MapPlacement::Anywhere),
+        (true, Some(address)) => Ok(MapPlacement::Fixed(address)),
+        _ => Err(unsupported("vm_map.fixed-address", flags.bits())),
+    }
+}
+
+fn validate_anonymous_source(file_descriptor: u64, offset: u64) -> Result<(), Errno> {
+    if file_descriptor != ANONYMOUS_FD || offset != 0 {
+        return Err(unsupported("vm_map.file", file_descriptor));
     }
 
     Ok(())
@@ -123,13 +149,22 @@ mod tests {
     use roxy_memory::UserAddress;
     use roxy_test::kernel_test;
 
-    use super::{MapFlags, VmMapRequest};
+    use super::{MapPlacement, VmMapArguments};
 
-    kernel_test!("roxy-syscall::vm-map-fixed-request", fixed_request, {
-        let request = VmMapRequest::parse([0x41_0000, 4096, 0x3, 0x32, u64::MAX, 0]).unwrap();
+    kernel_test!("roxy-syscall::vm-map-requests", requests, {
+        let fixed = VmMapArguments::parse([0x41_0000, 4096, 0x3, 0x32, u64::MAX, 0])
+            .unwrap()
+            .validate()
+            .unwrap();
+        let anywhere = VmMapArguments::parse([0, 4096, 0x3, 0x22, u64::MAX, 0])
+            .unwrap()
+            .validate()
+            .unwrap();
 
-        assert_eq!(request.address, UserAddress::new(0x41_0000));
-        assert!(request.flags.contains(MapFlags::FIXED));
-        assert_eq!(request.validate(), Ok(()));
+        assert_eq!(
+            fixed.placement,
+            MapPlacement::Fixed(UserAddress::new(0x41_0000).unwrap())
+        );
+        assert_eq!(anywhere.placement, MapPlacement::Anywhere);
     });
 }

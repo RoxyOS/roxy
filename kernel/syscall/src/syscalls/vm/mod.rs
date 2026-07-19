@@ -21,14 +21,14 @@ bitflags! {
 }
 
 impl MemoryProtection {
-    fn for_mapping(bits: u64) -> Result<Self, Errno> {
+    fn validate_mapping(bits: u64) -> Result<(), Errno> {
         let protection = Self::parse(bits, "vm_map.protection.unknown")?;
 
         if protection != Self::READ | Self::WRITE {
             return Err(unsupported("vm_map.protection", bits));
         }
 
-        Ok(protection)
+        Ok(())
     }
 
     /// Parses raw bits using the `MemoryProtection` flags and converts supported combinations
