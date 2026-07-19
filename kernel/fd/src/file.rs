@@ -1,4 +1,7 @@
 pub trait File: Send {
+    /// Reports whether this object is a terminal.
+    fn is_terminal(&self) -> bool;
+
     /// Reads data from this open object.
     ///
     /// `position` is owned by `OpenFile`; seekable implementations advance it by the consumed

@@ -14,6 +14,7 @@ pub(crate) enum SyscallNumber {
     VmUnmap = 10,
     Close = 11,
     Seek = 12,
+    Isatty = 13,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -34,6 +35,7 @@ impl TryFrom<u64> for SyscallNumber {
             10 => Ok(Self::VmUnmap),
             11 => Ok(Self::Close),
             12 => Ok(Self::Seek),
+            13 => Ok(Self::Isatty),
             _ => Err(()),
         }
     }
@@ -58,6 +60,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(10), Ok(SyscallNumber::VmUnmap));
         assert_eq!(SyscallNumber::try_from(11), Ok(SyscallNumber::Close));
         assert_eq!(SyscallNumber::try_from(12), Ok(SyscallNumber::Seek));
-        assert!(SyscallNumber::try_from(13).is_err());
+        assert_eq!(SyscallNumber::try_from(13), Ok(SyscallNumber::Isatty));
+        assert!(SyscallNumber::try_from(14).is_err());
     }
 }

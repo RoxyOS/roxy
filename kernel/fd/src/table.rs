@@ -60,6 +60,10 @@ mod tests {
     struct Unsupported;
 
     impl File for Unsupported {
+        fn is_terminal(&self) -> bool {
+            false
+        }
+
         fn read(&mut self, _position: &mut u64, _output: &mut [u8]) -> Result<usize, FileError> {
             Err(FileError::BadOperation)
         }

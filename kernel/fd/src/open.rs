@@ -25,6 +25,11 @@ impl OpenFile {
         })
     }
 
+    #[must_use]
+    pub fn is_terminal(&self) -> bool {
+        self.state.lock().object.is_terminal()
+    }
+
     /// Reads through the serialized open-file state.
     ///
     /// # Errors
@@ -76,13 +81,19 @@ mod tests {
     use super::OpenFile;
     use crate::{File, FileError, SeekError, SeekFrom};
 
-    struct Unsupported;
+    struct Unsupported {
+        terminal: bool,
+    }
 
     struct Cursor {
         length: u64,
     }
 
     impl File for Unsupported {
+        fn is_terminal(&self) -> bool {
+            self.terminal
+        }
+
         fn read(&mut self, _position: &mut u64, _output: &mut [u8]) -> Result<usize, FileError> {
             Err(FileError::BadOperation)
         }
@@ -97,6 +108,10 @@ mod tests {
     }
 
     impl File for Cursor {
+        fn is_terminal(&self) -> bool {
+            false
+        }
+
         fn read(&mut self, position: &mut u64, output: &mut [u8]) -> Result<usize, FileError> {
             let available = self.length.saturating_sub(*position);
             let available = usize::try_from(available).unwrap_or(usize::MAX);
@@ -137,11 +152,19 @@ mod tests {
         "roxy-fd::open-file-ownership",
         owns_a_file_object_without_running_io,
         {
-            let file = OpenFile::new(Box::new(Unsupported));
+            let file = OpenFile::new(Box::new(Unsupported { terminal: false }));
             assert_eq!(alloc::sync::Arc::strong_count(&file), 1);
             assert_eq!(file.seek(SeekFrom::Start(0)), Err(SeekError::NotSeekable));
         }
     );
+
+    kernel_test!("roxy-fd::terminal-property", reports_terminal_property, {
+        let terminal = OpenFile::new(Box::new(Unsupported { terminal: true }));
+        let non_terminal = OpenFile::new(Box::new(Unsupported { terminal: false }));
+
+        assert!(terminal.is_terminal());
+        assert!(!non_terminal.is_terminal());
+    });
 
     kernel_test!("roxy-fd::shared-seek-position", shared_seek_position, {
         let file = OpenFile::new(Box::new(Cursor { length: 10 }));
