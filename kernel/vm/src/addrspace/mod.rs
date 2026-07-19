@@ -92,6 +92,30 @@ impl AddrSpaceHandle {
         self.0.lock().id
     }
 
+    /// Creates an eager, private copy of this address space.
+    ///
+    /// # Errors
+    ///
+    /// Returns `OutOfMemory` when a page table or copied page cannot be allocated.
+    pub fn fork_copy(&self) -> Result<Self, VmError> {
+        let source = self.0.lock();
+        let mut destination = AddrSpace::new()?;
+        destination.anonymous = source.anonymous.clone();
+
+        for (page, state) in &source.pages {
+            match state {
+                PageState::Mapped { frame, permissions } => {
+                    destination.map_copied_page(*page, frame, *permissions)?;
+                }
+                PageState::Guard => {
+                    destination.pages.insert(*page, PageState::Guard);
+                }
+            }
+        }
+
+        Ok(destination.into_handle())
+    }
+
     #[must_use]
     pub fn root_address(&self) -> PhysicalAddress {
         self.0.lock().root_address()
@@ -265,6 +289,21 @@ mod tests {
             assert_eq!(statistics().allocated_frames, baseline);
         }
     );
+
+    kernel_test!("roxy-vm::fork-copy", fork_copy, {
+        let source = AddrSpace::new().unwrap().into_handle();
+        let address = source.allocate_anonymous(4096).unwrap();
+        source.write_bytes(address, &[42]).unwrap();
+
+        let copy = source.fork_copy().unwrap();
+        assert_ne!(source.id(), copy.id());
+        let mut value = [0];
+        copy.read_bytes(address, &mut value).unwrap();
+        assert_eq!(value, [42]);
+        copy.write_bytes(address, &[7]).unwrap();
+        source.read_bytes(address, &mut value).unwrap();
+        assert_eq!(value, [42]);
+    });
 
     fn region_at(address: u64, pages: usize) -> UserRegion {
         let address = UserAddress::new(address).unwrap();

@@ -18,6 +18,7 @@ kernel-test = [
 linkme = { workspace = true, optional = true }
 
 roxy-elf.workspace = true
+roxy-arch.workspace = true
 roxy-fd.workspace = true
 roxy-memory.workspace = true
 roxy-test = { workspace = true, optional = true }

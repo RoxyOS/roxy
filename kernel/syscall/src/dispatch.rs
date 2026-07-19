@@ -8,7 +8,7 @@ use crate::{
 };
 
 impl Registry {
-    pub(super) fn dispatch(&self, number: SyscallNumber, arguments: [u64; 6]) -> SyscallResult {
+    pub(super) fn dispatch(&self, number: SyscallNumber, request: RawSyscall) -> SyscallResult {
         let syscall = self
             .syscalls
             .iter()
@@ -17,7 +17,10 @@ impl Registry {
                 crate::unsupported::unsupported_argument("syscall", number as u64, Errno::NoSys)
             })?;
 
-        (syscall.handler)(arguments)
+        match syscall.handler {
+            crate::Handler::Arguments(handler) => handler(request.arguments),
+            crate::Handler::Context(handler) => handler(request),
+        }
     }
 }
 
@@ -26,7 +29,7 @@ pub(super) fn dispatch(request: RawSyscall) -> u64 {
         .map_err(|()| {
             crate::unsupported::unsupported_argument("syscall", request.number, Errno::NoSys)
         })
-        .and_then(|number| REGISTRY.dispatch(number, request.arguments));
+        .and_then(|number| REGISTRY.dispatch(number, request));
 
     match result {
         Ok(value) => value,
@@ -48,7 +51,14 @@ mod tests {
         let registry = Registry::new(&RETURNING);
 
         assert_eq!(
-            registry.dispatch(SyscallNumber::Exit, [42, 0, 0, 0, 0, 0]),
+            registry.dispatch(
+                SyscallNumber::Exit,
+                RawSyscall {
+                    number: SyscallNumber::Exit as u64,
+                    arguments: [42, 0, 0, 0, 0, 0],
+                    ..RawSyscall::default()
+                },
+            ),
             Ok(42)
         );
     });
@@ -57,6 +67,7 @@ mod tests {
         let result = dispatch(RawSyscall {
             number: u64::MAX,
             arguments: [0; 6],
+            ..RawSyscall::default()
         });
 
         assert_eq!(result, Errno::NoSys.encode());

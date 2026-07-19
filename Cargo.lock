@@ -513,6 +513,7 @@ name = "roxy-process"
 version = "0.1.0"
 dependencies = [
  "linkme",
+ "roxy-arch",
  "roxy-elf",
  "roxy-fd",
  "roxy-memory",

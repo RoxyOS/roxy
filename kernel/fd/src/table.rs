@@ -5,7 +5,7 @@ use alloc::{
 
 use crate::{Fd, OpenFile};
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct FdTable {
     entries: BTreeMap<Fd, Arc<OpenFile>>,
 }

@@ -3,6 +3,7 @@ use core::{
     mem::{offset_of, size_of},
 };
 
+use roxy_arch::UserContext;
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_memory::UserAddress;
 
@@ -71,6 +72,31 @@ impl ContextBackend for X86_64Context {
                 return_address: thread_returned as *const () as usize,
             },
         )
+    }
+
+    fn new_user_resume(kernel_stack: &KernelStack, context: UserContext) -> Self {
+        let fs_base = context.fs_base;
+        let context_pointer = (kernel_stack.top_address()
+            - size_of::<InitialStackFrame>()
+            - size_of::<UserContext>()) as *mut UserContext;
+        // SAFETY: the context is stored below the initial frame in this thread-owned stack.
+        unsafe { context_pointer.write(context) };
+
+        let mut saved_context = Self::with_frame(
+            kernel_stack,
+            InitialStackFrame {
+                r15: 0,
+                r14: 0,
+                r13: 0,
+                r12: context_pointer as usize,
+                rbp: 0,
+                rbx: 0,
+                instruction_pointer: user_resume_start as *const () as usize,
+                return_address: thread_returned as *const () as usize,
+            },
+        );
+        saved_context.fs_base = fs_base;
+        saved_context
     }
 
     fn empty() -> Self {
@@ -146,6 +172,45 @@ extern "C" fn user_thread_start() -> ! {
         "mov rdx, r14",
         "jmp {enter_user}",
         enter_user = sym enter_user,
+    );
+}
+
+#[unsafe(naked)]
+unsafe extern "C" fn user_resume_start() -> ! {
+    naked_asm!(
+        "mov r15, [r12 + {r15}]",
+        "mov r14, [r12 + {r14}]",
+        "mov r13, [r12 + {r13}]",
+        "mov rbp, [r12 + {rbp}]",
+        "mov rbx, [r12 + {rbx}]",
+        "mov rax, [r12 + {rax}]",
+        "mov rdi, [r12 + {rdi}]",
+        "mov rsi, [r12 + {rsi}]",
+        "mov rdx, [r12 + {rdx}]",
+        "mov r10, [r12 + {r10}]",
+        "mov r8, [r12 + {r8}]",
+        "mov r9, [r12 + {r9}]",
+        "mov rcx, [r12 + {instruction_pointer}]",
+        "mov r11, [r12 + {flags}]",
+        "mov rsp, [r12 + {stack_pointer}]",
+        "mov r12, [r12 + {r12}]",
+        "sysretq",
+        r15 = const offset_of!(UserContext, r15),
+        r14 = const offset_of!(UserContext, r14),
+        r13 = const offset_of!(UserContext, r13),
+        r12 = const offset_of!(UserContext, r12),
+        rbp = const offset_of!(UserContext, rbp),
+        rbx = const offset_of!(UserContext, rbx),
+        rax = const offset_of!(UserContext, rax),
+        rdi = const offset_of!(UserContext, rdi),
+        rsi = const offset_of!(UserContext, rsi),
+        rdx = const offset_of!(UserContext, rdx),
+        r10 = const offset_of!(UserContext, r10),
+        r8 = const offset_of!(UserContext, r8),
+        r9 = const offset_of!(UserContext, r9),
+        instruction_pointer = const offset_of!(UserContext, instruction_pointer),
+        flags = const offset_of!(UserContext, flags),
+        stack_pointer = const offset_of!(UserContext, stack_pointer),
     );
 }
 

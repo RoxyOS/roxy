@@ -10,21 +10,38 @@ mod syscalls;
 mod unsupported;
 mod user;
 
-use roxy_arch::{Architecture, CurrentArchitectureBackend};
+use roxy_arch::{Architecture, CurrentArchitectureBackend, RawSyscall};
 
 use crate::{errno::Errno, numbers::SyscallNumber};
 
 type SyscallHandler = fn([u64; 6]) -> SyscallResult;
+type ContextualSyscallHandler = fn(RawSyscall) -> SyscallResult;
 type SyscallResult = Result<u64, Errno>;
+
+#[derive(Clone, Copy)]
+enum Handler {
+    Arguments(SyscallHandler),
+    Context(ContextualSyscallHandler),
+}
 
 struct Syscall {
     number: SyscallNumber,
-    handler: SyscallHandler,
+    handler: Handler,
 }
 
 impl Syscall {
     const fn new(number: SyscallNumber, handler: SyscallHandler) -> Self {
-        Self { number, handler }
+        Self {
+            number,
+            handler: Handler::Arguments(handler),
+        }
+    }
+
+    const fn with_context(number: SyscallNumber, handler: ContextualSyscallHandler) -> Self {
+        Self {
+            number,
+            handler: Handler::Context(handler),
+        }
     }
 }
 

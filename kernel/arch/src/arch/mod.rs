@@ -7,6 +7,9 @@ use crate::CpuId;
 pub use self::x86_64::X86_64;
 
 #[cfg(target_arch = "x86_64")]
+pub type UserContext = self::x86_64::X86_64UserContext;
+
+#[cfg(target_arch = "x86_64")]
 pub type CurrentArchitectureBackend = X86_64;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -40,18 +43,19 @@ pub struct ExceptionContext {
 
 pub type ExceptionHandler = fn(&ExceptionContext) -> !;
 pub type LocalInterruptHandler = fn(LocalInterruptKind);
+
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Architecture-normalized syscall registers without ABI-level interpretation.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Normalized syscall arguments plus selected-backend user resume state.
 pub struct RawSyscall {
     pub number: u64,
     pub arguments: [u64; 6],
+    pub context: UserContext,
 }
 
 const _: () = {
     assert!(core::mem::offset_of!(RawSyscall, number) == 0);
     assert!(core::mem::offset_of!(RawSyscall, arguments) == 8);
-    assert!(core::mem::size_of::<RawSyscall>() == 56);
 };
 
 pub type SyscallHandler = fn(RawSyscall) -> u64;

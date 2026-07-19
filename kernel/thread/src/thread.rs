@@ -1,5 +1,6 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
+use roxy_arch::UserContext;
 use roxy_memory::{UserAddress, VirtualAddress};
 
 use crate::{SavedContext, stack::KernelStack};
@@ -51,6 +52,21 @@ impl Thread {
         let kernel_stack = KernelStack::new().ok_or(ThreadCreateError::OutOfMemory)?;
         let context =
             SavedContext::new_user(&kernel_stack, user_instruction_pointer, user_stack_pointer);
+        Ok(Self {
+            id: ThreadId::new(),
+            kernel_stack,
+            context,
+        })
+    }
+
+    /// Creates a ring-3 thread whose context returns directly from a syscall to userspace.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the kernel stack cannot be allocated.
+    pub fn new_user_resume(context: UserContext) -> Result<Self, ThreadCreateError> {
+        let kernel_stack = KernelStack::new().ok_or(ThreadCreateError::OutOfMemory)?;
+        let context = SavedContext::new_user_resume(&kernel_stack, context);
         Ok(Self {
             id: ThreadId::new(),
             kernel_stack,

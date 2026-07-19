@@ -97,6 +97,20 @@ impl Process {
             state: ProcessState::Running,
         }
     }
+
+    pub(super) fn from_fork(
+        main_thread_id: ThreadId,
+        addrspace: AddrSpaceHandle,
+        fds: roxy_fd::FdTable,
+    ) -> Self {
+        Self {
+            id: ProcessId(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed)),
+            addrspace: Some(addrspace),
+            main_thread_id,
+            fds,
+            state: ProcessState::Running,
+        }
+    }
 }
 
 pub(super) fn process_vm_error(error: VmError) -> ProcessError {

@@ -4,6 +4,8 @@ mod interrupt;
 mod syscall;
 mod user;
 
+pub use syscall::X86_64UserContext;
+
 use ::x86_64::{VirtAddr, registers::model_specific::FsBase};
 
 use crate::{CpuId, ExceptionHandler, LocalInterruptHandler, LocalInterruptKind, SyscallHandler};

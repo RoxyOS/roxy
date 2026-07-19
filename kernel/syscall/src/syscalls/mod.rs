@@ -3,6 +3,7 @@ mod anon_free;
 mod clock_get;
 mod close;
 mod exit;
+mod fork;
 mod futex_wait;
 mod futex_wake;
 mod isatty;
@@ -16,7 +17,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 17] = [
+pub(super) const SYSCALLS: [Syscall; 18] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -34,4 +35,5 @@ pub(super) const SYSCALLS: [Syscall; 17] = [
     open::SYSCALL,
     vm::PROTECT_SYSCALL,
     stat::SYSCALL,
+    fork::SYSCALL,
 ];

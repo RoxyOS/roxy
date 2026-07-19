@@ -3,12 +3,14 @@
 extern crate alloc;
 
 mod creation;
+mod fork;
 mod lifecycle;
 mod memory;
 mod startup_stack;
 mod table;
 
 pub use creation::spawn;
+pub use fork::{ForkError, fork_current};
 pub use lifecycle::{exit_current, initialize, take_exit_status};
 pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, protect_memory,
@@ -43,6 +45,13 @@ enum ProcessState {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ProcessId(u64);
+
+impl ProcessId {
+    #[must_use]
+    pub const fn as_u64(self) -> u64 {
+        self.0
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ExitStatus(pub u64);

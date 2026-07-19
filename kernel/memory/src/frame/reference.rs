@@ -53,6 +53,22 @@ impl PageRef {
         self.0.frame.start_address()
     }
 
+    /// Duplicates the complete physical page into a newly allocated frame.
+    ///
+    /// Returns `None` when the frame allocator cannot satisfy the request.
+    #[must_use]
+    pub fn duplicate(&self) -> Option<Self> {
+        let destination = OwnedFrame::new(allocator::allocate()?);
+        let source = allocator::physical_pointer::<u8>(self.start_address());
+        let destination_pointer = allocator::physical_pointer::<u8>(destination.start_address());
+
+        // SAFETY: both pointers identify live, page-sized physical frames owned by this method
+        // and the source page reference; the ranges do not overlap.
+        unsafe { source.copy_to_nonoverlapping(destination_pointer, PAGE_BYTES) };
+
+        Some(destination.into_page_ref())
+    }
+
     /// Reads bytes from this frame.
     ///
     /// # Safety

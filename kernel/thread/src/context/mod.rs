@@ -8,6 +8,7 @@
 mod x86_64;
 
 use crate::stack::KernelStack;
+use roxy_arch::UserContext;
 use roxy_memory::UserAddress;
 
 #[cfg(target_arch = "x86_64")]
@@ -32,6 +33,13 @@ impl SavedContext {
             kernel_stack,
             user_instruction_pointer,
             user_stack_pointer,
+        ))
+    }
+
+    pub(crate) fn new_user_resume(kernel_stack: &KernelStack, context: UserContext) -> Self {
+        Self(CurrentContextBackend::new_user_resume(
+            kernel_stack,
+            context,
         ))
     }
 
@@ -65,6 +73,8 @@ trait ContextBackend: Sized {
         user_instruction_pointer: UserAddress,
         user_stack_pointer: UserAddress,
     ) -> Self;
+
+    fn new_user_resume(kernel_stack: &KernelStack, context: UserContext) -> Self;
 
     fn empty() -> Self;
 

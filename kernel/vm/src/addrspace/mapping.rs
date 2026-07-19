@@ -27,9 +27,29 @@ impl AddrSpace {
 
     fn map_zeroed_page(&mut self, page: UserPage, permissions: Permissions) -> Result<(), VmError> {
         let frame = frame::allocate_zeroed().ok_or(VmError::OutOfMemory)?;
+        self.map_page(page, frame, permissions)
+    }
+
+    pub(super) fn map_copied_page(
+        &mut self,
+        page: UserPage,
+        source: &roxy_memory::PageRef,
+        permissions: Permissions,
+    ) -> Result<(), VmError> {
+        let frame = source.duplicate().ok_or(VmError::OutOfMemory)?;
+        self.map_page(page, frame, permissions)
+    }
+
+    fn map_page(
+        &mut self,
+        page: UserPage,
+        frame: roxy_memory::PageRef,
+        permissions: Permissions,
+    ) -> Result<(), VmError> {
         self.page_table
             .map_user_page(page, &frame, permissions.into())
             .map_err(mapping_error)?;
+
         self.pages
             .insert(page, PageState::Mapped { frame, permissions });
         Ok(())
