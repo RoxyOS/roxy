@@ -13,14 +13,17 @@ kernel-test = [
     "dep:roxy-test",
     "roxy-test/kernel-test",
     "roxy-arch/kernel-test",
+    "roxy-block/kernel-test",
     "roxy-boot/kernel-test",
     "roxy-cpu/kernel-test",
     "roxy-elf/kernel-test",
+    "roxy-ext4/kernel-test",
     "roxy-futex/kernel-test",
     "roxy-memory/kernel-test",
     "roxy-process/kernel-test",
     "roxy-syscall/kernel-test",
     "roxy-thread/kernel-test",
+    "roxy-vfs/kernel-test",
     "roxy-vm/kernel-test",
 ]
 
@@ -38,9 +41,11 @@ spin.workspace = true
 uart_16550.workspace = true
 
 roxy-arch.workspace = true
+roxy-block.workspace = true
 roxy-boot.workspace = true
 roxy-cpu.workspace = true
 roxy-elf.workspace = true
+roxy-ext4.workspace = true
 roxy-futex.workspace = true
 roxy-memory.workspace = true
 roxy-process.workspace = true
@@ -49,6 +54,7 @@ roxy-test = { workspace = true, optional = true }
 roxy-thread.workspace = true
 roxy-time.workspace = true
 roxy-utils.workspace = true
+roxy-vfs.workspace = true
 roxy-vm.workspace = true
 
 [lints]

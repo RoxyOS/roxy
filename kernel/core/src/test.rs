@@ -53,6 +53,22 @@ mod tests {
         }
     );
 
+    roxy_test::kernel_test!(
+        "roxy-kernel::hardcoded-root-device-is-mounted",
+        limine_rootfs_is_mounted,
+        {
+            let root = roxy_vfs::metadata(b"/").unwrap();
+
+            assert_eq!(root.file_type, roxy_vfs::FileType::Directory);
+            roxy_vfs::write(b"/interface-test", b"vfs interface").unwrap();
+            assert_eq!(
+                roxy_vfs::read(b"/interface-test").unwrap(),
+                b"vfs interface"
+            );
+            roxy_vfs::unlink(b"/interface-test").unwrap();
+        }
+    );
+
     fn unused_thread() -> ! {
         panic!("unused thread was started")
     }

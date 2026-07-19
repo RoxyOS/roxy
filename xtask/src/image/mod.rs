@@ -12,29 +12,29 @@ pub(super) enum Mode {
     Test,
 }
 
-pub(crate) fn build_iso(kernel: &Path) -> Result<()> {
+pub(crate) fn build_iso(kernel: &Path, rootfs: &Path) -> Result<()> {
     println!("==> Building boot image");
 
-    create_iso(kernel, Mode::Production)?;
+    create_iso(kernel, rootfs, Mode::Production)?;
     Ok(())
 }
 
-pub(crate) fn run(kernel: &Path) -> Result<()> {
-    let image = create_iso(kernel, Mode::Production)?;
+pub(crate) fn run(kernel: &Path, rootfs: &Path) -> Result<()> {
+    let image = create_iso(kernel, rootfs, Mode::Production)?;
 
     qemu::run(&image)
 }
 
-pub(crate) fn test(kernel: &Path) -> Result<()> {
-    let image = create_iso(kernel, Mode::Test)?;
+pub(crate) fn test(kernel: &Path, rootfs: &Path) -> Result<()> {
+    let image = create_iso(kernel, rootfs, Mode::Test)?;
 
     qemu::test(&image)
 }
 
-fn create_iso(kernel: &Path, mode: Mode) -> Result<PathBuf> {
+fn create_iso(kernel: &Path, rootfs: &Path, mode: Mode) -> Result<PathBuf> {
     let root = output_root();
     let limine = limine::prepare(&root)?;
-    iso::build(&root, kernel, &limine, mode)
+    iso::build(&root, kernel, rootfs, &limine, mode)
 }
 
 fn output_root() -> PathBuf {

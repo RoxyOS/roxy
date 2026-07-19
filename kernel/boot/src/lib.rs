@@ -12,6 +12,8 @@ pub use loader::{Bootloader, CurrentLoader, Limine};
 
 pub const MAX_FRAMEBUFFERS: usize = 8;
 pub const MAX_MEMORY_REGIONS: usize = 256;
+pub const MAX_MODULES: usize = 16;
+pub const ROOTFS_MODULE_CMDLINE: &str = "roxy.rootfs";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MemoryRegionKind {
@@ -66,9 +68,15 @@ pub struct FramebufferInfo {
     pub bits_per_pixel: u16,
 }
 
+pub struct ModuleInfo {
+    pub command_line: String<128>,
+    pub data: &'static [u8],
+}
+
 pub struct BootInfo {
     pub memory_regions: Vec<MemoryRegion, MAX_MEMORY_REGIONS>,
     pub framebuffers: Vec<FramebufferInfo, MAX_FRAMEBUFFERS>,
+    pub modules: Vec<ModuleInfo, MAX_MODULES>,
     pub hhdm_offset: u64,
     pub kernel_address: KernelAddressInfo,
     pub rsdp_address: u64,
@@ -83,5 +91,12 @@ impl BootInfo {
     #[must_use]
     pub fn parse() -> Self {
         CurrentLoader::parse()
+    }
+
+    #[must_use]
+    pub fn rootfs_module(&self) -> Option<&ModuleInfo> {
+        self.modules
+            .iter()
+            .find(|module| module.command_line.as_str() == ROOTFS_MODULE_CMDLINE)
     }
 }

@@ -4,7 +4,13 @@ use anyhow::{Context, Result};
 
 use super::Mode;
 
-pub(super) fn build(root: &Path, kernel: &Path, limine: &Path, mode: Mode) -> Result<PathBuf> {
+pub(super) fn build(
+    root: &Path,
+    kernel: &Path,
+    rootfs: &Path,
+    limine: &Path,
+    mode: Mode,
+) -> Result<PathBuf> {
     let (staging_name, output_name) = match mode {
         Mode::Production => ("iso-root", "roxy.iso"),
         Mode::Test => ("test-iso-root", "roxy-test.iso"),
@@ -13,15 +19,16 @@ pub(super) fn build(root: &Path, kernel: &Path, limine: &Path, mode: Mode) -> Re
     let output = root.join(output_name);
 
     reset_directory(&staging)?;
-    stage_kernel(&staging, kernel)?;
+    stage_kernel(&staging, kernel, rootfs)?;
     stage_limine(&staging, limine)?;
     create(&staging, &output)?;
     fs::remove_dir_all(staging).context("failed to remove the ISO staging directory")?;
     Ok(output)
 }
 
-fn stage_kernel(staging: &Path, kernel: &Path) -> Result<()> {
+fn stage_kernel(staging: &Path, kernel: &Path, rootfs: &Path) -> Result<()> {
     copy(kernel, &staging.join("boot/roxy-kernel"))?;
+    copy(rootfs, &staging.join("boot/rootfs.img"))?;
     copy(
         &workspace_root().join("kernel/limine.conf"),
         &staging.join("boot/limine/limine.conf"),

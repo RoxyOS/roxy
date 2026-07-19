@@ -4,7 +4,7 @@ use limine::{
     request::{
         BootloaderInfoRequest, DateAtBootRequest, ExecutableAddressRequest,
         ExecutableCmdlineRequest, FirmwareTypeRequest, FramebufferRequest, HhdmRequest,
-        MemmapRequest, RsdpRequest, StackSizeRequest,
+        MemmapRequest, ModulesRequest, RsdpRequest, StackSizeRequest,
     },
 };
 use roxy_arch::CpuId;
@@ -12,7 +12,7 @@ use roxy_arch::CpuId;
 use super::{Bootloader, sealed};
 use crate::{
     BootInfo, FramebufferInfo, KernelAddressInfo, MAX_FRAMEBUFFERS, MAX_MEMORY_REGIONS,
-    MemoryRegion, MemoryRegionKind,
+    MAX_MODULES, MemoryRegion, MemoryRegionKind, ModuleInfo,
 };
 
 #[used]
@@ -50,6 +50,9 @@ static FRAMEBUFFER: FramebufferRequest = FramebufferRequest::new();
 static RSDP: RsdpRequest = RsdpRequest::new();
 #[used]
 #[unsafe(link_section = ".limine_requests")]
+static MODULES: ModulesRequest = ModulesRequest::new();
+#[used]
+#[unsafe(link_section = ".limine_requests")]
 static DATE_AT_BOOT: DateAtBootRequest = DateAtBootRequest::new();
 #[used]
 #[unsafe(link_section = ".limine_requests_end")]
@@ -85,6 +88,7 @@ fn load_boot_info() -> BootInfo {
     BootInfo {
         memory_regions: memory_regions(),
         framebuffers: framebuffers(),
+        modules: modules(),
         hhdm_offset: HHDM.response().unwrap().offset,
         kernel_address: KernelAddressInfo {
             physical_base: address.physical_base,
@@ -97,6 +101,19 @@ fn load_boot_info() -> BootInfo {
         bsp: CpuId::BSP,
         unix_seconds_at_boot,
     }
+}
+
+fn modules() -> Vec<ModuleInfo, MAX_MODULES> {
+    MODULES
+        .response()
+        .unwrap()
+        .modules()
+        .iter()
+        .map(|module| ModuleInfo {
+            command_line: copy_string(module.cmdline()),
+            data: module.data(),
+        })
+        .collect()
 }
 
 fn memory_regions() -> Vec<MemoryRegion, MAX_MEMORY_REGIONS> {

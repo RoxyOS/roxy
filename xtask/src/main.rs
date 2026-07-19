@@ -3,6 +3,7 @@ mod build_kernel;
 mod check;
 mod cli;
 mod image;
+mod rootfs;
 mod utils;
 
 pub(crate) use build_kernel::{build_kernel, build_test_kernel};
@@ -18,6 +19,7 @@ fn main() -> Result<()> {
         match arg {
             Arg::Check => check::run(),
             Arg::Image => action::image(),
+            Arg::Rootfs => action::rootfs(),
             Arg::Run => action::run(),
             Arg::Test => action::test(),
         }?;

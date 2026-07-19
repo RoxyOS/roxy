@@ -11,6 +11,7 @@ pub(crate) struct Cli {
 pub(crate) enum Arg {
     Check,
     Image,
+    Rootfs,
     Run,
     Test,
 }

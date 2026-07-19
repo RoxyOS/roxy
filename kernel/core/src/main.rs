@@ -2,9 +2,12 @@
 #![no_main]
 #![feature(alloc_error_handler)]
 
+extern crate alloc;
+
 mod exception;
 mod interrupt;
 mod misc;
+mod rootfs;
 mod serial;
 #[cfg(feature = "kernel-test")]
 mod test;
@@ -25,6 +28,7 @@ pub extern "C" fn _start() -> ! {
     CurrentArchitectureBackend::initialize(exception::handler, interrupt::handler);
     roxy_memory::initialize(&boot_info);
     roxy_time::initialize(boot_info.unix_seconds_at_boot);
+    rootfs::initialize(&boot_info).expect("initialize root filesystem");
     roxy_cpu::current_cpu().initialize();
     roxy_process::initialize();
     roxy_futex::initialize();
