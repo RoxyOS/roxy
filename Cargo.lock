@@ -452,6 +452,7 @@ dependencies = [
  "linkme",
  "roxy-test",
  "roxy-utils",
+ "roxy-vfs",
 ]
 
 [[package]]
@@ -536,6 +537,8 @@ dependencies = [
  "roxy-thread",
  "roxy-time",
  "roxy-utils",
+ "roxy-vfs",
+ "roxy-vm",
 ]
 
 [[package]]
