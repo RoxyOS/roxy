@@ -27,6 +27,7 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
 ## Code Organization
 
 - Prefer small modules with narrow responsibilities over large files divided by comments.
+- Name general-purpose utility modules `utils.rs`, not `helper.rs` or `helpers.rs`.
 - Organize files by behavior or lifecycle phase rather than placing every operation for one type
   in the same file. Spread its `impl` blocks across focused modules when appropriate.
 - Write multi-stage pipelines as a short, linear sequence of named operations. The top-level
