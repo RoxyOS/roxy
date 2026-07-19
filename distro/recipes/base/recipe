@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+version=1
+revision=1
+
+# This base metapackage contains the essential software for a normal system.
+deps="bash"
