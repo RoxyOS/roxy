@@ -15,6 +15,11 @@ impl UserRegion {
         Some(Self { start, page_count })
     }
 
+    #[must_use]
+    pub fn byte_len(self) -> usize {
+        self.page_count.get() * usize::try_from(roxy_memory::PAGE_SIZE).unwrap()
+    }
+
     pub(crate) fn pages(self) -> impl Iterator<Item = UserPage> {
         (0..self.page_count.get()).map(move |index| self.start.checked_add(index).unwrap())
     }

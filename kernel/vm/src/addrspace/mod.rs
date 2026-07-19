@@ -1,6 +1,7 @@
 mod anonymous;
 mod io;
 mod mapping;
+mod protection;
 mod stack;
 mod types;
 
@@ -104,6 +105,33 @@ impl AddrSpaceHandle {
     /// failure.
     pub fn allocate_anonymous(&self, size: usize) -> Result<roxy_memory::UserAddress, VmError> {
         self.0.lock().allocate_anonymous(size)
+    }
+
+    /// Creates a private anonymous allocation at an exact page-aligned address.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid or occupied ranges and allocation failure.
+    pub fn allocate_anonymous_at(
+        &self,
+        address: roxy_memory::UserAddress,
+        size: usize,
+    ) -> Result<roxy_memory::UserAddress, VmError> {
+        self.0.lock().allocate_anonymous_at(address, size)
+    }
+
+    /// Changes permissions across a complete page-rounded mapped range.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unaligned, invalid, or unmapped ranges.
+    pub fn protect(
+        &self,
+        address: roxy_memory::UserAddress,
+        size: usize,
+        permissions: Permissions,
+    ) -> Result<(), VmError> {
+        self.0.lock().protect(address, size, permissions)
     }
 
     /// Releases one complete anonymous allocation.

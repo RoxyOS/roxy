@@ -25,6 +25,26 @@ impl AddrSpace {
         Ok(region.start.start_address())
     }
 
+    pub(super) fn allocate_anonymous_at(
+        &mut self,
+        address: UserAddress,
+        size: usize,
+    ) -> Result<UserAddress, VmError> {
+        let start = UserPage::new(address).ok_or(VmError::InvalidRange)?;
+        let region = UserRegion::new(start, page_count(size)?).ok_or(VmError::InvalidRange)?;
+
+        self.map_zeroed(region, Permissions::ReadWrite)?;
+        self.anonymous.insert(
+            start,
+            AnonymousAllocation {
+                region,
+                requested_size: size,
+            },
+        );
+
+        Ok(address)
+    }
+
     pub(super) fn free_anonymous(
         &mut self,
         address: UserAddress,
@@ -116,7 +136,7 @@ impl AddrSpace {
     }
 }
 
-fn page_count(size: usize) -> Result<NonZeroUsize, VmError> {
+pub(super) fn page_count(size: usize) -> Result<NonZeroUsize, VmError> {
     let page_size = usize::try_from(PAGE_SIZE).unwrap();
     size.checked_add(page_size - 1)
         .map(|bytes| bytes / page_size)
