@@ -387,6 +387,7 @@ dependencies = [
 name = "roxy-syscall"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.13.1",
  "linkme",
  "roxy-arch",
  "roxy-fd",
