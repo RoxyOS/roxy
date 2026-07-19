@@ -61,6 +61,18 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::FutexWake)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::AnonAllocate)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::AnonFree)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {

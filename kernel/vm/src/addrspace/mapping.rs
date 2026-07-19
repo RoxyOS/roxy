@@ -65,7 +65,7 @@ impl From<Permissions> for PagePermissions {
     }
 }
 
-fn mapping_error(error: MappingError) -> VmError {
+pub(super) fn mapping_error(error: MappingError) -> VmError {
     match error {
         MappingError::OutOfMemory => VmError::OutOfMemory,
         MappingError::AlreadyMapped => VmError::AddressInUse,

@@ -7,6 +7,7 @@ pub(crate) enum Errno {
     Fault = 14,
     Io = 5,
     Invalid = 22,
+    NoMem = 12,
     NotSupported = 95,
 }
 

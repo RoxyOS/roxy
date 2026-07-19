@@ -118,12 +118,16 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
         Ok(())
     }
 
-    fn unmap_user_page(&mut self, page: UserPage) -> Result<(), MappingError> {
+    fn unmap_user_page(&mut self, page: UserPage, flush_active: bool) -> Result<(), MappingError> {
         let (_, flush) = self
             .mapper
             .unmap(page_from(page))
             .map_err(|error| unmap_error(&error))?;
-        flush.ignore();
+        if flush_active {
+            flush.flush();
+        } else {
+            flush.ignore();
+        }
         Ok(())
     }
 

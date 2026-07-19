@@ -4,10 +4,12 @@ extern crate alloc;
 
 mod creation;
 mod lifecycle;
+mod memory;
 mod table;
 
 pub use creation::spawn;
 pub use lifecycle::{exit_current, initialize, take_exit_status};
+pub use memory::{MemoryError, allocate_anonymous, free_anonymous};
 
 use alloc::sync::Arc;
 

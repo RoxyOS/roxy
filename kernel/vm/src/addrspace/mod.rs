@@ -1,4 +1,5 @@
 mod io;
+mod anonymous;
 mod mapping;
 mod stack;
 mod types;
@@ -14,6 +15,7 @@ pub use types::{Permissions, VmError};
 
 pub struct AddrSpace {
     pub(super) pages: BTreeMap<UserPage, PageState>,
+    pub(super) anonymous: BTreeMap<UserPage, AnonymousAllocation>,
     page_table: AddrSpacePageTable,
     id: AddrSpaceId,
 }
@@ -23,6 +25,12 @@ pub struct AddrSpaceHandle(Arc<Lock<AddrSpace>>);
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct AddrSpaceId(u64);
+
+#[derive(Clone, Copy)]
+pub(super) struct AnonymousAllocation {
+    pub(super) region: crate::UserRegion,
+    pub(super) requested_size: usize,
+}
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -35,6 +43,7 @@ impl AddrSpace {
     pub fn new() -> Result<Self, VmError> {
         Ok(Self {
             pages: BTreeMap::new(),
+            anonymous: BTreeMap::new(),
             page_table: AddrSpacePageTable::new().map_err(|_| VmError::OutOfMemory)?,
             id: AddrSpaceId(NEXT_ID.fetch_add(1, Ordering::Relaxed)),
         })
@@ -85,6 +94,29 @@ impl AddrSpaceHandle {
     #[must_use]
     pub fn root_address(&self) -> PhysicalAddress {
         self.0.lock().root_address()
+    }
+
+    /// Creates a private, zero-filled, writable anonymous allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for zero or overflowing sizes, address-space exhaustion, or allocation
+    /// failure.
+    pub fn allocate_anonymous(&self, size: usize) -> Result<roxy_memory::UserAddress, VmError> {
+        self.0.lock().allocate_anonymous(size)
+    }
+
+    /// Releases one complete anonymous allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `address` and `size` exactly identify a live allocation.
+    pub fn free_anonymous(
+        &self,
+        address: roxy_memory::UserAddress,
+        size: usize,
+    ) -> Result<(), VmError> {
+        self.0.lock().free_anonymous(address, size)
     }
 
     /// Makes this address space active until another page table is selected.

@@ -83,6 +83,11 @@ impl AddrSpacePageTable {
         self.0.root_address()
     }
 
+    #[must_use]
+    pub fn is_active(&self) -> bool {
+        CurrentAddrSpacePageTableBackend::current().root == self.root_address()
+    }
+
     /// Installs this address space and returns the previously active page table.
     ///
     /// # Safety
@@ -124,7 +129,7 @@ impl AddrSpacePageTable {
     ///
     /// Returns an error when the page is not mapped or the hierarchy is invalid.
     pub fn unmap_user_page(&mut self, page: UserPage) -> Result<(), MappingError> {
-        self.0.unmap_user_page(page)
+        self.0.unmap_user_page(page, self.is_active())
     }
 
     /// Changes the permissions of an existing user page.
@@ -175,7 +180,7 @@ pub(crate) trait AddrSpacePageTableBackend: sealed::Sealed {
         permissions: PagePermissions,
     ) -> Result<(), MappingError>;
 
-    fn unmap_user_page(&mut self, page: UserPage) -> Result<(), MappingError>;
+    fn unmap_user_page(&mut self, page: UserPage, flush: bool) -> Result<(), MappingError>;
 
     fn protect_user_page(
         &mut self,
