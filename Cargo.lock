@@ -319,6 +319,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-futex"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-memory",
+ "roxy-test",
+ "roxy-thread",
+ "roxy-utils",
+ "roxy-vm",
+]
+
+[[package]]
 name = "roxy-kernel"
 version = "0.1.0"
 dependencies = [
@@ -328,6 +340,7 @@ dependencies = [
  "roxy-boot",
  "roxy-cpu",
  "roxy-elf",
+ "roxy-futex",
  "roxy-memory",
  "roxy-process",
  "roxy-syscall",
@@ -375,6 +388,7 @@ dependencies = [
  "linkme",
  "roxy-arch",
  "roxy-fd",
+ "roxy-futex",
  "roxy-memory",
  "roxy-process",
  "roxy-test",
@@ -391,8 +405,10 @@ dependencies = [
 name = "roxy-thread"
 version = "0.1.0"
 dependencies = [
+ "linkme",
  "roxy-arch",
  "roxy-memory",
+ "roxy-test",
  "roxy-utils",
  "roxy-vm",
 ]

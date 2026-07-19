@@ -1,10 +1,13 @@
 #[repr(u64)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Errno {
+    Again = 11,
     NoSys = 38,
     BadFd = 9,
     Fault = 14,
     Io = 5,
+    Invalid = 22,
+    NotSupported = 95,
 }
 
 impl Errno {

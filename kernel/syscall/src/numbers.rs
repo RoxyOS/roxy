@@ -4,6 +4,8 @@ pub(crate) enum SyscallNumber {
     Exit = 0,
     Read = 1,
     Write = 2,
+    FutexWait = 3,
+    FutexWake = 4,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -14,6 +16,8 @@ impl TryFrom<u64> for SyscallNumber {
             0 => Ok(Self::Exit),
             1 => Ok(Self::Read),
             2 => Ok(Self::Write),
+            3 => Ok(Self::FutexWait),
+            4 => Ok(Self::FutexWake),
             _ => Err(()),
         }
     }
@@ -28,6 +32,8 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(0), Ok(SyscallNumber::Exit));
         assert_eq!(SyscallNumber::try_from(1), Ok(SyscallNumber::Read));
         assert_eq!(SyscallNumber::try_from(2), Ok(SyscallNumber::Write));
-        assert!(SyscallNumber::try_from(3).is_err());
+        assert_eq!(SyscallNumber::try_from(3), Ok(SyscallNumber::FutexWait));
+        assert_eq!(SyscallNumber::try_from(4), Ok(SyscallNumber::FutexWake));
+        assert!(SyscallNumber::try_from(5).is_err());
     }
 }

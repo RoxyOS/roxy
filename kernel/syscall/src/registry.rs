@@ -42,12 +42,24 @@ mod tests {
         Syscall::new(SyscallNumber::Exit, return_first_argument),
     ];
 
-    kernel_test!("roxy-syscall::exit-registered", exit_registered, {
+    kernel_test!("roxy-syscall::required-registered", required_registered, {
         assert!(
             REGISTRY
                 .syscalls
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::Exit)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::FutexWait)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::FutexWake)
         );
     });
 

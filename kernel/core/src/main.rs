@@ -26,6 +26,7 @@ pub extern "C" fn _start() -> ! {
     roxy_memory::initialize(&boot_info);
     roxy_cpu::current_cpu().initialize();
     roxy_process::initialize();
+    roxy_futex::initialize();
     roxy_syscall::initialize();
     CurrentArchitectureBackend::enable_interrupts();
 
