@@ -46,6 +46,7 @@ fn process_vm_error(error: VmError) -> ProcessError {
     match error {
         VmError::OutOfMemory => ProcessError::OutOfMemory,
         VmError::InvalidRange
+        | VmError::PartialUnmap
         | VmError::AddressInUse
         | VmError::NotMapped
         | VmError::MappingFailed

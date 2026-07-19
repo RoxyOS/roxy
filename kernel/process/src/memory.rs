@@ -6,6 +6,7 @@ use crate::current_addrspace;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MemoryError {
     InvalidRange,
+    PartialUnmap,
     OutOfMemory,
     Fault,
 }
@@ -34,11 +35,24 @@ pub fn free_anonymous(address: UserAddress, size: usize) -> Result<(), MemoryErr
         .map_err(map_vm_error)
 }
 
+/// Unmaps one complete page-rounded anonymous allocation in the current process.
+///
+/// # Errors
+///
+/// Returns an error for invalid ranges, partial unmaps, or mapping failures.
+pub fn unmap_anonymous(address: UserAddress, size: usize) -> Result<(), MemoryError> {
+    current_addrspace()
+        .map_err(|_| MemoryError::Fault)?
+        .unmap_anonymous(address, size)
+        .map_err(map_vm_error)
+}
+
 fn map_vm_error(error: VmError) -> MemoryError {
     match error {
         VmError::InvalidRange | VmError::AddressInUse | VmError::NotMapped => {
             MemoryError::InvalidRange
         }
+        VmError::PartialUnmap => MemoryError::PartialUnmap,
         VmError::OutOfMemory => MemoryError::OutOfMemory,
         VmError::MappingFailed | VmError::PermissionDenied => MemoryError::Fault,
     }

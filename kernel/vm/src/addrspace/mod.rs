@@ -1,5 +1,5 @@
-mod io;
 mod anonymous;
+mod io;
 mod mapping;
 mod stack;
 mod types;
@@ -117,6 +117,19 @@ impl AddrSpaceHandle {
         size: usize,
     ) -> Result<(), VmError> {
         self.0.lock().free_anonymous(address, size)
+    }
+
+    /// Unmaps one complete page-rounded anonymous allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid ranges or requests that only partially overlap an allocation.
+    pub fn unmap_anonymous(
+        &self,
+        address: roxy_memory::UserAddress,
+        size: usize,
+    ) -> Result<(), VmError> {
+        self.0.lock().unmap_anonymous(address, size)
     }
 
     /// Makes this address space active until another page table is selected.

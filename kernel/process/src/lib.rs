@@ -9,7 +9,7 @@ mod table;
 
 pub use creation::spawn;
 pub use lifecycle::{exit_current, initialize, take_exit_status};
-pub use memory::{MemoryError, allocate_anonymous, free_anonymous};
+pub use memory::{MemoryError, allocate_anonymous, free_anonymous, unmap_anonymous};
 pub use table::current_process_id;
 
 use alloc::sync::Arc;

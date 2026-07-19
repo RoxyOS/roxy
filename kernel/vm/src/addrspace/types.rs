@@ -14,6 +14,7 @@ impl Permissions {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VmError {
     InvalidRange,
+    PartialUnmap,
     AddressInUse,
     OutOfMemory,
     NotMapped,

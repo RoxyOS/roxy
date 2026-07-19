@@ -38,6 +38,37 @@ impl AddrSpace {
             .filter(|allocation| allocation.requested_size == size)
             .ok_or(VmError::InvalidRange)?;
 
+        self.release_anonymous(start, allocation)
+    }
+
+    pub(super) fn unmap_anonymous(
+        &mut self,
+        address: UserAddress,
+        size: usize,
+    ) -> Result<(), VmError> {
+        let start = UserPage::new(address).ok_or(VmError::InvalidRange)?;
+        let requested = UserRegion::new(start, page_count(size)?).ok_or(VmError::InvalidRange)?;
+        let allocation = self
+            .anonymous
+            .values()
+            .copied()
+            .find(|allocation| regions_overlap(requested, allocation.region))
+            .ok_or(VmError::InvalidRange)?;
+
+        if requested.start != allocation.region.start
+            || requested.page_count != allocation.region.page_count
+        {
+            return Err(VmError::PartialUnmap);
+        }
+
+        self.release_anonymous(start, allocation)
+    }
+
+    fn release_anonymous(
+        &mut self,
+        start: UserPage,
+        allocation: AnonymousAllocation,
+    ) -> Result<(), VmError> {
         if !allocation.region.pages().all(|page| {
             matches!(self.pages.get(&page), Some(super::PageState::Mapped { .. }))
                 && self.page_table.is_user_page_mapped(page)
@@ -100,9 +131,16 @@ fn region_at(start: u64, page_count: NonZeroUsize) -> Result<UserRegion, VmError
     UserRegion::new(start, page_count).ok_or(VmError::InvalidRange)
 }
 
+fn regions_overlap(left: UserRegion, right: UserRegion) -> bool {
+    let left_end = left.start.checked_add(left.page_count.get() - 1).unwrap();
+    let right_end = right.start.checked_add(right.page_count.get() - 1).unwrap();
+
+    left.start <= right_end && right.start <= left_end
+}
+
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use roxy_memory::{UserPage, statistics};
+    use roxy_memory::{PAGE_SIZE, UserAddress, UserPage, statistics};
     use roxy_test::kernel_test;
 
     use super::AddrSpace;
@@ -131,9 +169,43 @@ mod tests {
         assert_eq!(statistics().allocated_frames, baseline);
     });
 
-    kernel_test!("roxy-vm::anonymous-rejects-invalid", anonymous_rejects_invalid, {
+    kernel_test!(
+        "roxy-vm::anonymous-rejects-invalid",
+        anonymous_rejects_invalid,
+        {
+            let mut space = AddrSpace::new().unwrap();
+            assert_eq!(space.allocate_anonymous(0), Err(VmError::InvalidRange));
+            assert_eq!(
+                space.allocate_anonymous(usize::MAX),
+                Err(VmError::InvalidRange)
+            );
+        }
+    );
+
+    kernel_test!("roxy-vm::anonymous-unmap", anonymous_unmap, {
+        let baseline = statistics().allocated_frames;
         let mut space = AddrSpace::new().unwrap();
-        assert_eq!(space.allocate_anonymous(0), Err(VmError::InvalidRange));
-        assert_eq!(space.allocate_anonymous(usize::MAX), Err(VmError::InvalidRange));
+        let rounded = space.allocate_anonymous(4097).unwrap();
+        let allocation = space.allocate_anonymous(8192).unwrap();
+        let interior = UserAddress::new(allocation.as_u64() + PAGE_SIZE).unwrap();
+        let unaligned = UserAddress::new(allocation.as_u64() + 1).unwrap();
+
+        space.unmap_anonymous(rounded, 8192).unwrap();
+        assert_eq!(
+            space.unmap_anonymous(allocation, 4096),
+            Err(VmError::PartialUnmap)
+        );
+        assert_eq!(
+            space.unmap_anonymous(interior, 4096),
+            Err(VmError::PartialUnmap)
+        );
+        assert_eq!(
+            space.unmap_anonymous(unaligned, 8192),
+            Err(VmError::InvalidRange)
+        );
+
+        space.unmap_anonymous(allocation, 8192).unwrap();
+        drop(space);
+        assert_eq!(statistics().allocated_frames, baseline);
     });
 }

@@ -9,6 +9,7 @@ publish.workspace = true
 kernel-test = ["dep:linkme", "dep:roxy-test", "roxy-arch/kernel-test"]
 
 [dependencies]
+bitflags.workspace = true
 linkme = { workspace = true, optional = true }
 
 roxy-arch.workspace = true
