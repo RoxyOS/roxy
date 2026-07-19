@@ -17,7 +17,8 @@ use core::{alloc::Layout, panic::PanicInfo};
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_boot::BootInfo;
 
-const INIT: &[u8] = b"/bin/sh";
+#[cfg(not(feature = "kernel-test"))]
+const INIT: &[u8] = b"/usr/bin/bash";
 
 #[unsafe(no_mangle)]
 #[allow(clippy::missing_panics_doc)]
