@@ -91,6 +91,12 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::VmUnmap)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Close)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {

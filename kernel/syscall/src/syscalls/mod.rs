@@ -1,6 +1,7 @@
 mod anon_allocate;
 mod anon_free;
 mod clock_get;
+mod close;
 mod exit;
 mod futex_wait;
 mod futex_wake;
@@ -12,7 +13,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 11] = [
+pub(super) const SYSCALLS: [Syscall; 12] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -24,4 +25,5 @@ pub(super) const SYSCALLS: [Syscall; 11] = [
     clock_get::SYSCALL,
     vm_map::SYSCALL,
     vm_unmap::SYSCALL,
+    close::SYSCALL,
 ];

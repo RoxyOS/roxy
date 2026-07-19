@@ -66,6 +66,29 @@ pub fn current_open_file(fd: Fd) -> Result<Arc<OpenFile>, DescriptorError> {
     process.fds.get(fd).ok_or(DescriptorError::NotOpen)
 }
 
+/// Closes a descriptor belonging to the currently scheduled process.
+///
+/// # Errors
+///
+/// Returns an error when the descriptor is not open.
+///
+/// # Panics
+///
+/// Panics when the current scheduled thread is not owned by a running process.
+pub fn close_file(fd: Fd) -> Result<(), DescriptorError> {
+    let file = {
+        let mut table = table::PROCESS_TABLE.lock();
+        let process_id = table.current_process_id();
+        let process = table.processes.get_mut(&process_id).unwrap();
+        process.fds.remove(fd)
+    }
+    .ok_or(DescriptorError::NotOpen)?;
+
+    drop(file);
+
+    Ok(())
+}
+
 /// Clones the user address space belonging to the currently scheduled process.
 ///
 /// # Errors

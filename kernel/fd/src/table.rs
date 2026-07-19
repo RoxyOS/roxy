@@ -83,6 +83,7 @@ mod tests {
             assert_eq!(table.insert(shared.clone()), Fd::new(0));
             assert_eq!(table.insert(shared.clone()), Fd::new(1));
             assert!(table.remove(Fd::new(0)).is_some());
+            assert!(table.remove(Fd::new(0)).is_none());
             assert_eq!(table.insert(shared), Fd::new(0));
         }
     );
@@ -97,6 +98,11 @@ mod tests {
 
             assert!(Arc::ptr_eq(&table.get(fd).unwrap(), &shared));
             assert!(table.get(Fd::new(9)).is_none());
+            let removed = table.remove(fd).unwrap();
+            assert!(Arc::ptr_eq(&removed, &shared));
+            assert!(table.get(fd).is_none());
+            drop(removed);
+            assert_eq!(Arc::strong_count(&shared), 1);
         }
     );
 }
