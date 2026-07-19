@@ -17,7 +17,7 @@ impl FileSystem for Ext4FileSystem {
             }
             Ok(inode) => inode,
             Err(VfsError::NotFound) if options.creation != CreationMode::OpenExisting => {
-                self.create_regular(path)?;
+                self.create_regular(path, options.permissions)?;
 
                 self.resolve_inode(path, true)?
             }

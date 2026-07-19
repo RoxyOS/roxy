@@ -1,16 +1,26 @@
 #[repr(u64)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Errno {
-    Again = 11,
-    NoSys = 38,
-    BadFd = 9,
-    Fault = 14,
+    NotFound = 2,
     Io = 5,
-    Invalid = 22,
+    BadFd = 9,
+    Again = 11,
     NoMem = 12,
+    Access = 13,
+    Fault = 14,
+    Busy = 16,
+    AlreadyExists = 17,
+    CrossDevice = 18,
+    NotDirectory = 20,
+    IsDirectory = 21,
+    Invalid = 22,
     NotTty = 25,
-    Overflow = 75,
+    NoSpace = 28,
     Pipe = 29,
+    ReadOnly = 30,
+    NameTooLong = 36,
+    NoSys = 38,
+    Overflow = 75,
     NotSupported = 95,
 }
 

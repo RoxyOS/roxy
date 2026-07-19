@@ -4,7 +4,7 @@ use ext4plus::{
     inode::{Inode, InodeCreationOptions, InodeFlags, InodeMode},
     path::Path,
 };
-use roxy_vfs::{FileType, VfsError, VfsPath};
+use roxy_vfs::{FilePermissions, FileType, VfsError, VfsPath};
 
 use crate::{Ext4FileSystem, error::map_ext4};
 
@@ -55,17 +55,17 @@ impl Ext4FileSystem {
         ))
     }
 
-    pub(crate) fn new_inode(&self, file_type: FileType) -> Result<Inode, VfsError> {
+    pub(crate) fn new_inode(
+        &self,
+        file_type: FileType,
+        permissions: FilePermissions,
+    ) -> Result<Inode, VfsError> {
         let (ext_type, mode) = match file_type {
             FileType::Regular => (ext4plus::FileType::Regular, InodeMode::S_IFREG),
             FileType::Directory => (ext4plus::FileType::Directory, InodeMode::S_IFDIR),
             _ => return Err(VfsError::Unsupported),
         };
-        let mode = mode
-            | InodeMode::S_IRUSR
-            | InodeMode::S_IWUSR
-            | InodeMode::S_IRGRP
-            | InodeMode::S_IROTH;
+        let mode = mode | InodeMode::from_bits_retain(permissions.bits());
 
         self.filesystem
             .create_inode(InodeCreationOptions {
@@ -79,9 +79,13 @@ impl Ext4FileSystem {
             .map_err(map_ext4)
     }
 
-    pub(crate) fn create_regular(&self, path: &VfsPath) -> Result<(), VfsError> {
+    pub(crate) fn create_regular(
+        &self,
+        path: &VfsPath,
+        permissions: FilePermissions,
+    ) -> Result<(), VfsError> {
         let (mut parent, name) = self.parent(path)?;
-        let mut inode = self.new_inode(FileType::Regular)?;
+        let mut inode = self.new_inode(FileType::Regular, permissions)?;
 
         parent.link(name, &mut inode).map_err(map_ext4)
     }

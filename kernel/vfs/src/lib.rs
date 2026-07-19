@@ -13,6 +13,7 @@ mod io;
 mod metadata;
 mod mount;
 mod path;
+mod permissions;
 #[cfg(feature = "kernel-test")]
 mod test_utils;
 mod traits;
@@ -43,4 +44,5 @@ pub use interface::{
 pub use metadata::{FileType, Metadata};
 pub use mount::Vfs;
 pub use path::VfsPath;
+pub use permissions::FilePermissions;
 pub use traits::{FileHandle, FileSystem};

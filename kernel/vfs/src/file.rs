@@ -2,7 +2,7 @@ use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
 
 use roxy_utils::Lock;
 
-use crate::{FileHandle, Metadata, Vfs, VfsError, VfsPath};
+use crate::{FileHandle, FilePermissions, Metadata, Vfs, VfsError, VfsPath};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum OpenAccess {
@@ -20,12 +20,19 @@ pub enum CreationMode {
     CreateNew,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OpenOptions {
     pub access: OpenAccess,
     pub creation: CreationMode,
+    pub permissions: FilePermissions,
     pub append: bool,
     pub truncate: bool,
+}
+
+impl Default for OpenOptions {
+    fn default() -> Self {
+        Self::read_only()
+    }
 }
 
 impl OpenOptions {
@@ -34,6 +41,7 @@ impl OpenOptions {
         Self {
             access: OpenAccess::ReadOnly,
             creation: CreationMode::OpenExisting,
+            permissions: FilePermissions::DEFAULT_FILE,
             append: false,
             truncate: false,
         }
@@ -44,6 +52,7 @@ impl OpenOptions {
         Self {
             access: OpenAccess::WriteOnly,
             creation: CreationMode::Create,
+            permissions: FilePermissions::DEFAULT_FILE,
             append: false,
             truncate: false,
         }
@@ -59,7 +68,7 @@ impl OpenOptions {
         matches!(self.access, OpenAccess::WriteOnly | OpenAccess::ReadWrite)
     }
 
-    pub(crate) fn validate(self) -> Result<(), VfsError> {
+    pub fn validate(self) -> Result<(), VfsError> {
         if (self.creation != CreationMode::OpenExisting || self.truncate || self.append)
             && !self.can_write()
         {

@@ -1,5 +1,5 @@
 use ext4plus::{dir::Dir, path::PathBuf};
-use roxy_vfs::{FileType, VfsError, VfsPath};
+use roxy_vfs::{FilePermissions, FileType, VfsError, VfsPath};
 
 use crate::{Ext4FileSystem, error::map_ext4, metadata};
 
@@ -12,7 +12,7 @@ impl Ext4FileSystem {
         }
 
         let (mut parent, name) = self.parent(path)?;
-        let inode = self.new_inode(FileType::Directory)?;
+        let inode = self.new_inode(FileType::Directory, FilePermissions::DEFAULT_DIRECTORY)?;
         let mut directory =
             Dir::init(self.filesystem.clone(), inode, parent.inode().index).map_err(map_ext4)?;
 

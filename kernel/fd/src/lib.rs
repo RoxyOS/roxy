@@ -6,6 +6,7 @@ mod fd;
 mod file;
 mod open;
 mod table;
+mod vfs;
 
 pub use fd::Fd;
 pub use file::{File, FileError, SeekError, SeekFrom};

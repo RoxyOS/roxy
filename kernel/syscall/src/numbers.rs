@@ -15,6 +15,7 @@ pub(crate) enum SyscallNumber {
     Close = 11,
     Seek = 12,
     Isatty = 13,
+    Open = 14,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -36,6 +37,7 @@ impl TryFrom<u64> for SyscallNumber {
             11 => Ok(Self::Close),
             12 => Ok(Self::Seek),
             13 => Ok(Self::Isatty),
+            14 => Ok(Self::Open),
             _ => Err(()),
         }
     }
@@ -61,6 +63,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(11), Ok(SyscallNumber::Close));
         assert_eq!(SyscallNumber::try_from(12), Ok(SyscallNumber::Seek));
         assert_eq!(SyscallNumber::try_from(13), Ok(SyscallNumber::Isatty));
-        assert!(SyscallNumber::try_from(14).is_err());
+        assert_eq!(SyscallNumber::try_from(14), Ok(SyscallNumber::Open));
+        assert!(SyscallNumber::try_from(15).is_err());
     }
 }

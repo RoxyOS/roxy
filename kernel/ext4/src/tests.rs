@@ -1,7 +1,10 @@
 use alloc::sync::Arc;
 
 use roxy_block::RamDisk;
-use roxy_vfs::{CreationMode, FileType, OpenAccess, OpenOptions, SeekFrom, Vfs, VfsError};
+use roxy_vfs::{
+    CreationMode, FilePermissions, FileType, OpenAccess, OpenOptions, SeekFrom, Vfs, VfsError,
+    VfsPath,
+};
 use spin::Once;
 
 use crate::Ext4FileSystem;
@@ -17,7 +20,7 @@ roxy_test::kernel_test!(
         let filesystem = Arc::new(Ext4FileSystem::load(device).unwrap());
         let vfs = Vfs::new();
 
-        vfs.mount(b"/", filesystem).unwrap();
+        vfs.mount(b"/", filesystem.clone()).unwrap();
 
         assert_eq!(vfs.metadata(b"/").unwrap().file_type, FileType::Directory);
         vfs.mkdir(b"/a").unwrap();
@@ -26,11 +29,22 @@ roxy_test::kernel_test!(
         let options = OpenOptions {
             access: OpenAccess::ReadWrite,
             creation: CreationMode::CreateNew,
+            permissions: FilePermissions::new(0o640).unwrap(),
             append: false,
             truncate: false,
         };
 
         let mut file = vfs.open(b"/a/file", options).unwrap();
+
+        assert_eq!(
+            filesystem
+                .resolve_inode(&VfsPath::new(b"/a/file").unwrap(), true)
+                .unwrap()
+                .mode()
+                .bits()
+                & 0o777,
+            0o640
+        );
 
         assert_eq!(file.write(b"hello").unwrap(), 5);
         assert_eq!(file.seek(SeekFrom::Start(0)).unwrap(), 0);

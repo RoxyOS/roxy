@@ -6,6 +6,7 @@ mod exit;
 mod futex_wait;
 mod futex_wake;
 mod isatty;
+mod open;
 mod read;
 mod seek;
 mod tcb_set;
@@ -15,7 +16,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 14] = [
+pub(super) const SYSCALLS: [Syscall; 15] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -30,4 +31,5 @@ pub(super) const SYSCALLS: [Syscall; 14] = [
     close::SYSCALL,
     seek::SYSCALL,
     isatty::SYSCALL,
+    open::SYSCALL,
 ];

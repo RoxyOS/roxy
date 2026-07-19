@@ -6,6 +6,11 @@ impl Fd {
     pub const fn new(value: u32) -> Self {
         Self(value)
     }
+
+    #[must_use]
+    pub const fn as_u32(self) -> u32 {
+        self.0
+    }
 }
 
 #[cfg(feature = "kernel-test")]

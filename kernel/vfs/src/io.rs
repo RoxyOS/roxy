@@ -23,6 +23,7 @@ impl Vfs {
         let options = OpenOptions {
             access: OpenAccess::WriteOnly,
             creation: CreationMode::Create,
+            permissions: crate::FilePermissions::DEFAULT_FILE,
             append: false,
             truncate: true,
         };

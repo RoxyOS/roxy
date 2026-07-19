@@ -1,11 +1,14 @@
 #![no_std]
 
+extern crate alloc;
+
 mod dispatch;
 mod errno;
 mod numbers;
 mod registry;
 mod syscalls;
 mod unsupported;
+mod user;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 
