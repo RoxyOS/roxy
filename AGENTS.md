@@ -25,6 +25,37 @@
 - Do not create placeholder crates, speculative abstractions, compatibility shims, silent stubs,
   or test-name special cases.
 
+## Module Layout
+
+- Do not place a `foo.rs` file beside a `foo/` directory. Use `foo/mod.rs` as the module entry
+  point and place sibling modules such as `foo/bar.rs` inside that directory.
+
+## Subsystem Design
+
+- Before changing a subsystem, find and read every applicable `DESIGN.md`, starting at the
+  subsystem root and following any more specific document in the directory being changed.
+- After changing a subsystem, review its `DESIGN.md` and update it in the same change so that it
+  still describes the implemented design. Do not leave ownership rules, cross-subsystem contracts,
+  or architectural rationale only in source comments.
+- Create a subsystem `DESIGN.md` when a design-level change has no applicable design document.
+  Local implementation changes that do not affect the documented design do not require a new
+  document.
+- A subsystem design document should cover the parts that apply to that subsystem:
+  - purpose, scope, and explicit non-goals;
+  - responsibilities, resource ownership, and dependency boundaries;
+  - invariants and important lifecycle, control-flow, or data-flow sequences;
+  - extension points and hooks, including who registers or calls them, when they run, their
+    locking or interrupt context, and what they must guarantee;
+  - concurrency and safety assumptions, failure behavior, unsupported cases, and current
+    limitations; and
+  - important rejected alternatives when their tradeoffs are likely to be reconsidered.
+- Write design documents in English for long-term maintainers. Explain why the design exists and
+  state durable contracts rather than walking through functions or restating the current code.
+  Use compact diagrams or tables only when they clarify a relationship or sequence.
+- Do not duplicate `STYLE.md`, API rustdoc, code comments, changelogs, temporary plans, TODO lists,
+  or source line references in `DESIGN.md`. Design documentation complements local API, safety,
+  and invariant comments; it does not replace them.
+
 ## Design and Safety
 
 - Keep unsafe code local. Every unsafe block or unsafe implementation must have a nearby `SAFETY`
