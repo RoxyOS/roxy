@@ -20,3 +20,7 @@ Keep every syscall handler in three visibly separated stages, with one blank lin
 Do not mix argument conversion, validation side effects, and the operation itself in one tightly
 packed block. Small early returns for invalid arguments belong to the parsing or checking stage;
 the actual implementation starts only after those checks have completed.
+
+Keep argument parsing and checking in the syscall handler, but keep the actual implementation to
+10 lines or fewer. If the implementation exceeds 10 lines, move it to the owning subsystem and
+call it from the handler after validation succeeds.
