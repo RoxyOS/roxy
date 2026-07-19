@@ -73,6 +73,12 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::AnonFree)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::ClockGet)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {

@@ -292,6 +292,7 @@ dependencies = [
  "linkme",
  "roxy-arch",
  "roxy-test",
+ "roxy-time",
  "roxy-utils",
  "spin",
  "x2apic",
@@ -346,6 +347,7 @@ dependencies = [
  "roxy-syscall",
  "roxy-test",
  "roxy-thread",
+ "roxy-time",
  "roxy-utils",
  "roxy-vm",
  "spin",
@@ -392,6 +394,9 @@ dependencies = [
  "roxy-memory",
  "roxy-process",
  "roxy-test",
+ "roxy-thread",
+ "roxy-time",
+ "roxy-utils",
 ]
 
 [[package]]
@@ -411,6 +416,13 @@ dependencies = [
  "roxy-test",
  "roxy-utils",
  "roxy-vm",
+]
+
+[[package]]
+name = "roxy-time"
+version = "0.1.0"
+dependencies = [
+ "spin",
 ]
 
 [[package]]

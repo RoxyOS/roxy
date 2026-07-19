@@ -76,6 +76,7 @@ pub struct BootInfo {
     pub bootloader_name: String<64>,
     pub bootloader_version: String<64>,
     pub bsp: CpuId,
+    pub unix_seconds_at_boot: u64,
 }
 
 impl BootInfo {

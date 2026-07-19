@@ -5,7 +5,7 @@ use x2apic::lapic::{LocalApic, LocalApicBuilder, TimerDivide, TimerMode};
 use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
 use roxy_utils::Lock;
 
-use crate::{CpuLocal, clock::TIMER_HZ};
+use crate::{CpuLocal, timer::TIMER_HZ};
 
 use super::{CpuBackend, CpuInitResult, sealed};
 

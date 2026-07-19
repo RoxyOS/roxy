@@ -13,7 +13,9 @@ impl Registry {
             .syscalls
             .iter()
             .find(|syscall| syscall.number == number)
-            .ok_or(Errno::NoSys)?;
+            .ok_or_else(|| {
+                crate::unsupported::unsupported_argument("syscall", number as u64, Errno::NoSys)
+            })?;
 
         (syscall.handler)(arguments)
     }
@@ -21,7 +23,9 @@ impl Registry {
 
 pub(super) fn dispatch(request: RawSyscall) -> u64 {
     let result = SyscallNumber::try_from(request.number)
-        .map_err(|()| Errno::NoSys)
+        .map_err(|()| {
+            crate::unsupported::unsupported_argument("syscall", request.number, Errno::NoSys)
+        })
         .and_then(|number| REGISTRY.dispatch(number, request.arguments));
 
     match result {

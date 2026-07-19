@@ -1,11 +1,11 @@
 use core::sync::atomic::Ordering;
 
-use roxy_arch::LocalInterruptKind;
+use roxy_arch::{Architecture, CpuId, CurrentArchitectureBackend, LocalInterruptKind};
 
 use crate::{
     arch::{CpuBackend, CurrentCpuBackend},
-    clock,
     cpu::CPU_STATE,
+    timer,
 };
 
 pub fn handle_local_interrupt(kind: LocalInterruptKind) {
@@ -19,7 +19,9 @@ pub fn handle_local_interrupt(kind: LocalInterruptKind) {
 }
 
 fn handle_timer() {
-    clock::advance();
+    if CurrentArchitectureBackend::current_cpu_id() == CpuId::BSP {
+        timer::advance_time();
+    }
     CPU_STATE.get().timer_ticks.fetch_add(1, Ordering::Relaxed);
     CurrentCpuBackend::end_of_interrupt();
 }

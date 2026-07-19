@@ -36,3 +36,7 @@ impl ProcessTable {
         assert!(previous.is_none(), "process id reused");
     }
 }
+
+pub fn current_process_id() -> ProcessId {
+    PROCESS_TABLE.lock().current_process_id()
+}

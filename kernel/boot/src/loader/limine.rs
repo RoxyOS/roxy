@@ -2,9 +2,9 @@ use heapless::{String, Vec};
 use limine::{
     BaseRevision, RequestsEndMarker, RequestsStartMarker, firmware, memmap,
     request::{
-        BootloaderInfoRequest, ExecutableAddressRequest, ExecutableCmdlineRequest,
-        FirmwareTypeRequest, FramebufferRequest, HhdmRequest, MemmapRequest, RsdpRequest,
-        StackSizeRequest,
+        BootloaderInfoRequest, DateAtBootRequest, ExecutableAddressRequest,
+        ExecutableCmdlineRequest, FirmwareTypeRequest, FramebufferRequest, HhdmRequest,
+        MemmapRequest, RsdpRequest, StackSizeRequest,
     },
 };
 use roxy_arch::CpuId;
@@ -49,6 +49,9 @@ static FRAMEBUFFER: FramebufferRequest = FramebufferRequest::new();
 #[unsafe(link_section = ".limine_requests")]
 static RSDP: RsdpRequest = RsdpRequest::new();
 #[used]
+#[unsafe(link_section = ".limine_requests")]
+static DATE_AT_BOOT: DateAtBootRequest = DateAtBootRequest::new();
+#[used]
 #[unsafe(link_section = ".limine_requests_end")]
 static REQUESTS_END: RequestsEndMarker = RequestsEndMarker::new();
 
@@ -70,11 +73,14 @@ fn validate_environment() {
     assert_eq!(firmware.firmware_type, firmware::FIRMWARE_TYPE_EFI64);
 
     STACK_SIZE.response().unwrap();
+    DATE_AT_BOOT.response().unwrap();
 }
 
 fn load_boot_info() -> BootInfo {
     let loader = BOOTLOADER.response().unwrap();
     let address = EXECUTABLE_ADDRESS.response().unwrap();
+    let unix_seconds_at_boot = u64::try_from(DATE_AT_BOOT.response().unwrap().timestamp)
+        .expect("Limine returned a negative boot timestamp");
 
     BootInfo {
         memory_regions: memory_regions(),
@@ -89,6 +95,7 @@ fn load_boot_info() -> BootInfo {
         bootloader_name: copy_string(loader.name()),
         bootloader_version: copy_string(loader.version()),
         bsp: CpuId::BSP,
+        unix_seconds_at_boot,
     }
 }
 

@@ -13,6 +13,11 @@ pub(crate) enum Errno {
 
 impl Errno {
     #[must_use]
+    pub(crate) const fn number(self) -> u64 {
+        self as u64
+    }
+
+    #[must_use]
     pub(crate) const fn encode(self) -> u64 {
         (-(self as i64)).cast_unsigned()
     }

@@ -35,12 +35,12 @@ pub(crate) fn initialize() {
             .expect("COM1 must be a valid UART port");
         Lock::new(uart)
     });
+    roxy_utils::unsupported::initialize(print);
 }
 
 pub(crate) fn print(arguments: fmt::Arguments<'_>) {
-    if let Some(serial) = SERIAL.get() {
-        let _ = serial.lock().write_fmt(arguments);
-    }
+    let serial = SERIAL.get().expect("serial must be initialized");
+    let _ = serial.lock().write_fmt(arguments);
 }
 
 pub(crate) fn emergency_print(arguments: fmt::Arguments<'_>) {

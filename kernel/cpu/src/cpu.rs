@@ -1,7 +1,4 @@
-use core::{
-    sync::atomic::{AtomicU8, AtomicU32, AtomicU64, Ordering},
-    time::Duration,
-};
+use core::sync::atomic::{AtomicU8, AtomicU32, AtomicU64, Ordering};
 
 use roxy_arch::{Architecture, CpuId, CurrentArchitectureBackend};
 
@@ -16,7 +13,6 @@ pub(crate) struct CpuState {
     pub hardware_id: u32,
     pub interrupt_depth: AtomicU32,
     pub interrupt_entries: AtomicU64,
-    pub monotonic_nanos: AtomicU64,
     pub timer_ticks: AtomicU64,
     pub apic_errors: AtomicU64,
     pub last_apic_error: AtomicU8,
@@ -29,7 +25,6 @@ impl CpuState {
             hardware_id,
             interrupt_depth: AtomicU32::new(0),
             interrupt_entries: AtomicU64::new(0),
-            monotonic_nanos: AtomicU64::new(0),
             timer_ticks: AtomicU64::new(0),
             apic_errors: AtomicU64::new(0),
             last_apic_error: AtomicU8::new(0),
@@ -81,12 +76,6 @@ impl Cpu {
         }
     }
 
-    #[must_use]
-    pub fn monotonic_time(self) -> Duration {
-        self.assert_current();
-        Duration::from_nanos(CPU_STATE.get().monotonic_nanos.load(Ordering::Relaxed))
-    }
-
     fn assert_current(self) {
         assert_eq!(self.id, CurrentArchitectureBackend::current_cpu_id());
     }
@@ -119,7 +108,7 @@ mod tests {
     roxy_test::kernel_test!("roxy-cpu::periodic-timer-progresses", periodic_timer, {
         assert!(CurrentArchitectureBackend::interrupts_enabled());
         let cpu = current_cpu();
-        let before_time = cpu.monotonic_time();
+        let before_time = roxy_time::monotonic_time();
         let before = cpu.statistics();
 
         while cpu.statistics().timer_ticks < before.timer_ticks + 3 {
@@ -127,7 +116,7 @@ mod tests {
         }
 
         let after = cpu.statistics();
-        assert!(cpu.monotonic_time() >= before_time + Duration::from_millis(12));
+        assert!(roxy_time::monotonic_time() >= before_time + Duration::from_millis(12));
         assert!(after.interrupt_entries >= before.interrupt_entries + 3);
         assert_eq!(after.apic_errors, 0);
         assert_eq!(after.last_apic_error, 0);

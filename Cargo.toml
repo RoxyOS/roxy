@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/elf", "kernel/fd", "kernel/futex", "kernel/memory", "kernel/process", "kernel/syscall", "kernel/test", "kernel/thread", "kernel/utils", "kernel/vm"]
+members = ["xtask", "kernel/arch", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/elf", "kernel/fd", "kernel/futex", "kernel/memory", "kernel/process", "kernel/syscall", "kernel/test", "kernel/thread", "kernel/time", "kernel/utils", "kernel/vm"]
 
 [workspace.package]
 edition = "2024"
@@ -35,6 +35,7 @@ roxy-process.path = "kernel/process"
 roxy-syscall.path = "kernel/syscall"
 roxy-test.path = "kernel/test"
 roxy-thread.path = "kernel/thread"
+roxy-time.path = "kernel/time"
 roxy-utils.path = "kernel/utils"
 roxy-vm.path = "kernel/vm"
 

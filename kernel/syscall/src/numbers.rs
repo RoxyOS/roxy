@@ -9,6 +9,7 @@ pub(crate) enum SyscallNumber {
     AnonAllocate = 5,
     AnonFree = 6,
     TcbSet = 7,
+    ClockGet = 8,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -24,6 +25,7 @@ impl TryFrom<u64> for SyscallNumber {
             5 => Ok(Self::AnonAllocate),
             6 => Ok(Self::AnonFree),
             7 => Ok(Self::TcbSet),
+            8 => Ok(Self::ClockGet),
             _ => Err(()),
         }
     }
@@ -43,6 +45,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(5), Ok(SyscallNumber::AnonAllocate));
         assert_eq!(SyscallNumber::try_from(6), Ok(SyscallNumber::AnonFree));
         assert_eq!(SyscallNumber::try_from(7), Ok(SyscallNumber::TcbSet));
-        assert!(SyscallNumber::try_from(8).is_err());
+        assert_eq!(SyscallNumber::try_from(8), Ok(SyscallNumber::ClockGet));
+        assert!(SyscallNumber::try_from(9).is_err());
     }
 }

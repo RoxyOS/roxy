@@ -5,6 +5,7 @@ mod errno;
 mod numbers;
 mod registry;
 mod syscalls;
+mod unsupported;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 
