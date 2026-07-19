@@ -4,7 +4,7 @@ use roxy_arch::{Architecture, CurrentArchitectureBackend};
 
 use super::{
     addrspace::ScheduledAddrSpace,
-    state::{Scheduler, ThreadIndex},
+    state::{Scheduler, ThreadIndex, ThreadState},
 };
 use crate::{SavedContext, ThreadId};
 
@@ -19,6 +19,7 @@ pub(super) struct PendingContextSwitch {
 pub(super) struct ScheduleResult {
     pub(super) pending_switch: Option<PendingContextSwitch>,
     pub(super) reaped: Option<ThreadId>,
+    pub(super) exiting: Option<ThreadId>,
 }
 
 impl PendingContextSwitch {
@@ -47,18 +48,27 @@ impl Scheduler {
             return ScheduleResult {
                 pending_switch: None,
                 reaped,
+                exiting: None,
             };
         }
 
         assert!(self.current.is_none(), "scheduler control resumed early");
+        let Some(next) = self.next_runnable(ThreadIndex(0)) else {
+            return ScheduleResult {
+                pending_switch: None,
+                reaped,
+                exiting: None,
+            };
+        };
         let control = self.control_context.get_or_insert_with(SavedContext::empty);
-        self.current = Some(ThreadIndex(0));
+        self.current = Some(next);
         let previous = ptr::from_mut(control);
-        let pending_switch = Some(self.prepare_switch_from(previous, ThreadIndex(0)));
+        let pending_switch = Some(self.prepare_switch_from(previous, next));
 
         ScheduleResult {
             pending_switch,
             reaped,
+            exiting: None,
         }
     }
 
@@ -73,24 +83,64 @@ impl Scheduler {
             return ScheduleResult {
                 pending_switch: None,
                 reaped,
+                exiting: None,
             };
         };
 
-        if self.entries.len() < 2 {
+        let Some(next) = self.next_runnable(ThreadIndex((current.0 + 1) % self.entries.len()))
+        else {
             return ScheduleResult {
                 pending_switch: None,
                 reaped,
+                exiting: None,
+            };
+        };
+        if next == current {
+            return ScheduleResult {
+                pending_switch: None,
+                reaped,
+                exiting: None,
             };
         }
 
-        let next = ThreadIndex((current.0 + 1) % self.entries.len());
         let previous = ptr::from_mut(self.entry(current).thread.context());
         self.current = Some(next);
 
         ScheduleResult {
             pending_switch: Some(self.prepare_switch_from(previous, next)),
             reaped,
+            exiting: None,
         }
+    }
+
+    pub(super) fn prepare_block(&mut self) -> PendingContextSwitch {
+        let current = self.current.expect("no current thread");
+        self.entry(current).state = ThreadState::Blocked;
+        let previous = ptr::from_mut(self.entry(current).thread.context());
+        let next = self.next_runnable(ThreadIndex((current.0 + 1) % self.entries.len()));
+        self.current = next;
+
+        match next {
+            Some(next) => self.prepare_switch_from(previous, next),
+            None => PendingContextSwitch {
+                previous,
+                next: ptr::from_ref(self.control_context.get_or_insert_with(SavedContext::empty)),
+                next_addrspace: ScheduledAddrSpace::Kernel,
+                next_kernel_stack_top: None,
+            },
+        }
+    }
+
+    pub(super) fn wake(&mut self, thread_id: ThreadId) -> bool {
+        let Some(index) = self.index_of(thread_id) else {
+            return false;
+        };
+        let entry = self.entry(index);
+        if entry.state != ThreadState::Blocked {
+            return false;
+        }
+        entry.state = ThreadState::Runnable;
+        true
     }
 
     /// Marks the current thread for deferred reaping and prepares its final switch away.
@@ -101,8 +151,8 @@ impl Scheduler {
     pub(super) fn prepare_exit(&mut self) -> ScheduleResult {
         let reaped = self.reap_pending();
         let current = self.current.expect("no current thread");
-        let next =
-            (self.entries.len() > 1).then(|| ThreadIndex((current.0 + 1) % self.entries.len()));
+        self.entry(current).state = ThreadState::Exiting;
+        let next = self.next_runnable(ThreadIndex((current.0 + 1) % self.entries.len()));
         self.current = next;
         self.pending_reap = Some(current);
 
@@ -124,6 +174,7 @@ impl Scheduler {
         ScheduleResult {
             pending_switch: Some(pending_switch),
             reaped,
+            exiting: Some(self.entry(current).thread.id()),
         }
     }
 
@@ -139,5 +190,41 @@ impl Scheduler {
             next_addrspace: entry.addrspace.clone(),
             next_kernel_stack_top: Some(entry.thread.kernel_stack_top().as_u64()),
         }
+    }
+
+    fn next_runnable(&self, start: ThreadIndex) -> Option<ThreadIndex> {
+        (0..self.entries.len()).find_map(|offset| {
+            let index = (start.0 + offset) % self.entries.len();
+            (self.entries[index].state == ThreadState::Runnable).then_some(ThreadIndex(index))
+        })
+    }
+}
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use roxy_test::kernel_test;
+
+    use super::{ScheduledAddrSpace, Scheduler, ThreadIndex, ThreadState};
+    use crate::Thread;
+
+    kernel_test!("roxy-thread::scheduler-block-wake", scheduler_block_wake, {
+        let first = Thread::new(unused_thread).unwrap();
+        let first_id = first.id();
+        let second = Thread::new(unused_thread).unwrap();
+        let mut scheduler = Scheduler::new();
+        scheduler.enqueue(first, ScheduledAddrSpace::Kernel);
+        scheduler.enqueue(second, ScheduledAddrSpace::Kernel);
+        scheduler.current = Some(ThreadIndex(0));
+
+        let _pending = scheduler.prepare_block();
+        assert_eq!(scheduler.entries[0].state, ThreadState::Blocked);
+        assert_eq!(scheduler.current, Some(ThreadIndex(1)));
+        assert!(scheduler.wake(first_id));
+        assert_eq!(scheduler.entries[0].state, ThreadState::Runnable);
+        assert!(!scheduler.wake(first_id));
+    });
+
+    fn unused_thread() -> ! {
+        panic!("unused scheduler test thread started")
     }
 }

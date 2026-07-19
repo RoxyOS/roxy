@@ -9,7 +9,9 @@ use roxy_utils::Lock;
 use roxy_vm::AddrSpaceHandle;
 
 pub use control::{exit_current, on_timer_interrupt, start};
-pub use reap::{ThreadReapedHandler, register_reaped_handler};
+pub use reap::{
+    ThreadExitHandler, ThreadReapedHandler, register_exit_handler, register_reaped_handler,
+};
 
 use self::{addrspace::ScheduledAddrSpace, state::Scheduler};
 use crate::{Thread, ThreadCreateError, ThreadId};
@@ -42,6 +44,34 @@ pub fn enqueue_user(thread: Thread, addrspace: AddrSpaceHandle) {
 /// Panics when called outside a scheduled thread.
 pub fn current_thread_id() -> ThreadId {
     SCHEDULER.lock().current_thread_id()
+}
+
+#[must_use = "a prepared block must be performed"]
+pub struct PendingBlock(switch::PendingContextSwitch);
+
+/// Marks the current thread blocked and prepares its context switch.
+///
+/// # Panics
+///
+/// Panics when called outside a scheduled thread or with interrupts enabled.
+pub fn prepare_block_current() -> PendingBlock {
+    assert!(!CurrentArchitectureBackend::interrupts_enabled());
+    PendingBlock(SCHEDULER.lock().prepare_block())
+}
+
+impl PendingBlock {
+    /// Performs the prepared context switch and returns after the thread is woken.
+    pub fn perform(self) {
+        self.0.perform();
+    }
+}
+
+/// Makes a blocked thread runnable.
+///
+/// Returns `false` when the thread does not exist or is not blocked.
+#[must_use]
+pub fn wake(thread_id: ThreadId) -> bool {
+    CurrentArchitectureBackend::without_interrupts(|| SCHEDULER.lock().wake(thread_id))
 }
 
 fn enqueue(thread: Thread, addrspace: ScheduledAddrSpace) {

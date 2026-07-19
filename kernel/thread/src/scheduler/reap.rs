@@ -6,6 +6,9 @@ use crate::ThreadId;
 static REAPED_HANDLER: AtomicUsize = AtomicUsize::new(0);
 
 pub type ThreadReapedHandler = fn(ThreadId);
+pub type ThreadExitHandler = fn(ThreadId);
+
+static EXIT_HANDLER: AtomicUsize = AtomicUsize::new(0);
 
 /// Registers the owner notification invoked after a thread is safely reaped.
 ///
@@ -18,6 +21,33 @@ pub fn register_reaped_handler(handler: ThreadReapedHandler) {
         0,
         "thread reaped handler registered twice"
     );
+}
+
+/// Registers the owner notification invoked before a thread leaves the scheduler.
+///
+/// # Panics
+///
+/// Panics when a handler was already registered.
+pub fn register_exit_handler(handler: ThreadExitHandler) {
+    assert_eq!(
+        EXIT_HANDLER.swap(handler as usize, Ordering::AcqRel),
+        0,
+        "thread exit handler registered twice"
+    );
+}
+
+pub(super) fn notify_exit(exiting: Option<ThreadId>) {
+    let Some(thread_id) = exiting else {
+        return;
+    };
+    let address = EXIT_HANDLER.load(Ordering::Acquire);
+    if address == 0 {
+        return;
+    }
+
+    // SAFETY: register_exit_handler stores one permanent ThreadExitHandler pointer.
+    let handler: ThreadExitHandler = unsafe { core::mem::transmute(address) };
+    handler(thread_id);
 }
 
 pub(super) fn notify_reaped(reaped: Option<ThreadId>) {

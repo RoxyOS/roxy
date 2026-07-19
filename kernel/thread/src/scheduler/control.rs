@@ -1,13 +1,17 @@
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_utils::preemption;
 
-use super::{SCHEDULER, reap::notify_reaped};
+use super::{
+    SCHEDULER,
+    reap::{notify_exit, notify_reaped},
+};
 
 pub fn start() -> ! {
     CurrentArchitectureBackend::without_interrupts(|| {
         loop {
             let prepared = SCHEDULER.lock().prepare_dispatch();
             notify_reaped(prepared.reaped);
+            notify_exit(prepared.exiting);
 
             if let Some(pending_switch) = prepared.pending_switch {
                 pending_switch.perform();
@@ -27,6 +31,7 @@ pub fn exit_current() -> ! {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
     let prepared = SCHEDULER.lock().prepare_exit();
     notify_reaped(prepared.reaped);
+    notify_exit(prepared.exiting);
     prepared.pending_switch.unwrap().perform();
     panic!("exited thread resumed")
 }
