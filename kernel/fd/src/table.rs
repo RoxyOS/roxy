@@ -54,18 +54,22 @@ mod tests {
     use alloc::{boxed::Box, sync::Arc};
 
     use super::FdTable;
-    use crate::{Fd, File, FileError, OpenFile};
+    use crate::{Fd, File, FileError, OpenFile, SeekError, SeekFrom};
     use roxy_test::kernel_test;
 
     struct Unsupported;
 
     impl File for Unsupported {
-        fn read(&mut self, _output: &mut [u8]) -> Result<usize, FileError> {
+        fn read(&mut self, _position: &mut u64, _output: &mut [u8]) -> Result<usize, FileError> {
             Err(FileError::BadOperation)
         }
 
-        fn write(&mut self, _input: &[u8]) -> Result<usize, FileError> {
+        fn write(&mut self, _position: &mut u64, _input: &[u8]) -> Result<usize, FileError> {
             Err(FileError::BadOperation)
+        }
+
+        fn seek(&mut self, _current: u64, _position: SeekFrom) -> Result<u64, SeekError> {
+            Err(SeekError::NotSeekable)
         }
     }
 
