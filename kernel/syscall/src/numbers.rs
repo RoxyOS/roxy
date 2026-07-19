@@ -8,6 +8,7 @@ pub(crate) enum SyscallNumber {
     FutexWake = 4,
     AnonAllocate = 5,
     AnonFree = 6,
+    TcbSet = 7,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -22,6 +23,7 @@ impl TryFrom<u64> for SyscallNumber {
             4 => Ok(Self::FutexWake),
             5 => Ok(Self::AnonAllocate),
             6 => Ok(Self::AnonFree),
+            7 => Ok(Self::TcbSet),
             _ => Err(()),
         }
     }
@@ -40,6 +42,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(4), Ok(SyscallNumber::FutexWake));
         assert_eq!(SyscallNumber::try_from(5), Ok(SyscallNumber::AnonAllocate));
         assert_eq!(SyscallNumber::try_from(6), Ok(SyscallNumber::AnonFree));
-        assert!(SyscallNumber::try_from(7).is_err());
+        assert_eq!(SyscallNumber::try_from(7), Ok(SyscallNumber::TcbSet));
+        assert!(SyscallNumber::try_from(8).is_err());
     }
 }

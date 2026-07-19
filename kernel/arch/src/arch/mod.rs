@@ -87,6 +87,15 @@ pub trait Architecture: sealed::Sealed {
 
     fn set_kernel_stack_top(kernel_stack_top: u64);
 
+    fn user_thread_pointer() -> u64;
+
+    /// Sets the architecture register used as the userspace thread pointer.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `pointer` is not a canonical virtual address.
+    fn set_user_thread_pointer(pointer: u64);
+
     fn wait_for_interrupt();
 
     fn halt();

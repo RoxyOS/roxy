@@ -1,4 +1,7 @@
-use core::{arch::naked_asm, mem::size_of};
+use core::{
+    arch::naked_asm,
+    mem::{offset_of, size_of},
+};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_memory::UserAddress;
@@ -9,7 +12,10 @@ use crate::stack::KernelStack;
 #[repr(C)]
 pub(super) struct X86_64Context {
     stack_pointer: usize,
+    fs_base: u64,
 }
+
+const _: () = assert!(offset_of!(X86_64Context, stack_pointer) == 0);
 
 /// Stack layout consumed by `switch_context` when a thread runs for the first time.
 ///
@@ -68,10 +74,18 @@ impl ContextBackend for X86_64Context {
     }
 
     fn empty() -> Self {
-        Self { stack_pointer: 0 }
+        Self {
+            stack_pointer: 0,
+            fs_base: 0,
+        }
     }
 
     unsafe fn switch(previous: *mut Self, next: *const Self) {
+        // SAFETY: the caller guarantees distinct, exclusively owned live contexts.
+        let (previous, next) = unsafe { (&mut *previous, &*next) };
+        previous.fs_base = CurrentArchitectureBackend::user_thread_pointer();
+        CurrentArchitectureBackend::set_user_thread_pointer(next.fs_base);
+
         // SAFETY: The caller guarantees valid exclusive contexts and live backing stacks.
         unsafe { switch_context(previous, next) };
     }
@@ -89,6 +103,7 @@ impl X86_64Context {
         }
         Self {
             stack_pointer: frame_pointer as usize,
+            fs_base: 0,
         }
     }
 }

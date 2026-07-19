@@ -4,6 +4,8 @@ mod interrupt;
 mod syscall;
 mod user;
 
+use ::x86_64::{VirtAddr, registers::model_specific::FsBase};
+
 use crate::{CpuId, ExceptionHandler, LocalInterruptHandler, LocalInterruptKind, SyscallHandler};
 
 use super::{Architecture, sealed};
@@ -61,6 +63,14 @@ impl Architecture for X86_64 {
 
     fn set_kernel_stack_top(kernel_stack_top: u64) {
         syscall::set_kernel_stack_top(kernel_stack_top);
+    }
+
+    fn user_thread_pointer() -> u64 {
+        FsBase::read().as_u64()
+    }
+
+    fn set_user_thread_pointer(pointer: u64) {
+        FsBase::write(VirtAddr::new(pointer));
     }
 
     fn wait_for_interrupt() {
