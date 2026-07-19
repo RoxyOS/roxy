@@ -17,6 +17,8 @@ use core::{alloc::Layout, panic::PanicInfo};
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_boot::BootInfo;
 
+const INIT: &[u8] = b"/bin/sh";
+
 #[unsafe(no_mangle)]
 #[allow(clippy::missing_panics_doc)]
 pub extern "C" fn _start() -> ! {
@@ -39,11 +41,13 @@ pub extern "C" fn _start() -> ! {
     test::run();
 
     #[cfg(not(feature = "kernel-test"))]
-    kernel_main(boot_info)
+    kernel_main()
 }
 
 #[cfg(not(feature = "kernel-test"))]
-fn kernel_main(_boot_info: BootInfo) -> ! {
+fn kernel_main() -> ! {
+    roxy_process::spawn(INIT).expect("spawn init process");
+
     roxy_thread::scheduler::start()
 }
 
