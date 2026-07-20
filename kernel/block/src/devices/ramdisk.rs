@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, collections::BTreeMap};
 
 use roxy_utils::Lock;
 
@@ -7,17 +7,19 @@ use crate::{BlockDevice, BlockError};
 pub const LOGICAL_BLOCK_SIZE: usize = 512;
 
 pub struct RamDisk {
-    data: Lock<Box<[u8]>>,
+    source: &'static [u8],
+    overrides: Lock<BTreeMap<u64, Box<[u8; LOGICAL_BLOCK_SIZE]>>>,
 }
 
 impl RamDisk {
-    pub fn new(source: &[u8]) -> Result<Self, BlockError> {
+    pub fn new(source: &'static [u8]) -> Result<Self, BlockError> {
         if source.is_empty() || !source.len().is_multiple_of(LOGICAL_BLOCK_SIZE) {
             return Err(BlockError::Misaligned);
         }
 
         Ok(Self {
-            data: Lock::new(source.into()),
+            source,
+            overrides: Lock::new(BTreeMap::new()),
         })
     }
 
@@ -35,11 +37,17 @@ impl RamDisk {
             .and_then(|index| index.checked_mul(LOGICAL_BLOCK_SIZE))
             .ok_or(BlockError::OutOfBounds)?;
         let end = start.checked_add(byte_len).ok_or(BlockError::OutOfBounds)?;
-        if end > self.data.lock().len() {
+        if end > self.source.len() {
             return Err(BlockError::OutOfBounds);
         }
 
         Ok(start..end)
+    }
+
+    fn block_index(start: u64, offset: usize) -> Result<u64, BlockError> {
+        start
+            .checked_add(u64::try_from(offset).map_err(|_| BlockError::OutOfBounds)?)
+            .ok_or(BlockError::OutOfBounds)
     }
 }
 
@@ -49,23 +57,53 @@ impl BlockDevice for RamDisk {
     }
 
     fn block_count(&self) -> u64 {
-        u64::try_from(self.data.lock().len() / LOGICAL_BLOCK_SIZE)
+        u64::try_from(self.source.len() / LOGICAL_BLOCK_SIZE)
             .expect("RAM disk block count must fit in u64")
     }
 
     fn read_blocks(&self, start: u64, destination: &mut [u8]) -> Result<(), BlockError> {
         let range = self.byte_range(start, destination.len())?;
-        let data = self.data.lock();
+        let overrides = self.overrides.lock();
 
-        destination.copy_from_slice(&data[range]);
+        for (offset, destination) in destination
+            .as_chunks_mut::<LOGICAL_BLOCK_SIZE>()
+            .0
+            .iter_mut()
+            .enumerate()
+        {
+            let index = Self::block_index(start, offset)?;
+            let source_start = range.start + offset * LOGICAL_BLOCK_SIZE;
+            let source_end = source_start + LOGICAL_BLOCK_SIZE;
+            let source = if let Some(block) = overrides.get(&index) {
+                block.as_ref().as_slice()
+            } else {
+                &self.source[source_start..source_end]
+            };
+
+            destination.copy_from_slice(source);
+        }
+
         Ok(())
     }
 
     fn write_blocks(&self, start: u64, source: &[u8]) -> Result<(), BlockError> {
-        let range = self.byte_range(start, source.len())?;
-        let mut data = self.data.lock();
+        self.byte_range(start, source.len())?;
+        let mut overrides = self.overrides.lock();
 
-        data[range].copy_from_slice(source);
+        for (offset, source) in source
+            .as_chunks::<LOGICAL_BLOCK_SIZE>()
+            .0
+            .iter()
+            .enumerate()
+        {
+            let index = Self::block_index(start, offset)?;
+            let block = overrides
+                .entry(index)
+                .or_insert_with(|| Box::new([0; LOGICAL_BLOCK_SIZE]));
+
+            block.copy_from_slice(source);
+        }
+
         Ok(())
     }
 
@@ -76,17 +114,17 @@ impl BlockDevice for RamDisk {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
+    use alloc::boxed::Box;
+
     use super::{BlockDevice, BlockError, LOGICAL_BLOCK_SIZE, RamDisk};
 
     roxy_test::kernel_test!(
         "roxy-block::ram-disk-validates-io",
         ram_disk_validates_io,
         {
-            let mut source = [0_u8; LOGICAL_BLOCK_SIZE * 2];
+            let source = Box::leak(Box::new([0_u8; LOGICAL_BLOCK_SIZE * 2]));
             source[LOGICAL_BLOCK_SIZE] = 7;
-            let disk = RamDisk::new(&source).unwrap();
-            source[LOGICAL_BLOCK_SIZE] = 9;
-            assert_eq!(source[LOGICAL_BLOCK_SIZE], 9);
+            let disk = RamDisk::new(source).unwrap();
 
             let mut block = [0_u8; LOGICAL_BLOCK_SIZE];
             disk.read_blocks(1, &mut block).unwrap();
