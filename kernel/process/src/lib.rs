@@ -6,6 +6,7 @@ mod creation;
 mod execve;
 mod fork;
 mod image;
+mod initial_fds;
 mod lifecycle;
 mod memory;
 mod startup_stack;
@@ -14,6 +15,7 @@ mod table;
 pub use creation::spawn;
 pub use execve::execve_current;
 pub use fork::{ForkError, fork_current};
+pub use initial_fds::InitialFdInjector;
 pub use lifecycle::{exit_current, initialize, take_exit_status};
 pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, protect_memory,

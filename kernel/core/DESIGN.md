@@ -3,9 +3,9 @@
 ## Purpose and scope
 
 `roxy-kernel` is the composition root and executable kernel image. It establishes the initialization
-order, installs top-level exception/interrupt/serial handlers, starts the root filesystem, and
-selects normal boot or the kernel-test harness. Subsystems own their services; core should not
-duplicate their state or policy.
+order, installs top-level exception/interrupt/serial handlers, selects the initial process terminal,
+starts the root filesystem, and selects normal boot or the kernel-test harness. Subsystems own their
+services; core should not duplicate their state or policy.
 
 ## Initialization contract
 
@@ -20,6 +20,15 @@ Each subsystem must publish the global state required by later steps before the 
 In particular, process registers its scheduler address-space hook before user threads can run, and
 syscall configures the architecture entry before interrupts are enabled.
 
+Process initialization also receives core's initial-FD injector. The current injector creates three
+independent terminal open files at descriptors 0, 1, and 2 for every directly spawned process. They
+share the COM1 endpoint, while process and syscall code remain unaware of the selected backend.
+
+COM1 input waits for at least one byte by releasing the serial lock and halting until an interrupt.
+The current architecture has no external UART interrupt path, so the periodic timer provides the
+wakeup and bounds polling latency. Output and kernel diagnostics share the serial lock and may
+interleave only between calls.
+
 ## Ownership and failure
 
 Core owns only composition-level handlers and the final kernel entry loop. Boot-fatal setup errors
@@ -32,6 +41,7 @@ allocation path.
 
 ## Design limits
 
-The current image assumes one statically selected init program and the existing Limine/x86_64
-boot path. Changes to initialization order must update this document and the affected subsystem
-designs together.
+The current image assumes one statically selected init program, one COM1 endpoint shared by all
+directly spawned processes, and the existing Limine/x86_64 boot path. It does not provide serial
+input ownership between multiple readers. Changes to initialization order or console selection must
+update this document and the affected subsystem designs together.

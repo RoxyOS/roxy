@@ -15,7 +15,8 @@ must update the object and offset together.
 
 The underlying `File` trait owns object-specific behavior. The VFS adapter translates a
 `VfsFile`/`FileHandle` pair into that trait without exposing VFS implementation details to process
-code.
+code. Other subsystems, including the terminal subsystem, adapt their objects through the same
+trait; the FD layer does not identify terminals by descriptor number or concrete backend type.
 
 ## Invariants
 

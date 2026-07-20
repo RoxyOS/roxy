@@ -16,6 +16,7 @@ kernel-test = [
 
 [dependencies]
 linkme = { workspace = true, optional = true }
+spin.workspace = true
 
 roxy-elf.workspace = true
 roxy-arch.workspace = true

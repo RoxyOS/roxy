@@ -16,6 +16,18 @@ The scheduler owns threads and saved contexts, but never owns a process address-
 ELF and VM crates provide construction primitives; process decides when a constructed image becomes
 published.
 
+## Initial descriptor injection
+
+Initialization registers one `InitialFdInjector` before any process is spawned. Every direct
+`spawn` creates a new empty descriptor table, invokes that injector, and publishes the process only
+after injection completes. The injector is supplied by the composition root, so process owns the
+creation sequence without depending on a terminal or hardware backend.
+
+Fork does not invoke the injector: it clones the parent's open-file references. `execve` also does
+not invoke it and preserves the current descriptor table. Closing an injected descriptor therefore
+does not cause it to reappear. The current composition connects every directly spawned process to
+one shared serial endpoint; selecting separate terminals remains composition policy.
+
 ## Image and exec flow
 
 Spawn and `execve` share the image builder:
@@ -33,6 +45,7 @@ FD table remain unchanged. A failed build leaves the old image untouched.
 ## Lifecycle invariants
 
 - A running process has a process-table entry, a thread-owner mapping, and an address space.
+- A directly spawned process receives its completed initial descriptor table before publication.
 - Address-space replacement is process-level; it is never performed by mutating a scheduler entry.
 - A dying process retains its address space until its thread is safely reaped on another kernel
   stack.

@@ -1,11 +1,17 @@
 use roxy_thread::{ThreadId, scheduler};
 
 use crate::{
-    ExitStatus, ProcessId, ProcessState,
+    ExitStatus, InitialFdInjector, ProcessId, ProcessState, initial_fds,
     table::{PROCESS_TABLE, ProcessTable},
 };
 
-pub fn initialize() {
+/// Initializes process integration and registers the initial descriptor policy.
+///
+/// # Panics
+///
+/// Panics when the process subsystem was already initialized.
+pub fn initialize(initial_fd_injector: InitialFdInjector) {
+    initial_fds::register(initial_fd_injector);
     scheduler::register_user_dispatch_hook(activate_addrspace);
     scheduler::register_reaped_handler(on_thread_reaped);
 }
@@ -75,7 +81,7 @@ mod tests {
         let thread = Thread::new(unused_thread).unwrap();
         let thread_id = thread.id();
         let mut table = ProcessTable::new();
-        let process = Process::new(thread_id, addrspace.clone());
+        let process = Process::new(thread_id, addrspace.clone(), roxy_fd::FdTable::new());
         let process_id = process.id;
 
         table.insert(process);
@@ -99,7 +105,7 @@ mod tests {
             let thread = Thread::new(unused_thread).unwrap();
             let thread_id = thread.id();
             let mut table = ProcessTable::new();
-            let process = Process::new(thread_id, old.clone());
+            let process = Process::new(thread_id, old.clone(), roxy_fd::FdTable::new());
             let process_id = process.id;
 
             table.insert(process);

@@ -22,6 +22,7 @@ kernel-test = [
     "roxy-memory/kernel-test",
     "roxy-process/kernel-test",
     "roxy-syscall/kernel-test",
+    "roxy-terminal/kernel-test",
     "roxy-thread/kernel-test",
     "roxy-vfs/kernel-test",
     "roxy-vm/kernel-test",
@@ -46,10 +47,12 @@ roxy-boot.workspace = true
 roxy-cpu.workspace = true
 roxy-elf.workspace = true
 roxy-ext4.workspace = true
+roxy-fd.workspace = true
 roxy-futex.workspace = true
 roxy-memory.workspace = true
 roxy-process.workspace = true
 roxy-syscall.workspace = true
+roxy-terminal.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-thread.workspace = true
 roxy-time.workspace = true
