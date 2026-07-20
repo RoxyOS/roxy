@@ -21,7 +21,7 @@ pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, protect_memory,
     unmap_anonymous,
 };
-pub use table::current_process_id;
+pub use table::{current_parent_process_id, current_process_id};
 
 use alloc::sync::Arc;
 
@@ -35,6 +35,7 @@ use roxy_vm::AddrSpaceHandle;
 /// The process retains it until its thread has been safely reaped on another kernel stack.
 struct Process {
     id: ProcessId,
+    parent_process_id: Option<ProcessId>,
     addrspace: Option<AddrSpaceHandle>,
     main_thread_id: ThreadId,
     fds: FdTable,

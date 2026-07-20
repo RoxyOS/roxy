@@ -18,6 +18,8 @@ not a second copy of subsystem policy.
 
 Process-identity queries delegate to the process subsystem. `getpid` returns the stable process ID
 owned by the current thread's process and does not expose scheduler thread IDs through the ABI.
+`getppid` returns the recorded fork parent while that process remains in the process table and
+returns `0` for directly spawned or orphaned processes.
 
 ## Userspace memory contract
 

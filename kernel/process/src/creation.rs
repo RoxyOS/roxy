@@ -42,6 +42,7 @@ impl Process {
     ) -> Self {
         Self {
             id: ProcessId(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed)),
+            parent_process_id: None,
             addrspace: Some(addrspace),
             main_thread_id,
             fds,
@@ -50,12 +51,14 @@ impl Process {
     }
 
     pub(super) fn from_fork(
+        parent_process_id: ProcessId,
         main_thread_id: ThreadId,
         addrspace: AddrSpaceHandle,
         fds: roxy_fd::FdTable,
     ) -> Self {
         Self {
             id: ProcessId(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed)),
+            parent_process_id: Some(parent_process_id),
             addrspace: Some(addrspace),
             main_thread_id,
             fds,

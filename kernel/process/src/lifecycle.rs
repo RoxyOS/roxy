@@ -61,6 +61,12 @@ impl ProcessTable {
         };
 
         self.processes.remove(&process_id);
+        for process in self.processes.values_mut() {
+            if process.parent_process_id == Some(process_id) {
+                process.parent_process_id = None;
+            }
+        }
+
         Some(status)
     }
 }
@@ -83,16 +89,33 @@ mod tests {
         let mut table = ProcessTable::new();
         let process = Process::new(thread_id, addrspace.clone(), roxy_fd::FdTable::new());
         let process_id = process.id;
+        assert_eq!(process.parent_process_id, None);
+
+        let child_addrspace = AddrSpace::new().unwrap().into_handle();
+        let child_thread = Thread::new(unused_thread).unwrap();
+        let child_process = Process::from_fork(
+            process_id,
+            child_thread.id(),
+            child_addrspace.clone(),
+            roxy_fd::FdTable::new(),
+        );
+        let child_process_id = child_process.id;
+        assert_eq!(child_process.parent_process_id, Some(process_id));
 
         table.insert(process);
+        table.insert(child_process);
 
         table.begin_exit(thread_id, ExitStatus(42));
         table.finish_thread_reap(thread_id);
         assert_eq!(table.take_exit_status(process_id), Some(ExitStatus(42)));
+        assert_eq!(table.processes[&child_process_id].parent_process_id, None);
+        table.processes.remove(&child_process_id);
         assert!(statistics().allocated_frames > baseline);
 
         drop(thread);
         drop(addrspace);
+        drop(child_thread);
+        drop(child_addrspace);
         assert_eq!(statistics().allocated_frames, baseline);
     });
 

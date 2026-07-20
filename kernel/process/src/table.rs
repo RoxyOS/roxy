@@ -21,6 +21,13 @@ impl ProcessTable {
             .get(&thread_id)
             .expect("thread has no process")
     }
+
+    pub(super) fn current_parent_process_id(&self) -> Option<ProcessId> {
+        let process_id = self.current_process_id();
+
+        self.processes[&process_id].parent_process_id
+    }
+
     pub(super) const fn new() -> Self {
         Self {
             processes: BTreeMap::new(),
@@ -61,4 +68,8 @@ impl ProcessTable {
 
 pub fn current_process_id() -> ProcessId {
     PROCESS_TABLE.lock().current_process_id()
+}
+
+pub fn current_parent_process_id() -> Option<ProcessId> {
+    PROCESS_TABLE.lock().current_parent_process_id()
 }

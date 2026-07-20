@@ -12,6 +12,11 @@ Each process owns exactly one optional `AddrSpaceHandle`, one main thread id in 
 single-thread model, and one `FdTable`. The process table maps thread ids to process ids so the
 thread scheduler can request address-space activation without depending on this crate.
 
+Each process also records an optional parent process ID. Directly spawned processes have no parent;
+fork children record the caller's process ID. This relationship is informational and does not own
+either process. An exited parent remains visible while its process-table entry is retained. Removing
+that entry clears every child's matching parent ID, making the child an orphan.
+
 The scheduler owns threads and saved contexts, but never owns a process address-space handle. The
 ELF and VM crates provide construction primitives; process decides when a constructed image becomes
 published.
@@ -49,6 +54,8 @@ FD table remain unchanged. A failed build leaves the old image untouched.
 - Address-space replacement is process-level; it is never performed by mutating a scheduler entry.
 - A dying process retains its address space until its thread is safely reaped on another kernel
   stack.
+- A child's parent ID remains stable through the parent's zombie state and becomes absent only when
+  the parent is removed from the process table.
 - The scheduler dispatch hook must activate the address space currently stored by the target
   process immediately before a user thread runs.
 
@@ -56,4 +63,5 @@ FD table remain unchanged. A failed build leaves the old image untouched.
 
 The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
 survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
-multi-threaded exec cleanup, credentials, signals, and process groups are not.
+multi-threaded exec cleanup, credentials, signals, process groups, PID 1 reparenting, and child
+process collections are not. Process-identity callers encode an absent parent as PID 0.
