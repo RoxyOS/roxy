@@ -13,6 +13,11 @@ reaping removes the entry. A scheduler entry records only whether the thread is 
 does not retain an `AddrSpaceHandle`. Process address spaces remain owned by the process table so
 `execve` can replace them without updating scheduler state.
 
+On x86_64 each saved context also owns one aligned FXSAVE image. Every context switch eagerly saves
+the outgoing x87/MMX/SSE state and restores the incoming state. A new process starts from the
+architectural default, while fork captures the current parent's state for the child. This keeps
+asynchronous preemption from leaking SIMD state between threads.
+
 ## Context-switch flow
 
 Every dispatch, preemption, block, or exit produces a `PendingContextSwitch` while the scheduler

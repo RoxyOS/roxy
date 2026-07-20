@@ -3,8 +3,7 @@ use core::{
     mem::{offset_of, size_of},
 };
 
-use roxy_arch::UserContext;
-use roxy_arch::{Architecture, CurrentArchitectureBackend};
+use roxy_arch::{Architecture, CurrentArchitectureBackend, FloatState, UserContext};
 use roxy_memory::UserAddress;
 
 use super::ContextBackend;
@@ -14,6 +13,7 @@ use crate::stack::KernelStack;
 pub(super) struct X86_64Context {
     stack_pointer: usize,
     fs_base: u64,
+    float_state: FloatState,
 }
 
 const _: () = assert!(offset_of!(X86_64Context, stack_pointer) == 0);
@@ -96,6 +96,8 @@ impl ContextBackend for X86_64Context {
             },
         );
         saved_context.fs_base = fs_base;
+        // SAFETY: Architecture initialization configures FXSAVE before any thread is created.
+        saved_context.float_state = unsafe { FloatState::capture_current() };
         saved_context
     }
 
@@ -103,6 +105,7 @@ impl ContextBackend for X86_64Context {
         Self {
             stack_pointer: 0,
             fs_base: 0,
+            float_state: FloatState::initial(),
         }
     }
 
@@ -111,6 +114,12 @@ impl ContextBackend for X86_64Context {
         let (previous, next) = unsafe { (&mut *previous, &*next) };
         previous.fs_base = CurrentArchitectureBackend::user_thread_pointer();
         CurrentArchitectureBackend::set_user_thread_pointer(next.fs_base);
+        // SAFETY: Both aligned states belong exclusively to their contexts, and architecture
+        // initialization enabled FXSAVE before scheduler context switching became possible.
+        unsafe {
+            previous.float_state.save();
+            next.float_state.restore();
+        }
 
         // SAFETY: The caller guarantees valid exclusive contexts and live backing stacks.
         unsafe { switch_context(previous, next) };
@@ -130,6 +139,7 @@ impl X86_64Context {
         Self {
             stack_pointer: frame_pointer as usize,
             fs_base: 0,
+            float_state: FloatState::initial(),
         }
     }
 }

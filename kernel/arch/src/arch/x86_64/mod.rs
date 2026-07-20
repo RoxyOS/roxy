@@ -1,9 +1,11 @@
 mod exception;
+mod float;
 mod init;
 mod interrupt;
 mod syscall;
 mod user;
 
+pub use float::X86_64FloatState;
 pub use syscall::X86_64UserContext;
 
 use ::x86_64::{VirtAddr, registers::model_specific::FsBase};

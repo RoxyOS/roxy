@@ -10,6 +10,9 @@ pub use self::x86_64::X86_64;
 pub type UserContext = self::x86_64::X86_64UserContext;
 
 #[cfg(target_arch = "x86_64")]
+pub type FloatState = self::x86_64::X86_64FloatState;
+
+#[cfg(target_arch = "x86_64")]
 pub type CurrentArchitectureBackend = X86_64;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

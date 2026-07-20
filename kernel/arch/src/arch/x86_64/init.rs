@@ -17,7 +17,7 @@ use x86_64::{
 
 use crate::{ExceptionHandler, LocalInterruptHandler};
 
-use super::{exception, interrupt};
+use super::{exception, float, interrupt};
 
 const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 const DOUBLE_FAULT_STACK_SIZE: usize = 4096 * 5;
@@ -48,6 +48,7 @@ pub(super) fn initialize(
 ) {
     x86_64::instructions::interrupts::disable();
     assert!(!IDT.is_completed(), "architecture initialized twice");
+    float::initialize();
     exception::register(exception_handler);
     interrupt::register(local_interrupt_handler);
 

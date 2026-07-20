@@ -14,7 +14,7 @@ use x86_64::{
 
 use crate::{Architecture, CurrentArchitectureBackend, RawSyscall, SyscallHandler};
 
-use super::init;
+use super::{float, init};
 
 static KERNEL_STACK_TOP: AtomicU64 = AtomicU64::new(0);
 static USER_STACK_POINTER: AtomicU64 = AtomicU64::new(0);
@@ -171,6 +171,7 @@ extern "C" fn dispatch(frame: *const EntryFrame) -> u64 {
 
 pub(super) unsafe fn resume_user(instruction_pointer: u64, stack_pointer: u64) -> ! {
     CurrentArchitectureBackend::set_user_thread_pointer(0);
+    float::reset();
 
     // SAFETY: the caller guarantees valid user mappings and this function resets user state.
     unsafe { sysret_fresh(instruction_pointer, stack_pointer) }

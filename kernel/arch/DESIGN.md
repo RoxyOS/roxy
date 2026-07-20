@@ -21,10 +21,14 @@ ownership rules.
 ## Invariants and flows
 
 Initialization installs exception and local-interrupt callbacks before interrupts are enabled.
+The x86_64 backend also enables x87/SSE execution, establishes the default FXSAVE state, and makes
+that state type available to the thread subsystem. Long mode guarantees the required x87, FXSAVE,
+and SSE2 capabilities.
+
 Syscall entry normalizes the raw register frame, dispatches one handler, and restores the saved
 userspace return context when that handler returns. A fresh `execve` image uses the separate
-`resume_user` contract so it can enter new RIP/RSP values without returning through the old
-userspace frame.
+`resume_user` contract so it can reset floating-point state and enter new RIP/RSP values without
+returning through the old userspace frame.
 
 Architecture methods that enter userspace require the active page table to map the supplied user
 addresses. Unsafe backend code must keep this obligation local and document it at the call site.
