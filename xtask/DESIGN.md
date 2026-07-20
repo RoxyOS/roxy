@@ -23,10 +23,11 @@ Artifacts live below `target/roxy` or the target-specific Cargo output tree. Jin
 resolution and staging installation; Cargo owns Rust builds; filesystem/image tools own image
 formatting; the task runner supplies sequencing, paths, and contextual errors.
 
-The existence of `target/roxy/rootfs.img` is the cache validity signal for commands that consume a
-rootfs. Distribution or package changes do not invalidate it automatically; developers explicitly
-run `rootfs` when they need a fresh userspace image. Removing the cached image also causes the next
-consumer command to rebuild it.
+Commands reuse `target/roxy/rootfs.img` only when it contains the ext4 superblock magic. Missing,
+truncated, or interrupted outputs are rebuilt instead of being treated as valid caches.
+Distribution or package changes do not invalidate a structurally valid image automatically;
+developers explicitly run `rootfs` when they need a fresh userspace image. Removing the cached
+image also causes the next consumer command to rebuild it.
 
 Commands must use the workspace root derived from `CARGO_MANIFEST_DIR` and must not depend on the
 caller's current directory. A failed external command aborts the current task instead of silently

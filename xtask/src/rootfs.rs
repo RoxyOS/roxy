@@ -1,21 +1,28 @@
 use std::{
     fs::{self, File},
+    io::{ErrorKind, Read, Seek, SeekFrom},
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, ensure};
 use xshell::Shell;
 
-const IMAGE_SIZE: u64 = 32 * 1024 * 1024;
+const IMAGE_SIZE: u64 = 64 * 1024 * 1024;
+const EXT4_MAGIC_OFFSET: u64 = 1024 + 0x38;
+const EXT4_MAGIC: [u8; 2] = [0x53, 0xef];
 
 pub(crate) fn get_or_build() -> Result<PathBuf> {
     let workspace = crate::build_kernel::workspace_root();
     let output = output_path(&workspace);
 
-    if output.is_file() {
+    if output.is_file() && has_ext4_superblock(&output)? {
         println!("==> Reusing root filesystem: {}", output.display());
 
         return Ok(output);
+    }
+
+    if output.exists() {
+        println!("==> Cached root filesystem is invalid; rebuilding");
     }
 
     build()
@@ -40,6 +47,21 @@ pub(crate) fn build() -> Result<PathBuf> {
 
 fn output_path(workspace: &Path) -> PathBuf {
     workspace.join("target/roxy/rootfs.img")
+}
+
+fn has_ext4_superblock(path: &Path) -> Result<bool> {
+    let mut image = File::open(path).context("failed to inspect root filesystem image")?;
+    let mut magic = [0; EXT4_MAGIC.len()];
+
+    image
+        .seek(SeekFrom::Start(EXT4_MAGIC_OFFSET))
+        .context("failed to seek root filesystem superblock")?;
+
+    match image.read_exact(&mut magic) {
+        Ok(()) => Ok(magic == EXT4_MAGIC),
+        Err(error) if error.kind() == ErrorKind::UnexpectedEof => Ok(false),
+        Err(error) => Err(error).context("failed to read root filesystem superblock"),
+    }
 }
 
 fn install_base(workspace: &Path, staging: &Path) -> Result<()> {
