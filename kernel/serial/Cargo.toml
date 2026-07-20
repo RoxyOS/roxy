@@ -1,0 +1,18 @@
+[package]
+name = "roxy-serial"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+spin.workspace = true
+uart_16550.workspace = true
+
+roxy-arch.workspace = true
+roxy-fd.workspace = true
+roxy-terminal.workspace = true
+roxy-utils.workspace = true
+
+[lints]
+workspace = true

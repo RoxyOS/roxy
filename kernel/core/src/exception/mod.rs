@@ -1,6 +1,5 @@
 use roxy_arch::{Architecture, CurrentArchitectureBackend, ExceptionContext};
-
-use crate::e_println;
+use roxy_serial::e_println;
 
 pub(crate) fn handler(context: &ExceptionContext) -> ! {
     e_println!(

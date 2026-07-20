@@ -39,7 +39,6 @@ required-features = ["kernel"]
 linkme = { workspace = true, optional = true }
 qemu-exit = { workspace = true, optional = true }
 spin.workspace = true
-uart_16550.workspace = true
 
 roxy-arch.workspace = true
 roxy-block.workspace = true
@@ -51,12 +50,12 @@ roxy-fd.workspace = true
 roxy-futex.workspace = true
 roxy-memory.workspace = true
 roxy-process.workspace = true
+roxy-serial.workspace = true
 roxy-syscall.workspace = true
 roxy-terminal.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-thread.workspace = true
 roxy-time.workspace = true
-roxy-utils.workspace = true
 roxy-vfs.workspace = true
 roxy-vm.workspace = true
 

@@ -1,6 +1,5 @@
 use qemu_exit::{QEMUExit, X86};
-
-use crate::s_println;
+use roxy_serial::s_println;
 
 const SUCCESS_STATUS: u32 = 33;
 const EXIT: X86 = {

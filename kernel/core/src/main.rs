@@ -5,10 +5,10 @@
 extern crate alloc;
 
 mod exception;
+mod initial_fds;
 mod interrupt;
 mod misc;
 mod rootfs;
-mod serial;
 #[cfg(feature = "kernel-test")]
 mod test;
 
@@ -16,6 +16,7 @@ use core::{alloc::Layout, panic::PanicInfo};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_boot::BootInfo;
+use roxy_serial::e_println;
 
 #[cfg(not(feature = "kernel-test"))]
 const INIT: &[u8] = b"/usr/bin/bash";
@@ -24,7 +25,7 @@ const INIT: &[u8] = b"/usr/bin/bash";
 #[allow(clippy::missing_panics_doc)]
 pub extern "C" fn _start() -> ! {
     misc::clear_bss();
-    serial::initialize();
+    roxy_serial::initialize();
 
     let boot_info = BootInfo::parse();
 
@@ -33,7 +34,7 @@ pub extern "C" fn _start() -> ! {
     roxy_time::initialize(boot_info.unix_seconds_at_boot);
     rootfs::initialize(&boot_info).expect("initialize root filesystem");
     roxy_cpu::current_cpu().initialize();
-    roxy_process::initialize(serial::inject_initial_fds);
+    roxy_process::initialize(initial_fds::inject);
     roxy_futex::initialize();
     roxy_syscall::initialize();
     CurrentArchitectureBackend::enable_interrupts();

@@ -479,18 +479,19 @@ dependencies = [
  "roxy-cpu",
  "roxy-elf",
  "roxy-ext4",
+ "roxy-fd",
  "roxy-futex",
  "roxy-memory",
  "roxy-process",
+ "roxy-serial",
  "roxy-syscall",
+ "roxy-terminal",
  "roxy-test",
  "roxy-thread",
  "roxy-time",
- "roxy-utils",
  "roxy-vfs",
  "roxy-vm",
  "spin 0.12.2",
- "uart_16550",
 ]
 
 [[package]]
@@ -522,6 +523,19 @@ dependencies = [
  "roxy-utils",
  "roxy-vfs",
  "roxy-vm",
+ "spin 0.12.2",
+]
+
+[[package]]
+name = "roxy-serial"
+version = "0.1.0"
+dependencies = [
+ "roxy-arch",
+ "roxy-fd",
+ "roxy-terminal",
+ "roxy-utils",
+ "spin 0.12.2",
+ "uart_16550",
 ]
 
 [[package]]
@@ -541,6 +555,15 @@ dependencies = [
  "roxy-utils",
  "roxy-vfs",
  "roxy-vm",
+]
+
+[[package]]
+name = "roxy-terminal"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-fd",
+ "roxy-test",
 ]
 
 [[package]]
