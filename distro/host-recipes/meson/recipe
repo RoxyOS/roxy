@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+version=1.10.2
+revision=1
+
+tarball_url="https://github.com/mesonbuild/meson/releases/download/${version}/meson-${version}.tar.gz"
+tarball_sha256="7890287d911dd4ee1ebd0efb61ed0321bfcd87c725df923a837cf90c6508f96b"
+
+package() {
+	mkdir -p "${dest_dir}${prefix}/bin" "${dest_dir}${prefix}/lib/meson"
+	cp -R "${source_dir}/mesonbuild" "${dest_dir}${prefix}/lib/meson/"
+	install -m755 "${source_dir}/meson.py" "${dest_dir}${prefix}/lib/meson/meson.py"
+	ln -s ../lib/meson/meson.py "${dest_dir}${prefix}/bin/meson"
+}
