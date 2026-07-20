@@ -30,7 +30,6 @@ prepare() {
 configure() {
 	meson_configure \
 		-Ddefault_library=both \
-		-Dcpp_link_args=-fuse-ld=lld,--rtlib=compiler-rt \
 		-Dlibgcc_dependency=true \
 		-Duse_freestnd_hdrs=enabled
 }

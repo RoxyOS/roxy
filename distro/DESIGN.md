@@ -13,9 +13,14 @@ toolchain description. It does not build the kernel or create the final root fil
 integrity or commit pin, build/image dependencies, cross-compilation mode, and package phases. The
 `base` metapackage defines the minimal userspace installed into the rootfs staging tree.
 
-Shared autotools and Meson scripts own common cross-build mechanics. Package recipes should contain
-only package-specific configuration and must not duplicate target setup already supplied by those
-adapters.
+Shared autotools and Meson scripts own common cross-build mechanics. They invoke the Roxy Clang
+driver directly; the driver owns target defaults, sysroot search paths, linker selection, CRT files,
+and runtime libraries. Package recipes should contain only package-specific configuration and must
+not duplicate target setup already supplied by those adapters.
+
+Meson identifies the host system as Roxy. Autotools packages temporarily use the compatible
+`x86_64-unknown-none` host tuple because GNU `config.sub` rejects the Roxy OS name; the compiler's
+`x86_64-unknown-roxy` target remains authoritative for generated code and linking.
 
 ## Build flow
 
@@ -37,6 +42,7 @@ than falling back to stale artifacts.
 
 ## Limits
 
-The current distribution is a minimal x86_64 Roxy userspace centered on mlibc and Bash. It is not a
-general package repository and does not define runtime service management, upgrades, or binary
-package compatibility across kernel ABI revisions.
+The current distribution is a minimal x86_64 Roxy userspace centered on mlibc and Bash. Clang
+userspace builds use the `x86_64-unknown-roxy` target; the kernel remains a separate
+`x86_64-unknown-none` Rust target. This is not a general package repository and does not define
+runtime service management, upgrades, or binary package compatibility across kernel ABI revisions.

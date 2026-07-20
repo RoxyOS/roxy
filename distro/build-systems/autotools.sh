@@ -2,7 +2,7 @@
 
 autotools_configure() {
 	export AR=llvm-ar
-	export CC="${base_dir}/toolchains/x86_64-roxy-clang"
+	export CC="clang --target=x86_64-unknown-roxy --sysroot=/sysroot"
 	export CC_FOR_BUILD=clang
 	export NM=llvm-nm
 	export RANLIB=llvm-ranlib
