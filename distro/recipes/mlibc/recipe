@@ -5,7 +5,7 @@ revision=2
 
 git_url="https://github.com/RoxyOS/mlibc"
 commit="8713f9dddc0810892e34e5f59729b6c50fcceafb"
-shallow=yes
+shallow=no
 
 source_imagedeps="ca-certificates git meson"
 source_allow_network=yes
