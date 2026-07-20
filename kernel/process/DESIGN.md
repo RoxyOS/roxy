@@ -1,0 +1,46 @@
+# Process Design
+
+## Purpose and scope
+
+`roxy-process` owns process identity, process state, the process table, process-owned address
+spaces, descriptor tables, process creation, fork, `execve`, and process-facing virtual-memory
+operations. It does not own scheduler context switching, ELF parsing policy, or VFS storage.
+
+## Ownership and dependency boundaries
+
+Each process owns exactly one optional `AddrSpaceHandle`, one main thread id in the current
+single-thread model, and one `FdTable`. The process table maps thread ids to process ids so the
+thread scheduler can request address-space activation without depending on this crate.
+
+The scheduler owns threads and saved contexts, but never owns a process address-space handle. The
+ELF and VM crates provide construction primitives; process decides when a constructed image becomes
+published.
+
+## Image and exec flow
+
+Spawn and `execve` share the image builder:
+
+```text
+new AddrSpace → load executable → load PT_INTERP → map stack
+→ encode startup stack → publish only after every step succeeds
+```
+
+`execve` first copies and validates all old-userspace arguments in the syscall layer. It then builds
+the new image independently, replaces the process table's address space with interrupts disabled,
+activates it, and returns the new entry/stack pair to the architecture layer. PID, main thread, and
+FD table remain unchanged. A failed build leaves the old image untouched.
+
+## Lifecycle invariants
+
+- A running process has a process-table entry, a thread-owner mapping, and an address space.
+- Address-space replacement is process-level; it is never performed by mutating a scheduler entry.
+- A dying process retains its address space until its thread is safely reaped on another kernel
+  stack.
+- The scheduler dispatch hook must activate the address space currently stored by the target
+  process immediately before a user thread runs.
+
+## Limits and non-goals
+
+The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
+survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
+multi-threaded exec cleanup, credentials, signals, and process groups are not.
