@@ -13,7 +13,7 @@ source_allow_network=yes
 cross_compile=yes
 clean_workdirs=no
 
-imagedeps="clang compiler-rt lld llvm meson ninja-build pkg-config"
+imagedeps="clang libclang-rt-dev lld llvm meson ninja-build pkg-config"
 
 source "${base_dir}/build-systems/meson.sh"
 
