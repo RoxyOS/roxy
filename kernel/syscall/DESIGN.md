@@ -16,6 +16,9 @@ Handlers follow three stages: parse raw values into typed data, validate all use
 state, then call the owning subsystem. The implementation stage should remain a small delegation,
 not a second copy of subsystem policy.
 
+Process-identity queries delegate to the process subsystem. `getpid` returns the stable process ID
+owned by the current thread's process and does not expose scheduler thread IDs through the ABI.
+
 ## Userspace memory contract
 
 Pointers are interpreted only through typed `UserAddress` values and the current process's
