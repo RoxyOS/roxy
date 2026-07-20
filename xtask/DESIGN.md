@@ -9,18 +9,24 @@ contain kernel runtime behavior or duplicate the build logic owned by external t
 ## Command flows
 
 - `rootfs` builds and installs the Jinx `base` package into a clean staging tree, then creates the
-  ext4 root image.
-- `image` builds rootfs and release kernel, then creates a bootable image.
-- `run` builds the same inputs and launches the configured emulator path.
-- `test` builds the kernel-test image and runs the test harness.
+  ext4 root image, replacing any existing image.
+- `image` reuses an existing rootfs image or builds one when absent, builds the release kernel, then
+  creates a bootable image.
+- `run` uses the same cached-rootfs behavior and launches the configured emulator path.
+- `test` uses the same cached-rootfs behavior, builds the kernel-test image, and runs the harness.
 - `check` runs formatting, workspace checks, Clippy, release kernel checks, test-kernel checks, and
-  diff whitespace validation.
+  diff whitespace validation without building userspace or rootfs artifacts.
 
 ## Ownership and external boundaries
 
 Artifacts live below `target/roxy` or the target-specific Cargo output tree. Jinx owns package
 resolution and staging installation; Cargo owns Rust builds; filesystem/image tools own image
 formatting; the task runner supplies sequencing, paths, and contextual errors.
+
+The existence of `target/roxy/rootfs.img` is the cache validity signal for commands that consume a
+rootfs. Distribution or package changes do not invalidate it automatically; developers explicitly
+run `rootfs` when they need a fresh userspace image. Removing the cached image also causes the next
+consumer command to rebuild it.
 
 Commands must use the workspace root derived from `CARGO_MANIFEST_DIR` and must not depend on the
 caller's current directory. A failed external command aborts the current task instead of silently

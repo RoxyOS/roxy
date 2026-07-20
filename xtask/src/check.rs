@@ -1,8 +1,6 @@
 use anyhow::Result;
 
 pub(crate) fn run() -> Result<()> {
-    crate::rootfs::build()?;
-
     println!("==> Checking formatting");
     crate::cmd!("cargo fmt --all --check")?;
 
