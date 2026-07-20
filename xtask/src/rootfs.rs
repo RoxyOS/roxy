@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{Context, Result, ensure};
 
-const IMAGE_SIZE: u64 = 4 * 1024 * 1024;
+const IMAGE_SIZE: u64 = 32 * 1024 * 1024;
 
 pub(crate) fn build() -> Result<PathBuf> {
     println!("==> Building empty root filesystem");
