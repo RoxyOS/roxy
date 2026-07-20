@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=5.3
-revision=1
+revision=2
 
 tarball_url="https://ftpmirror.gnu.org/gnu/bash/bash-${version}.tar.gz"
 tarball_sha256="0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba"
@@ -9,7 +9,8 @@ tarball_sha256="0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba
 cross_compile=yes
 
 deps="mlibc"
-imagedeps="clang compiler-rt lld llvm make"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make"
 
 source "${base_dir}/build-systems/autotools.sh"
 

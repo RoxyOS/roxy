@@ -18,6 +18,19 @@ driver directly; the driver owns target defaults, sysroot search paths, linker s
 and runtime libraries. Package recipes should contain only package-specific configuration and must
 not duplicate target setup already supplied by those adapters.
 
+The `roxy-llvm` host package pins and builds the Roxy LLVM fork as a native toolchain containing
+Clang, LLD, the required LLVM binary utilities, resource headers, and Roxy compiler-rt builtins.
+Cross-compiled packages depend on this host package instead of distribution LLVM packages so the
+compiler driver and runtime always describe the same target contract.
+The package exposes LLD through both `ld.lld` and the GNU-compatible `ld` entry point so compiler
+tool discovery used by Autotools remains self-contained within the host package.
+The target contract includes ELF IFUNC because x86_64 mlibc uses it for selected routines and its
+runtime linker resolves the resulting relocations.
+Roxy mlibc explicitly enables its glibc extension option to provide the compatibility interfaces
+expected by GNU userspace, including the `sys/ioctl.h` contract used by Bash job control.
+Packages that execute native build generators must separately declare a Linux host development
+environment; `roxy-llvm` intentionally does not bundle distribution C headers or host CRT objects.
+
 Meson identifies the host system as Roxy. Autotools packages temporarily use the compatible
 `x86_64-unknown-none` host tuple because GNU `config.sub` rejects the Roxy OS name; the compiler's
 `x86_64-unknown-roxy` target remains authoritative for generated code and linking.

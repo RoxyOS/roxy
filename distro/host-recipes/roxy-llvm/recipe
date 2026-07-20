@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+version=24.0.0.20260720.1
+revision=2
+
+tarball_url="https://github.com/RoxyOS/llvm-project/archive/508b65e2a8b5746a661022999e240ea7815a49eb.tar.gz"
+tarball_sha256="acc96e4f69b630f64a2dcdca6f2d56a6a73d8383d895a34c65cb04e9f8153cfc"
+
+imagedeps="cmake g++ gcc ninja-build python3"
+
+configure() {
+	cmake \
+		-G Ninja \
+		-S "${source_dir}/llvm" \
+		-B . \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCLANG_INCLUDE_TESTS=OFF \
+		-DLLD_SYMLINKS_TO_CREATE="lld-link;ld.lld;ld64.lld;wasm-ld;ld" \
+		-DLLVM_ENABLE_BINDINGS=OFF \
+		-DLLVM_ENABLE_CURL=OFF \
+		-DLLVM_ENABLE_LIBXML2=OFF \
+		-DLLVM_ENABLE_PROJECTS="clang;lld" \
+		-DLLVM_ENABLE_TERMINFO=OFF \
+		-DLLVM_ENABLE_ZLIB=OFF \
+		-DLLVM_ENABLE_ZSTD=OFF \
+		-DLLVM_INCLUDE_DOCS=OFF \
+		-DLLVM_INCLUDE_EXAMPLES=OFF \
+		-DLLVM_INCLUDE_TESTS=OFF \
+		-DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
+		-DLLVM_TARGETS_TO_BUILD=X86 \
+		-DLLVM_TOOLCHAIN_TOOLS="llvm-ar;llvm-nm;llvm-ranlib;llvm-strip"
+}
+
+build() {
+	cmake --build . --parallel "${parallelism}" --target \
+		clang \
+		lld \
+		llvm-ar \
+		llvm-nm \
+		llvm-ranlib \
+		llvm-strip
+
+	configure_builtins
+	cmake --build builtins --parallel "${parallelism}" --target builtins
+}
+
+configure_builtins() {
+	local clang_major
+	clang_major="$(bin/clang -dumpversion)"
+	clang_major="${clang_major%%.*}"
+
+	cmake \
+		-G Ninja \
+		-S "${source_dir}/compiler-rt" \
+		-B builtins \
+		-DCMAKE_AR="${PWD}/bin/llvm-ar" \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_C_COMPILER="${PWD}/bin/clang" \
+		-DCMAKE_C_COMPILER_TARGET=x86_64-unknown-roxy \
+		-DCMAKE_C_FLAGS=-ffreestanding \
+		-DCMAKE_CXX_COMPILER="${PWD}/bin/clang++" \
+		-DCMAKE_CXX_COMPILER_TARGET=x86_64-unknown-roxy \
+		-DCMAKE_CXX_FLAGS=-ffreestanding \
+		-DCMAKE_INSTALL_PREFIX="${prefix}" \
+		-DCMAKE_RANLIB="${PWD}/bin/llvm-ranlib" \
+		-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+		-DCOMPILER_RT_BAREMETAL_BUILD=ON \
+		-DCOMPILER_RT_BUILD_BUILTINS=ON \
+		-DCOMPILER_RT_BUILD_CRT=OFF \
+		-DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
+		-DCOMPILER_RT_BUILD_ORC=OFF \
+		-DCOMPILER_RT_BUILD_PROFILE=OFF \
+		-DCOMPILER_RT_BUILD_SANITIZERS=OFF \
+		-DCOMPILER_RT_BUILD_XRAY=OFF \
+		-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
+		-DCOMPILER_RT_INSTALL_LIBRARY_DIR="${prefix}/lib/clang/${clang_major}/lib" \
+		-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=ON
+}
+
+package() {
+	local component
+	for component in \
+		clang \
+		clang-resource-headers \
+		lld \
+		llvm-ar \
+		llvm-nm \
+		llvm-ranlib; do
+		DESTDIR="${dest_dir}" cmake --install . --component "${component}" --strip
+	done
+	install -Dm755 bin/llvm-strip "${dest_dir}${prefix}/bin/llvm-strip"
+	DESTDIR="${dest_dir}" cmake --build builtins --target install-builtins-stripped
+}
