@@ -1,6 +1,6 @@
 # Syscall Subsystem Style
 
-This guide supplements the repository-wide `STYLE.md` for syscall handlers.
+This guide supplements the repository-wide `agent-instructions/STYLE.md` for syscall handlers.
 
 ## Handler Flow
 
