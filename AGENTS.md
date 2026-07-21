@@ -128,3 +128,19 @@ Stage-aware validation:
   every ABI change, including the current exit syscall.
 - The repository currently has only a distributed kernel unit harness. It has no CI or other test
   layers; add those only when their stage is explicitly resumed by the project owner.
+
+## mlibc Development Workflow
+
+- Iterate on mlibc in the persistent `distro/sources/mlibc-workdir` tree. Do not update the recipe
+  commit or fetch upstream for every local change.
+- Use the persistent Jinx and Meson build directories for incremental package builds:
+  `cd target/jinx && jinx build mlibc`. Use `jinx rebuild mlibc` only when the incremental build
+  state is invalid or configure state must be recreated.
+- Rebuild the root filesystem only when userspace artifacts must be tested. Delete
+  `target/roxy/rootfs.img`, then run `cargo run -p xtask -- rootfs`; the normal rootfs workflow
+  otherwise reuses any structurally valid cached image.
+- After refreshing the rootfs, use `cargo run -p xtask -- run` for manual userspace verification.
+  Kernel-only changes should reuse the existing rootfs and must not trigger an mlibc rebuild.
+- Once local behavior is stable, commit or export the mlibc change to the RoxyOS fork, update the
+  recipe `commit` and `version`/`revision`, and perform one clean package/rootfs build before
+  treating the change as reproducible. Keep upstream pin changes out of the local iteration loop.
