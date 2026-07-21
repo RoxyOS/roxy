@@ -1,7 +1,7 @@
 use roxy_fd::{Fd, FdTable};
 
 pub(crate) fn inject(table: &mut FdTable) {
-    let terminal = roxy_serial::terminal();
+    let terminal = roxy_fbterm::terminal().unwrap_or_else(roxy_serial::terminal);
 
     for expected in [Fd::new(0), Fd::new(1), Fd::new(2)] {
         let inserted = table.insert(roxy_terminal::open(terminal.clone()));

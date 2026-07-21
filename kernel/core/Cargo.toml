@@ -18,6 +18,7 @@ kernel-test = [
     "roxy-cpu/kernel-test",
     "roxy-elf/kernel-test",
     "roxy-ext4/kernel-test",
+    "roxy-fbterm/kernel-test",
     "roxy-futex/kernel-test",
     "roxy-memory/kernel-test",
     "roxy-process/kernel-test",
@@ -46,6 +47,7 @@ roxy-boot.workspace = true
 roxy-cpu.workspace = true
 roxy-elf.workspace = true
 roxy-ext4.workspace = true
+roxy-fbterm.workspace = true
 roxy-fd.workspace = true
 roxy-futex.workspace = true
 roxy-memory.workspace = true

@@ -12,7 +12,7 @@ own their services; core should not duplicate their state or policy.
 The startup sequence is intentionally ordered:
 
 ```text
-clear BSS → serial → BootInfo → architecture → memory → time → rootfs
+clear BSS → serial → BootInfo → architecture → memory → fbterm → time → rootfs
 → CPU → process → futex → syscall → enable interrupts → run/test
 ```
 
@@ -22,9 +22,10 @@ syscall configures the architecture entry before interrupts are enabled.
 
 Process initialization also receives core's initial-FD injector. The current injector creates three
 independent terminal open files at descriptors 0, 1, and 2 for every directly spawned process. They
-share the endpoint returned by the serial subsystem, while process and syscall code remain unaware
-of the selected backend. Descriptor assignment remains in core rather than the serial subsystem so
-other terminals or PTYs can replace the boot policy without changing the hardware driver.
+share the endpoint selected by core: a compatible `fbterm` framebuffer when available, or the
+serial subsystem after a serial diagnostic for unsupported framebuffer modes. Process and syscall
+code remain unaware of the selected backend. Descriptor assignment remains in core rather than the
+hardware subsystems so other terminals or PTYs can replace the boot policy.
 
 ## Ownership and failure
 
@@ -38,7 +39,7 @@ not a recoverable memory allocation path.
 
 ## Design limits
 
-The current image assumes one statically selected init program, one COM1 endpoint shared by all
-directly spawned processes, and the existing Limine/x86_64 boot path. It does not provide serial
-input ownership between multiple readers. Changes to initialization order or console selection must
-update this document and the affected subsystem designs together.
+The current image assumes one statically selected init program and the existing Limine/x86_64 boot
+path. It does not provide framebuffer terminal input or serial input ownership between multiple
+readers. Changes to initialization order or console selection must update this document and the
+affected subsystem designs together.

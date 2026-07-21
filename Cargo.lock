@@ -233,6 +233,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "font8x8"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "875488b8711a968268c7cf5d139578713097ca4635a76044e8fe8eedf831d07e"
+
+[[package]]
 name = "hash32"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -446,6 +452,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-fbterm"
+version = "0.1.0"
+dependencies = [
+ "font8x8",
+ "linkme",
+ "roxy-boot",
+ "roxy-fd",
+ "roxy-process",
+ "roxy-terminal",
+ "roxy-test",
+ "roxy-thread",
+ "roxy-utils",
+ "spin 0.12.2",
+]
+
+[[package]]
 name = "roxy-fd"
 version = "0.1.0"
 dependencies = [
@@ -479,6 +501,7 @@ dependencies = [
  "roxy-cpu",
  "roxy-elf",
  "roxy-ext4",
+ "roxy-fbterm",
  "roxy-fd",
  "roxy-futex",
  "roxy-memory",

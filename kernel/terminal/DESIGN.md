@@ -29,6 +29,8 @@ concurrently. Implementations must serialize their mutable device state without 
 process or descriptor-table locks across I/O. Blocking reads must not retain locks needed by output
 or kernel diagnostics while waiting.
 
-Future physical terminals and PTY endpoints can implement the same contract. Terminal attributes
-and line discipline will require explicit state and control interfaces in this subsystem; they must
-not be inferred from a serial backend or hidden inside syscall handlers.
+Physical endpoints such as serial and `fbterm`, along with future PTY endpoints, implement the same
+contract. Output-only endpoints emit the centralized unsupported-operation diagnostic before
+returning their file error through the adapter. Terminal attributes and line discipline will
+require explicit state and control interfaces in this subsystem; they must not be inferred from a
+concrete backend or hidden inside syscall handlers.

@@ -31,6 +31,9 @@ pub extern "C" fn _start() -> ! {
 
     CurrentArchitectureBackend::initialize(exception::handler, interrupt::handler);
     roxy_memory::initialize(&boot_info);
+    if let Err(error) = roxy_fbterm::initialize(&boot_info) {
+        roxy_serial::e_println!("fbterm unavailable: {error:?}; using serial terminal");
+    }
     roxy_time::initialize(boot_info.unix_seconds_at_boot);
     rootfs::initialize(&boot_info).expect("initialize root filesystem");
     roxy_cpu::current_cpu().initialize();

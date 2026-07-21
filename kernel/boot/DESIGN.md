@@ -12,7 +12,7 @@ The loader backend owns the bootloader request statics and validates the respons
 `BootInfo` owns bounded copies of strings and metadata while module byte ranges remain borrowed
 from bootloader-provided memory for the kernel lifetime.
 
-The public data model normalizes memory-region kinds, framebuffers, kernel addresses, modules,
+The public data model normalizes memory-region kinds, framebuffer modes, kernel addresses, modules,
 HHDM offset, CPU identity, command line, and boot time. Downstream subsystems interpret this data;
 they do not depend on Limine response types.
 
@@ -26,9 +26,14 @@ they do not depend on Limine response types.
 Missing mandatory responses or an invalid environment are boot-fatal because later initialization
 cannot establish its safety invariants.
 
+Framebuffer metadata includes the RGB memory model and channel masks so `fbterm` can validate and
+pack pixels without depending on Limine types. Mode compatibility remains a `fbterm` decision and
+may fall back to serial during core initialization.
+
 ## Invariants and limits
 
 All bounded collections have explicit capacities. Memory regions are reported with their original
 classification, including unknown values, so memory initialization can reject unsafe assumptions.
-The current backend requires EFI64 Limine and a valid framebuffer response; other boot protocols
-must implement the sealed `Bootloader` contract rather than bypassing `BootInfo`.
+The current backend requires EFI64 Limine. A missing framebuffer response produces an empty bounded
+collection so core can retain its serial terminal. Other boot protocols must implement the sealed
+`Bootloader` contract rather than bypassing `BootInfo`.

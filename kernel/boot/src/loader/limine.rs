@@ -131,9 +131,11 @@ fn memory_regions() -> Vec<MemoryRegion, MAX_MEMORY_REGIONS> {
 }
 
 fn framebuffers() -> Vec<FramebufferInfo, MAX_FRAMEBUFFERS> {
-    let framebuffers: Vec<FramebufferInfo, MAX_FRAMEBUFFERS> = FRAMEBUFFER
-        .response()
-        .unwrap()
+    let Some(response) = FRAMEBUFFER.response() else {
+        return Vec::new();
+    };
+
+    response
         .framebuffers()
         .iter()
         .map(|framebuffer| FramebufferInfo {
@@ -142,10 +144,15 @@ fn framebuffers() -> Vec<FramebufferInfo, MAX_FRAMEBUFFERS> {
             height: framebuffer.height,
             pitch: framebuffer.pitch,
             bits_per_pixel: framebuffer.bpp,
+            memory_model: framebuffer.memory_model,
+            red_mask_size: framebuffer.red_mask_size,
+            red_mask_shift: framebuffer.red_mask_shift,
+            green_mask_size: framebuffer.green_mask_size,
+            green_mask_shift: framebuffer.green_mask_shift,
+            blue_mask_size: framebuffer.blue_mask_size,
+            blue_mask_shift: framebuffer.blue_mask_shift,
         })
-        .collect();
-
-    (!framebuffers.is_empty()).then_some(framebuffers).unwrap()
+        .collect()
 }
 
 fn copy_string<const SIZE: usize>(value: &str) -> String<SIZE> {
