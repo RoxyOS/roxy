@@ -13,9 +13,10 @@ The caller owns the address space and image bytes. The loader owns validation an
 transaction: it must reject malformed metadata before exposing an unsafe mapping and must roll
 back mappings when a later segment cannot be loaded.
 
-`LoadType::Executable` uses the executable's normal load bias. `LoadType::Interpreter` supplies the
-base address selected by the process image builder. The loader reports metadata through repository
-types instead of exposing `object` crate types.
+`LoadType::Executable` accepts fixed-address `ET_EXEC` images with zero bias and PIE `ET_DYN`
+images with the ELF subsystem's fixed executable base. `LoadType::Interpreter` accepts only
+`ET_DYN` and uses the base address selected by the process image builder. The loader reports
+metadata through repository types instead of exposing `object` crate types.
 
 ## Invariants
 
@@ -23,11 +24,13 @@ types instead of exposing `object` crate types.
 - Segment permissions are derived from ELF flags and writable executable segments are rejected.
 - The entry point must resolve to a valid mapped executable address.
 - Program-header metadata and interpreter strings are preserved for startup auxiliary vectors.
+- PIE entry points, segments, and program headers use the same checked load bias.
 - Allocation and mapping failures are returned as `ElfError`; partial construction must not be
   published as a process image.
 
 ## Flow and limits
 
-The loader parses headers, validates program-header and segment relationships, maps zero-filled
-pages, copies file-backed bytes, and applies final permissions. Only ELF loading is supported;
-shebang scripts, relocations, symbol loading, and dynamic-linker policy belong elsewhere.
+The loader parses headers, validates program-header and segment relationships, selects the
+executable bias, maps zero-filled pages, copies file-backed bytes, and applies final permissions.
+PIE currently uses a fixed base rather than ASLR. Only ELF loading is supported; shebang scripts,
+relocations, symbol loading, and dynamic-linker policy belong elsewhere.

@@ -20,7 +20,7 @@ pub(super) fn load(
 
     validate(&file, load_type)?;
 
-    let bias = load_type.bias();
+    let bias = load_type.bias(file.kind());
 
     let mappings = mappings(&file, bias)?;
     let entry = entry(&file, bias, &mappings)?;
@@ -120,6 +120,23 @@ mod tests {
 
         addrspace.read_bytes(loaded.entry, &mut bytes).unwrap();
         assert_eq!(bytes, [0xc3, 0]);
+    });
+
+    kernel_test!("roxy-elf::load-pie", load_pie, {
+        let mut image = image(1);
+
+        write_u16(&mut image, 16, 3);
+        write_u64(&mut image, 24, ENTRY_OFFSET);
+        write_u64(&mut image, HEADER_SIZE + 16, 0);
+
+        let loaded = load(&mut AddrSpace::new().unwrap(), &image, LoadType::Executable).unwrap();
+
+        assert_eq!(loaded.base, BASE);
+        assert_eq!(loaded.entry, UserAddress::new(BASE + ENTRY_OFFSET).unwrap());
+        assert_eq!(
+            loaded.program_headers.address,
+            UserAddress::new(BASE + 64).unwrap()
+        );
     });
 
     kernel_test!("roxy-elf::load-interpreter", load_interpreter, {

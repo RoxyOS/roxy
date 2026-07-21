@@ -7,6 +7,8 @@ use alloc::vec::Vec;
 use roxy_memory::UserAddress;
 use roxy_vm::AddrSpace;
 
+const EXECUTABLE_PIE_BASE: u64 = 0x0040_0000;
+
 mod loader;
 mod metadata;
 mod segment;
@@ -21,8 +23,9 @@ pub enum LoadType {
 }
 
 impl LoadType {
-    pub(crate) fn bias(self) -> u64 {
+    pub(crate) fn bias(self, kind: object::ObjectKind) -> u64 {
         match self {
+            Self::Executable if kind == object::ObjectKind::Dynamic => EXECUTABLE_PIE_BASE,
             Self::Executable => 0,
             Self::Interpreter { base } => base.as_u64(),
         }

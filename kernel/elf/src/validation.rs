@@ -9,14 +9,15 @@ pub(super) fn validate(
     file: &ElfFile64<'_, Endianness>,
     load_type: LoadType,
 ) -> Result<(), ElfError> {
-    let expected = match load_type {
-        LoadType::Executable => ObjectKind::Executable,
-        LoadType::Interpreter { .. } => ObjectKind::Dynamic,
+    let kind = file.kind();
+    let supported_kind = match load_type {
+        LoadType::Executable => matches!(kind, ObjectKind::Executable | ObjectKind::Dynamic),
+        LoadType::Interpreter { .. } => kind == ObjectKind::Dynamic,
     };
 
     if file.architecture() != Architecture::X86_64
         || file.endianness() != Endianness::Little
-        || file.kind() != expected
+        || !supported_kind
     {
         return Err(ElfError::UnsupportedFormat);
     }
@@ -41,7 +42,7 @@ mod tests {
     };
 
     kernel_test!("roxy-elf::reject-format", reject_format, {
-        for (offset, value) in [(4, 1), (5, 2), (16, 3), (18, 3)] {
+        for (offset, value) in [(4, 1), (5, 2), (16, 1), (18, 3)] {
             let mut image = image(1);
 
             image[offset] = value;
