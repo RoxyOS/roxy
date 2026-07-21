@@ -260,11 +260,12 @@ mod tests {
     roxy_test::kernel_test!("roxy-fd::vfs-open-file", synchronizes_vfs_position, {
         let vfs = Vfs::new();
 
-        vfs.mount(b"/", Arc::new(MockFileSystem)).unwrap();
+        vfs.mount(ResolvedPath::root(), Arc::new(MockFileSystem))
+            .unwrap();
 
         let file = vfs
             .open(
-                b"/file",
+                &ResolvedPath::resolve(b"/file").unwrap(),
                 OpenOptions {
                     access: OpenAccess::ReadWrite,
                     ..OpenOptions::read_only()

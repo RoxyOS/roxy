@@ -30,10 +30,9 @@ impl Vfs {
 
     pub fn mount(
         &self,
-        path: impl AsRef<[u8]>,
+        path: ResolvedPath,
         filesystem: Arc<dyn FileSystem>,
     ) -> Result<(), VfsError> {
-        let path = ResolvedPath::resolve(path)?;
         let mut mounts = self.mounts.lock();
 
         if mounts.contains_key(&path) {
@@ -51,16 +50,15 @@ impl Vfs {
         Ok(())
     }
 
-    pub fn unmount(&self, path: impl AsRef<[u8]>) -> Result<Arc<dyn FileSystem>, VfsError> {
-        let path = ResolvedPath::resolve(path)?;
+    pub fn unmount(&self, path: &ResolvedPath) -> Result<Arc<dyn FileSystem>, VfsError> {
         let mut mounts = self.mounts.lock();
-        let mount = mounts.get(&path).ok_or(VfsError::NotFound)?;
+        let mount = mounts.get(path).ok_or(VfsError::NotFound)?;
 
         if mount.active.any() {
             return Err(VfsError::Busy);
         }
 
-        let mount = mounts.remove(&path).ok_or(VfsError::NotFound)?;
+        let mount = mounts.remove(path).ok_or(VfsError::NotFound)?;
 
         Ok(mount.filesystem)
     }
@@ -108,7 +106,7 @@ impl Default for Vfs {
 mod tests {
     use alloc::sync::Arc;
 
-    use crate::{OpenOptions, Vfs, VfsError, test_utils::MockFileSystem};
+    use crate::{OpenOptions, ResolvedPath, Vfs, VfsError, test_utils::MockFileSystem};
 
     roxy_test::kernel_test!(
         "roxy-vfs::routes-longest-mount-and-syncs-all",
@@ -118,12 +116,12 @@ mod tests {
             let root = Arc::new(MockFileSystem::new(1));
             let nested = Arc::new(MockFileSystem::new(2));
 
-            vfs.mount(b"/", root.clone()).unwrap();
-            vfs.mount(b"/mnt", nested.clone()).unwrap();
+            vfs.mount(ResolvedPath::root(), root.clone()).unwrap();
+            vfs.mount(path(b"/mnt"), nested.clone()).unwrap();
 
-            assert_eq!(vfs.metadata(b"/mnt/file").unwrap().file_id, 2);
+            assert_eq!(vfs.metadata(&path(b"/mnt/file")).unwrap().file_id, 2);
             assert_eq!(nested.last_path(), b"/file");
-            assert_eq!(vfs.metadata(b"/mnt2").unwrap().file_id, 1);
+            assert_eq!(vfs.metadata(&path(b"/mnt2")).unwrap().file_id, 1);
 
             vfs.sync().unwrap();
 
@@ -138,15 +136,25 @@ mod tests {
         {
             let vfs = Vfs::new();
 
-            vfs.mount(b"/", Arc::new(MockFileSystem::new(7))).unwrap();
+            vfs.mount(ResolvedPath::root(), Arc::new(MockFileSystem::new(7)))
+                .unwrap();
 
-            let file = vfs.open(b"/file", OpenOptions::read_only()).unwrap();
+            let file = vfs
+                .open(&path(b"/file"), OpenOptions::read_only())
+                .unwrap();
 
-            assert!(matches!(vfs.unmount(b"/"), Err(VfsError::Busy)));
+            assert!(matches!(
+                vfs.unmount(&ResolvedPath::root()),
+                Err(VfsError::Busy)
+            ));
 
             drop(file);
 
-            vfs.unmount(b"/").unwrap();
+            vfs.unmount(&ResolvedPath::root()).unwrap();
         }
     );
+
+    fn path(bytes: &[u8]) -> ResolvedPath {
+        ResolvedPath::resolve(bytes).unwrap()
+    }
 }

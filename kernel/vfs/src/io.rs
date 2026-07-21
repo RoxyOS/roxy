@@ -1,9 +1,9 @@
 use alloc::vec::Vec;
 
-use crate::{CreationMode, OpenAccess, OpenOptions, Vfs, VfsError};
+use crate::{CreationMode, OpenAccess, OpenOptions, ResolvedPath, Vfs, VfsError};
 
 impl Vfs {
-    pub fn read(&self, path: impl AsRef<[u8]>) -> Result<Vec<u8>, VfsError> {
+    pub fn read(&self, path: &ResolvedPath) -> Result<Vec<u8>, VfsError> {
         let mut file = self.open(path, OpenOptions::read_only())?;
         let mut output = Vec::new();
         let mut buffer = [0_u8; 4096];
@@ -19,7 +19,7 @@ impl Vfs {
         Ok(output)
     }
 
-    pub fn write(&self, path: impl AsRef<[u8]>, data: &[u8]) -> Result<(), VfsError> {
+    pub fn write(&self, path: &ResolvedPath, data: &[u8]) -> Result<(), VfsError> {
         let options = OpenOptions {
             access: OpenAccess::WriteOnly,
             creation: CreationMode::Create,

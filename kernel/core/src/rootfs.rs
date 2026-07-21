@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use roxy_block::{BlockError, RamDisk};
 use roxy_boot::BootInfo;
 use roxy_ext4::Ext4FileSystem;
-use roxy_vfs::{Vfs, VfsError};
+use roxy_vfs::{ResolvedPath, Vfs, VfsError};
 use spin::Once;
 
 static ROOT_DEVICE: Once<RamDisk> = Once::new();
@@ -15,7 +15,7 @@ pub(crate) fn initialize(boot_info: &BootInfo) -> Result<(), VfsError> {
     let filesystem = Arc::new(Ext4FileSystem::load(device)?);
     let vfs = Vfs::new();
 
-    vfs.mount(b"/", filesystem)?;
+    vfs.mount(ResolvedPath::root(), filesystem)?;
 
     roxy_vfs::register_global_vfs(vfs)?;
 

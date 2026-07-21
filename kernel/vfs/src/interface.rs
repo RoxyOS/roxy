@@ -6,63 +6,63 @@ pub fn open(path: impl AsRef<[u8]>, options: OpenOptions) -> Result<VfsFile, Vfs
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
 
-    vfs.open(path.as_bytes(), options)
+    vfs.open(&path, options)
 }
 
 pub fn create(path: impl AsRef<[u8]>) -> Result<VfsFile, VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
 
-    vfs.create(path.as_bytes())
+    vfs.create(&path)
 }
 
 pub fn read(path: impl AsRef<[u8]>) -> Result<Vec<u8>, VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
 
-    vfs.read(path.as_bytes())
+    vfs.read(&path)
 }
 
 pub fn write(path: impl AsRef<[u8]>, data: &[u8]) -> Result<(), VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
 
-    vfs.write(path.as_bytes(), data)
+    vfs.write(&path, data)
 }
 
 pub fn metadata(path: impl AsRef<[u8]>) -> Result<Metadata, VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
 
-    vfs.metadata(path.as_bytes())
+    vfs.metadata(&path)
 }
 
 pub fn read_dir(path: impl AsRef<[u8]>) -> Result<Vec<DirEntry>, VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
 
-    vfs.read_dir(path.as_bytes())
+    vfs.read_dir(&path)
 }
 
 pub fn mkdir(path: impl AsRef<[u8]>) -> Result<(), VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
 
-    vfs.mkdir(path.as_bytes())
+    vfs.mkdir(&path)
 }
 
 pub fn rmdir(path: impl AsRef<[u8]>) -> Result<(), VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
 
-    vfs.rmdir(path.as_bytes())
+    vfs.rmdir(&path)
 }
 
 pub fn unlink(path: impl AsRef<[u8]>) -> Result<(), VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
 
-    vfs.unlink(path.as_bytes())
+    vfs.unlink(&path)
 }
 
 pub fn hard_link(source: impl AsRef<[u8]>, destination: impl AsRef<[u8]>) -> Result<(), VfsError> {
@@ -70,21 +70,21 @@ pub fn hard_link(source: impl AsRef<[u8]>, destination: impl AsRef<[u8]>) -> Res
     let source = ResolvedPath::resolve(source)?;
     let destination = ResolvedPath::resolve(destination)?;
 
-    vfs.hard_link(source.as_bytes(), destination.as_bytes())
+    vfs.hard_link(&source, &destination)
 }
 
 pub fn symlink(target: impl AsRef<[u8]>, link: impl AsRef<[u8]>) -> Result<(), VfsError> {
     let vfs = global_vfs()?;
     let link = ResolvedPath::resolve(link)?;
 
-    vfs.symlink(target, link.as_bytes())
+    vfs.symlink(target, &link)
 }
 
 pub fn read_link(path: impl AsRef<[u8]>) -> Result<Vec<u8>, VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
 
-    vfs.read_link(path.as_bytes())
+    vfs.read_link(&path)
 }
 
 pub fn rename(source: impl AsRef<[u8]>, destination: impl AsRef<[u8]>) -> Result<(), VfsError> {
@@ -92,7 +92,7 @@ pub fn rename(source: impl AsRef<[u8]>, destination: impl AsRef<[u8]>) -> Result
     let source = ResolvedPath::resolve(source)?;
     let destination = ResolvedPath::resolve(destination)?;
 
-    vfs.rename(source.as_bytes(), destination.as_bytes())
+    vfs.rename(&source, &destination)
 }
 
 pub fn sync() -> Result<(), VfsError> {

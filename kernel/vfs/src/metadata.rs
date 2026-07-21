@@ -22,9 +22,8 @@ pub struct Metadata {
 }
 
 impl Vfs {
-    pub fn metadata(&self, path: impl AsRef<[u8]>) -> Result<Metadata, VfsError> {
-        let path = ResolvedPath::resolve(path)?;
-        let resolved = self.resolve(&path)?;
+    pub fn metadata(&self, path: &ResolvedPath) -> Result<Metadata, VfsError> {
+        let resolved = self.resolve(path)?;
 
         resolved.filesystem.metadata(&resolved.local_path, true)
     }

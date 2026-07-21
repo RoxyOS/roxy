@@ -4,9 +4,11 @@ use spin::Once;
 
 use crate::VfsError;
 
+/// A normalized absolute path ready for mount routing and filesystem operations.
 #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ResolvedPath(Vec<u8>);
 
+/// Supplies the normalized absolute working directory of the current process.
 pub type WorkingDirectoryProvider = fn() -> ResolvedPath;
 
 static WORKING_DIRECTORY_PROVIDER: Once<WorkingDirectoryProvider> = Once::new();
@@ -27,9 +29,10 @@ impl ResolvedPath {
     pub const MAX_LEN: usize = 4096;
     pub const MAX_COMPONENT_LEN: usize = 255;
 
+    /// Resolves raw absolute or process-relative path bytes into a normalized absolute path.
     pub fn resolve(path: impl AsRef<[u8]>) -> Result<Self, VfsError> {
         let path = path.as_ref();
-        if path.contains(&0) {
+        if path.is_empty() || path.contains(&0) {
             return Err(VfsError::InvalidPath);
         }
 
@@ -170,7 +173,7 @@ mod tests {
                 b"/usr/bin"
             );
             assert_eq!(ResolvedPath::resolve(b"/../../etc"), Err(VfsError::InvalidPath));
-            assert_eq!(ResolvedPath::resolve(b"relative"), Err(VfsError::InvalidPath));
+            assert_eq!(ResolvedPath::resolve(b""), Err(VfsError::InvalidPath));
         }
     );
 

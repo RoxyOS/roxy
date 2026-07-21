@@ -9,33 +9,32 @@ pub struct DirEntry {
 }
 
 impl Vfs {
-    pub fn read_dir(&self, path: impl AsRef<[u8]>) -> Result<Vec<DirEntry>, VfsError> {
-        let path = ResolvedPath::resolve(path)?;
-        let resolved = self.resolve(&path)?;
+    pub fn read_dir(&self, path: &ResolvedPath) -> Result<Vec<DirEntry>, VfsError> {
+        let resolved = self.resolve(path)?;
 
         resolved.filesystem.read_dir(&resolved.local_path)
     }
 
-    pub fn mkdir(&self, path: impl AsRef<[u8]>) -> Result<(), VfsError> {
+    pub fn mkdir(&self, path: &ResolvedPath) -> Result<(), VfsError> {
         self.with_path(path, |filesystem, local| filesystem.mkdir(local))
     }
 
-    pub fn rmdir(&self, path: impl AsRef<[u8]>) -> Result<(), VfsError> {
+    pub fn rmdir(&self, path: &ResolvedPath) -> Result<(), VfsError> {
         self.mutate_path(path, |filesystem, local| filesystem.rmdir(local))
     }
 
-    pub fn unlink(&self, path: impl AsRef<[u8]>) -> Result<(), VfsError> {
+    pub fn unlink(&self, path: &ResolvedPath) -> Result<(), VfsError> {
         self.mutate_path(path, |filesystem, local| filesystem.unlink(local))
     }
 
-    pub fn read_link(&self, path: impl AsRef<[u8]>) -> Result<Vec<u8>, VfsError> {
+    pub fn read_link(&self, path: &ResolvedPath) -> Result<Vec<u8>, VfsError> {
         self.with_path(path, |filesystem, local| filesystem.read_link(local))
     }
 
     pub fn symlink(
         &self,
         target: impl AsRef<[u8]>,
-        link: impl AsRef<[u8]>,
+        link: &ResolvedPath,
     ) -> Result<(), VfsError> {
         let target = target.as_ref();
 
@@ -43,16 +42,15 @@ impl Vfs {
             return Err(VfsError::InvalidPath);
         }
 
-        let link = ResolvedPath::resolve(link)?;
-        let resolved = self.resolve(&link)?;
+        let resolved = self.resolve(link)?;
 
         resolved.filesystem.symlink(target, &resolved.local_path)
     }
 
     pub fn hard_link(
         &self,
-        source: impl AsRef<[u8]>,
-        destination: impl AsRef<[u8]>,
+        source: &ResolvedPath,
+        destination: &ResolvedPath,
     ) -> Result<(), VfsError> {
         self.two_paths(source, destination, |filesystem, from, to| {
             filesystem.hard_link(from, to)
@@ -61,8 +59,8 @@ impl Vfs {
 
     pub fn rename(
         &self,
-        source: impl AsRef<[u8]>,
-        destination: impl AsRef<[u8]>,
+        source: &ResolvedPath,
+        destination: &ResolvedPath,
     ) -> Result<(), VfsError> {
         self.two_paths(source, destination, |filesystem, from, to| {
             filesystem.rename(from, to)
@@ -71,11 +69,10 @@ impl Vfs {
 
     fn mutate_path<T>(
         &self,
-        path: impl AsRef<[u8]>,
+        path: &ResolvedPath,
         operation: impl FnOnce(&dyn FileSystem, &ResolvedPath) -> Result<T, VfsError>,
     ) -> Result<T, VfsError> {
-        let path = ResolvedPath::resolve(path)?;
-        let resolved = self.resolve(&path)?;
+        let resolved = self.resolve(path)?;
         let metadata = resolved.filesystem.metadata(&resolved.local_path, false)?;
 
         if resolved.active.contains(metadata.file_id) {
@@ -87,25 +84,22 @@ impl Vfs {
 
     fn with_path<T>(
         &self,
-        path: impl AsRef<[u8]>,
+        path: &ResolvedPath,
         operation: impl FnOnce(&dyn FileSystem, &ResolvedPath) -> Result<T, VfsError>,
     ) -> Result<T, VfsError> {
-        let path = ResolvedPath::resolve(path)?;
-        let resolved = self.resolve(&path)?;
+        let resolved = self.resolve(path)?;
 
         operation(&*resolved.filesystem, &resolved.local_path)
     }
 
     fn two_paths<T>(
         &self,
-        source: impl AsRef<[u8]>,
-        destination: impl AsRef<[u8]>,
+        source: &ResolvedPath,
+        destination: &ResolvedPath,
         operation: impl FnOnce(&dyn FileSystem, &ResolvedPath, &ResolvedPath) -> Result<T, VfsError>,
     ) -> Result<T, VfsError> {
-        let source = ResolvedPath::resolve(source)?;
-        let destination = ResolvedPath::resolve(destination)?;
-        let from = self.resolve(&source)?;
-        let to = self.resolve(&destination)?;
+        let from = self.resolve(source)?;
+        let to = self.resolve(destination)?;
 
         if from.mount_path != to.mount_path {
             return Err(VfsError::CrossDevice);
@@ -131,7 +125,7 @@ impl Vfs {
 mod tests {
     use alloc::sync::Arc;
 
-    use crate::{OpenOptions, Vfs, VfsError, test_utils::MockFileSystem};
+    use crate::{OpenOptions, ResolvedPath, Vfs, VfsError, test_utils::MockFileSystem};
 
     roxy_test::kernel_test!(
         "roxy-vfs::rejects-cross-mount-operations",
@@ -139,16 +133,17 @@ mod tests {
         {
             let vfs = Vfs::new();
 
-            vfs.mount(b"/", Arc::new(MockFileSystem::new(1))).unwrap();
-            vfs.mount(b"/mnt", Arc::new(MockFileSystem::new(2)))
+            vfs.mount(ResolvedPath::root(), Arc::new(MockFileSystem::new(1)))
+                .unwrap();
+            vfs.mount(path(b"/mnt"), Arc::new(MockFileSystem::new(2)))
                 .unwrap();
 
             assert_eq!(
-                vfs.rename(b"/source", b"/mnt/destination"),
+                vfs.rename(&path(b"/source"), &path(b"/mnt/destination")),
                 Err(VfsError::CrossDevice)
             );
             assert_eq!(
-                vfs.hard_link(b"/source", b"/mnt/destination"),
+                vfs.hard_link(&path(b"/source"), &path(b"/mnt/destination")),
                 Err(VfsError::CrossDevice)
             );
         }
@@ -160,15 +155,22 @@ mod tests {
         {
             let vfs = Vfs::new();
 
-            vfs.mount(b"/", Arc::new(MockFileSystem::new(7))).unwrap();
+            vfs.mount(ResolvedPath::root(), Arc::new(MockFileSystem::new(7)))
+                .unwrap();
 
-            let file = vfs.open(b"/file", OpenOptions::read_only()).unwrap();
+            let file = vfs
+                .open(&path(b"/file"), OpenOptions::read_only())
+                .unwrap();
 
-            assert_eq!(vfs.unlink(b"/file"), Err(VfsError::Busy));
+            assert_eq!(vfs.unlink(&path(b"/file")), Err(VfsError::Busy));
 
             drop(file);
 
-            vfs.unlink(b"/file").unwrap();
+            vfs.unlink(&path(b"/file")).unwrap();
         }
     );
+
+    fn path(bytes: &[u8]) -> ResolvedPath {
+        ResolvedPath::resolve(bytes).unwrap()
+    }
 }

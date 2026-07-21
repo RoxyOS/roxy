@@ -167,10 +167,9 @@ impl VfsFile {
 }
 
 impl Vfs {
-    pub fn open(&self, path: impl AsRef<[u8]>, options: OpenOptions) -> Result<VfsFile, VfsError> {
+    pub fn open(&self, path: &ResolvedPath, options: OpenOptions) -> Result<VfsFile, VfsError> {
         options.validate()?;
-        let path = ResolvedPath::resolve(path)?;
-        let resolved = self.resolve(&path)?;
+        let resolved = self.resolve(path)?;
         let handle = resolved.filesystem.open(&resolved.local_path, options)?;
         let file_id = handle.metadata()?.file_id;
 
@@ -183,7 +182,7 @@ impl Vfs {
         })
     }
 
-    pub fn create(&self, path: impl AsRef<[u8]>) -> Result<VfsFile, VfsError> {
+    pub fn create(&self, path: &ResolvedPath) -> Result<VfsFile, VfsError> {
         self.open(path, OpenOptions::create())
     }
 }

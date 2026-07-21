@@ -20,11 +20,14 @@ roxy_test::kernel_test!(
         let filesystem = Arc::new(Ext4FileSystem::load(device).unwrap());
         let vfs = Vfs::new();
 
-        vfs.mount(b"/", filesystem.clone()).unwrap();
+        vfs.mount(ResolvedPath::root(), filesystem.clone()).unwrap();
 
-        assert_eq!(vfs.metadata(b"/").unwrap().file_type, FileType::Directory);
-        vfs.mkdir(b"/a").unwrap();
-        vfs.mkdir(b"/b").unwrap();
+        assert_eq!(
+            vfs.metadata(&path(b"/")).unwrap().file_type,
+            FileType::Directory
+        );
+        vfs.mkdir(&path(b"/a")).unwrap();
+        vfs.mkdir(&path(b"/b")).unwrap();
 
         let options = OpenOptions {
             access: OpenAccess::ReadWrite,
@@ -34,7 +37,7 @@ roxy_test::kernel_test!(
             truncate: false,
         };
 
-        let mut file = vfs.open(b"/a/file", options).unwrap();
+        let mut file = vfs.open(&path(b"/a/file"), options).unwrap();
 
         assert_eq!(
             filesystem
@@ -55,16 +58,18 @@ roxy_test::kernel_test!(
         assert_eq!(&contents, b"hello");
         drop(file);
 
-        vfs.rename(b"/a/file", b"/b/file").unwrap();
-        vfs.hard_link(b"/b/file", b"/hard").unwrap();
-        vfs.symlink(b"/hard", b"/sym").unwrap();
-        assert_eq!(vfs.read_link(b"/sym").unwrap(), b"/hard");
-        vfs.rename(b"/sym", b"/a/sym").unwrap();
-        assert_eq!(vfs.read_link(b"/a/sym").unwrap(), b"/hard");
+        vfs.rename(&path(b"/a/file"), &path(b"/b/file"))
+            .unwrap();
+        vfs.hard_link(&path(b"/b/file"), &path(b"/hard"))
+            .unwrap();
+        vfs.symlink(b"/hard", &path(b"/sym")).unwrap();
+        assert_eq!(vfs.read_link(&path(b"/sym")).unwrap(), b"/hard");
+        vfs.rename(&path(b"/sym"), &path(b"/a/sym")).unwrap();
+        assert_eq!(vfs.read_link(&path(b"/a/sym")).unwrap(), b"/hard");
 
         let mut hard = vfs
             .open(
-                b"/hard",
+                &path(b"/hard"),
                 OpenOptions {
                     access: OpenAccess::ReadWrite,
                     ..OpenOptions::read_only()
@@ -82,26 +87,33 @@ roxy_test::kernel_test!(
         hard.sync().unwrap();
         drop(hard);
 
-        let entries = vfs.read_dir(b"/b").unwrap();
+        let entries = vfs.read_dir(&path(b"/b")).unwrap();
 
         assert!(entries.iter().any(|entry| entry.name == b"file"));
 
-        vfs.unlink(b"/b/file").unwrap();
-        assert_eq!(vfs.metadata(b"/hard").unwrap().size, 2);
+        vfs.unlink(&path(b"/b/file")).unwrap();
+        assert_eq!(vfs.metadata(&path(b"/hard")).unwrap().size, 2);
 
-        vfs.mkdir(b"/old").unwrap();
-        vfs.rename(b"/old", b"/new").unwrap();
-        vfs.mkdir(b"/a/dir").unwrap();
+        vfs.mkdir(&path(b"/old")).unwrap();
+        vfs.rename(&path(b"/old"), &path(b"/new")).unwrap();
+        vfs.mkdir(&path(b"/a/dir")).unwrap();
 
-        assert_eq!(vfs.rename(b"/a/dir", b"/b/dir"), Err(VfsError::Unsupported));
+        assert_eq!(
+            vfs.rename(&path(b"/a/dir"), &path(b"/b/dir")),
+            Err(VfsError::Unsupported)
+        );
 
-        vfs.rmdir(b"/a/dir").unwrap();
-        vfs.rmdir(b"/new").unwrap();
-        vfs.unlink(b"/a/sym").unwrap();
-        vfs.unlink(b"/hard").unwrap();
-        vfs.rmdir(b"/a").unwrap();
-        vfs.rmdir(b"/b").unwrap();
+        vfs.rmdir(&path(b"/a/dir")).unwrap();
+        vfs.rmdir(&path(b"/new")).unwrap();
+        vfs.unlink(&path(b"/a/sym")).unwrap();
+        vfs.unlink(&path(b"/hard")).unwrap();
+        vfs.rmdir(&path(b"/a")).unwrap();
+        vfs.rmdir(&path(b"/b")).unwrap();
 
         vfs.sync().unwrap();
     }
 );
+
+fn path(bytes: &[u8]) -> ResolvedPath {
+    ResolvedPath::resolve(bytes).unwrap()
+}

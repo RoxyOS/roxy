@@ -8,10 +8,12 @@ own block devices.
 
 ## Paths and mount routing
 
-`ResolvedPath` accepts absolute byte paths, rejects NUL and traversal above root, normalizes `.`/`..` and
-repeated separators, and enforces path/component limits. It can also resolve a relative byte path
-against an explicit absolute base; relative `..` remains at root when there is no parent. Paths are
-bytes rather than UTF-8 because the kernel ABI does not require filenames to be Unicode.
+`ResolvedPath` represents only a normalized absolute byte path. `ResolvedPath::resolve` is the raw
+path conversion boundary: it rejects empty and NUL-containing inputs, normalizes `.`/`..` and
+repeated separators, and enforces path/component limits. Absolute inputs are normalized directly;
+relative inputs use the registered working-directory provider, and relative `..` remains at root
+when there is no parent. Paths are bytes rather than UTF-8 because the kernel ABI does not require
+filenames to be Unicode.
 
 The global VFS interface resolves every relative input through one registered working-directory
 provider before dispatching the operation. The process subsystem registers that callback during
@@ -24,9 +26,15 @@ is rejected while any file from that mount remains active.
 
 ## Global interface and ownership
 
-One `Vfs` is registered globally before process file operations begin. Free functions delegate to
-that instance after applying the global path context. Filesystems own persistent filesystem state,
-while `VfsFile` owns an active handle and boxed `FileHandle` until close/drop.
+One `Vfs` is registered globally before process file operations begin. Free functions accept raw
+path bytes, resolve them exactly once, and delegate to the global instance. `Vfs` methods, mount
+routing, and `FileSystem` callbacks accept only `ResolvedPath`; they never repeat raw validation or
+cwd lookup. Filesystems own persistent filesystem state, while `VfsFile` owns an active handle and
+boxed `FileHandle` until close/drop.
+
+Symbolic-link targets remain raw validated bytes because a relative target is stored data whose
+meaning depends on the directory containing the link. The link location itself is a
+`ResolvedPath`, and `read_link` returns the stored target without resolving it.
 
 Filesystem traits are synchronous and return `VfsError`. Filesystem-specific types and errors must
 be translated inside adapters such as `roxy-ext4`.
@@ -34,6 +42,7 @@ be translated inside adapters such as `roxy-ext4`.
 ## Invariants and limits
 
 - Mount points are normalized and unique.
+- Raw bytes do not cross the global facade except as symbolic-link target data.
 - Filesystem operations and mount routing receive only normalized absolute paths.
 - The working-directory provider may acquire the process-table lock, but it must not perform VFS
   operations or retain that lock after returning the cwd snapshot.
