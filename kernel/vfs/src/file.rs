@@ -2,7 +2,7 @@ use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
 
 use roxy_utils::Lock;
 
-use crate::{FileHandle, FilePermissions, Metadata, Vfs, VfsError, ResolvedPath};
+use crate::{FileHandle, FilePermissions, Metadata, ResolvedPath, Vfs, VfsError};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum OpenAccess {

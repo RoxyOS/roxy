@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use roxy_memory::UserAddress;
-use roxy_vfs::{CreationMode, FilePermissions, OpenAccess, OpenOptions, VfsError, ResolvedPath};
+use roxy_vfs::{CreationMode, FilePermissions, OpenAccess, OpenOptions, ResolvedPath, VfsError};
 
 use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
 

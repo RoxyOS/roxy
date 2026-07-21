@@ -2,13 +2,17 @@ use alloc::{boxed::Box, vec::Vec};
 
 use ext4plus::file::File;
 use roxy_vfs::{
-    CreationMode, DirEntry, FileHandle, FileSystem, Metadata, OpenOptions, VfsError, ResolvedPath,
+    CreationMode, DirEntry, FileHandle, FileSystem, Metadata, OpenOptions, ResolvedPath, VfsError,
 };
 
 use crate::{Ext4FileSystem, error::map_ext4, file::Ext4File, metadata};
 
 impl FileSystem for Ext4FileSystem {
-    fn open(&self, path: &ResolvedPath, options: OpenOptions) -> Result<Box<dyn FileHandle>, VfsError> {
+    fn open(
+        &self,
+        path: &ResolvedPath,
+        options: OpenOptions,
+    ) -> Result<Box<dyn FileHandle>, VfsError> {
         let _mutation = self.mutation.lock();
 
         let inode = match self.resolve_inode(path, true) {

@@ -1,4 +1,4 @@
-use crate::{FilePermissions, Vfs, VfsError, ResolvedPath};
+use crate::{FilePermissions, ResolvedPath, Vfs, VfsError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileType {

@@ -5,7 +5,7 @@ use core::{
 
 use roxy_fd::{Fd, FileError, FileMetadata, FileType as FdFileType};
 use roxy_memory::UserAddress;
-use roxy_vfs::{FileType as VfsFileType, Metadata as VfsMetadata, VfsError, ResolvedPath};
+use roxy_vfs::{FileType as VfsFileType, Metadata as VfsMetadata, ResolvedPath, VfsError};
 
 use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
 

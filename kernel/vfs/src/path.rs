@@ -169,10 +169,15 @@ mod tests {
         normalizes_absolute_byte_paths,
         {
             assert_eq!(
-                ResolvedPath::resolve(b"//usr/./lib/../bin/").unwrap().as_bytes(),
+                ResolvedPath::resolve(b"//usr/./lib/../bin/")
+                    .unwrap()
+                    .as_bytes(),
                 b"/usr/bin"
             );
-            assert_eq!(ResolvedPath::resolve(b"/../../etc"), Err(VfsError::InvalidPath));
+            assert_eq!(
+                ResolvedPath::resolve(b"/../../etc"),
+                Err(VfsError::InvalidPath)
+            );
             assert_eq!(ResolvedPath::resolve(b""), Err(VfsError::InvalidPath));
         }
     );
@@ -184,8 +189,14 @@ mod tests {
             let root = ResolvedPath::root();
             let working_directory = ResolvedPath::resolve(b"/usr/lib").unwrap();
 
-            assert_eq!(ResolvedPath::with_base(b".", &root).unwrap().as_bytes(), b"/");
-            assert_eq!(ResolvedPath::with_base(b"..", &root).unwrap().as_bytes(), b"/");
+            assert_eq!(
+                ResolvedPath::with_base(b".", &root).unwrap().as_bytes(),
+                b"/"
+            );
+            assert_eq!(
+                ResolvedPath::with_base(b"..", &root).unwrap().as_bytes(),
+                b"/"
+            );
             assert_eq!(
                 ResolvedPath::with_base(b"foo", &root).unwrap().as_bytes(),
                 b"/foo"

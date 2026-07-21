@@ -2,7 +2,7 @@ use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 
 use roxy_utils::Lock;
 
-use crate::{FileSystem, VfsError, ResolvedPath, file::ActiveHandles};
+use crate::{FileSystem, ResolvedPath, VfsError, file::ActiveHandles};
 
 struct Mount {
     filesystem: Arc<dyn FileSystem>,
@@ -139,9 +139,7 @@ mod tests {
             vfs.mount(ResolvedPath::root(), Arc::new(MockFileSystem::new(7)))
                 .unwrap();
 
-            let file = vfs
-                .open(&path(b"/file"), OpenOptions::read_only())
-                .unwrap();
+            let file = vfs.open(&path(b"/file"), OpenOptions::read_only()).unwrap();
 
             assert!(matches!(
                 vfs.unmount(&ResolvedPath::root()),

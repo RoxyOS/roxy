@@ -4,7 +4,8 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use roxy_utils::Lock;
 
 use crate::{
-    DirEntry, FileHandle, FileSystem, FileType, Metadata, OpenOptions, SeekFrom, VfsError, ResolvedPath,
+    DirEntry, FileHandle, FileSystem, FileType, Metadata, OpenOptions, ResolvedPath, SeekFrom,
+    VfsError,
 };
 
 pub(crate) struct MockFileSystem {
@@ -42,7 +43,11 @@ impl MockFileSystem {
 }
 
 impl FileSystem for MockFileSystem {
-    fn open(&self, path: &ResolvedPath, _options: OpenOptions) -> Result<Box<dyn FileHandle>, VfsError> {
+    fn open(
+        &self,
+        path: &ResolvedPath,
+        _options: OpenOptions,
+    ) -> Result<Box<dyn FileHandle>, VfsError> {
         *self.last_path.lock() = path.as_bytes().into();
 
         Ok(Box::new(MockFile(self.metadata_value())))
@@ -70,7 +75,11 @@ impl FileSystem for MockFileSystem {
         Ok(())
     }
 
-    fn hard_link(&self, _source: &ResolvedPath, _destination: &ResolvedPath) -> Result<(), VfsError> {
+    fn hard_link(
+        &self,
+        _source: &ResolvedPath,
+        _destination: &ResolvedPath,
+    ) -> Result<(), VfsError> {
         Ok(())
     }
 

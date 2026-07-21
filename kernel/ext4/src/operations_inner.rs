@@ -1,5 +1,5 @@
 use ext4plus::{dir::Dir, path::PathBuf};
-use roxy_vfs::{FilePermissions, FileType, VfsError, ResolvedPath};
+use roxy_vfs::{FilePermissions, FileType, ResolvedPath, VfsError};
 
 use crate::{Ext4FileSystem, error::map_ext4, metadata};
 

@@ -2,8 +2,8 @@ use alloc::sync::Arc;
 
 use roxy_block::RamDisk;
 use roxy_vfs::{
-    CreationMode, FilePermissions, FileType, OpenAccess, OpenOptions, SeekFrom, Vfs, VfsError,
-    ResolvedPath,
+    CreationMode, FilePermissions, FileType, OpenAccess, OpenOptions, ResolvedPath, SeekFrom, Vfs,
+    VfsError,
 };
 use spin::Once;
 
@@ -58,10 +58,8 @@ roxy_test::kernel_test!(
         assert_eq!(&contents, b"hello");
         drop(file);
 
-        vfs.rename(&path(b"/a/file"), &path(b"/b/file"))
-            .unwrap();
-        vfs.hard_link(&path(b"/b/file"), &path(b"/hard"))
-            .unwrap();
+        vfs.rename(&path(b"/a/file"), &path(b"/b/file")).unwrap();
+        vfs.hard_link(&path(b"/b/file"), &path(b"/hard")).unwrap();
         vfs.symlink(b"/hard", &path(b"/sym")).unwrap();
         assert_eq!(vfs.read_link(&path(b"/sym")).unwrap(), b"/hard");
         vfs.rename(&path(b"/sym"), &path(b"/a/sym")).unwrap();

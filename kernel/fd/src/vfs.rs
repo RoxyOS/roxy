@@ -117,7 +117,7 @@ mod tests {
 
     use roxy_vfs::{
         DirEntry, FileHandle, FileSystem, FileType, Metadata, OpenAccess, OpenOptions,
-        SeekFrom as VfsSeekFrom, Vfs, VfsError, ResolvedPath,
+        ResolvedPath, SeekFrom as VfsSeekFrom, Vfs, VfsError,
     };
 
     use super::OpenFile;
@@ -162,7 +162,11 @@ mod tests {
             Err(VfsError::Unsupported)
         }
 
-        fn hard_link(&self, _source: &ResolvedPath, _destination: &ResolvedPath) -> Result<(), VfsError> {
+        fn hard_link(
+            &self,
+            _source: &ResolvedPath,
+            _destination: &ResolvedPath,
+        ) -> Result<(), VfsError> {
             Err(VfsError::Unsupported)
         }
 
@@ -174,7 +178,11 @@ mod tests {
             Err(VfsError::Unsupported)
         }
 
-        fn rename(&self, _source: &ResolvedPath, _destination: &ResolvedPath) -> Result<(), VfsError> {
+        fn rename(
+            &self,
+            _source: &ResolvedPath,
+            _destination: &ResolvedPath,
+        ) -> Result<(), VfsError> {
             Err(VfsError::Unsupported)
         }
 

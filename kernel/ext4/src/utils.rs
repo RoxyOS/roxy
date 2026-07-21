@@ -4,7 +4,7 @@ use ext4plus::{
     inode::{Inode, InodeCreationOptions, InodeFlags, InodeMode},
     path::Path,
 };
-use roxy_vfs::{FilePermissions, FileType, VfsError, ResolvedPath};
+use roxy_vfs::{FilePermissions, FileType, ResolvedPath, VfsError};
 
 use crate::{Ext4FileSystem, error::map_ext4};
 

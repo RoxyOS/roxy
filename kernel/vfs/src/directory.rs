@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::{FileSystem, FileType, Vfs, VfsError, ResolvedPath};
+use crate::{FileSystem, FileType, ResolvedPath, Vfs, VfsError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DirEntry {
@@ -31,11 +31,7 @@ impl Vfs {
         self.with_path(path, |filesystem, local| filesystem.read_link(local))
     }
 
-    pub fn symlink(
-        &self,
-        target: impl AsRef<[u8]>,
-        link: &ResolvedPath,
-    ) -> Result<(), VfsError> {
+    pub fn symlink(&self, target: impl AsRef<[u8]>, link: &ResolvedPath) -> Result<(), VfsError> {
         let target = target.as_ref();
 
         if target.is_empty() || target.len() > ResolvedPath::MAX_LEN || target.contains(&0) {
@@ -158,9 +154,7 @@ mod tests {
             vfs.mount(ResolvedPath::root(), Arc::new(MockFileSystem::new(7)))
                 .unwrap();
 
-            let file = vfs
-                .open(&path(b"/file"), OpenOptions::read_only())
-                .unwrap();
+            let file = vfs.open(&path(b"/file"), OpenOptions::read_only()).unwrap();
 
             assert_eq!(vfs.unlink(&path(b"/file")), Err(VfsError::Busy));
 
