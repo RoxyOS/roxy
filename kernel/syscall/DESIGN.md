@@ -26,6 +26,10 @@ owned by the current thread's process and does not expose scheduler thread IDs t
 `getppid` returns the recorded fork parent while that process remains in the process table and
 returns `0` for directly spawned or orphaned processes.
 
+The current process model has no stored credentials and treats every process as the root identity.
+`geteuid` therefore returns effective user ID `0` without consulting process state. Credential
+storage, mutation, and permission enforcement remain outside the supported ABI.
+
 ## Userspace memory contract
 
 Pointers are interpreted only through typed `UserAddress` values and the current process's
