@@ -6,7 +6,7 @@ pub(super) fn run(image: &Path) -> Result<()> {
     println!("==> Starting virtual machine");
 
     let mut command = command(image)?;
-    command.args(["-no-shutdown", "-display", "none"]);
+    command.arg("-no-shutdown");
     ensure!(command.status()?.success(), "QEMU failed");
     Ok(())
 }
