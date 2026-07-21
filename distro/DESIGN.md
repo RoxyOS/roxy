@@ -55,7 +55,10 @@ than falling back to stale artifacts.
 
 ## Limits
 
-The current distribution is a minimal x86_64 Roxy userspace centered on mlibc and Bash. Clang
-userspace builds use the `x86_64-unknown-roxy` target; the kernel remains a separate
+The current distribution is a minimal x86_64 Roxy userspace centered on mlibc, Bash, and a
+purposefully small BusyBox configuration. BusyBox supplies a shell and basic file and process
+utilities; Linux-specific mount-table, filesystem-statistics, and UTMP features remain disabled
+until their kernel and mlibc contracts are supported. Clang userspace builds use the
+`x86_64-unknown-roxy` target; the kernel remains a separate
 `x86_64-unknown-none` Rust target. This is not a general package repository and does not define
 runtime service management, upgrades, or binary package compatibility across kernel ABI revisions.

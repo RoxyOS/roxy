@@ -1,0 +1,14 @@
+diff --git a/libbb/appletlib.c b/libbb/appletlib.c
+index 34b74c3..52997b6 100644
+--- a/libbb/appletlib.c
++++ b/libbb/appletlib.c
+@@ -32,7 +32,8 @@ static inline int *get_perrno(void) { return &errno; }
+ 
+ #include "busybox.h"
+ 
+-#if !(defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) \
++#if defined(HAVE_MALLOC_H) \
++ && !(defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) \
+     || defined(__APPLE__) \
+     )
+ # include <malloc.h> /* for mallopt */

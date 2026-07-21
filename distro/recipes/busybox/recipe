@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+version=1.38.0
+revision=1
+
+tarball_url="https://busybox.net/downloads/busybox-${version}.tar.bz2"
+tarball_sha256="34f9ea6ff8636f2c9241153b9114eefa9e65674a45318ae1ef95bb5f31c53bb2"
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make"
+
+configure() {
+	KCONFIG_ALLCONFIG="${source_dir}/configs/roxy_defconfig" \
+		make -C "${source_dir}" O="${PWD}" allnoconfig
+}
+
+build() {
+	make -C "${source_dir}" O="${PWD}" \
+		ARCH=x86_64 \
+		CC="clang --target=x86_64-unknown-roxy --sysroot=/sysroot" \
+		HOSTCC=clang \
+		AR=llvm-ar \
+		NM=llvm-nm \
+		STRIP=llvm-strip \
+		-j "${parallelism}"
+}
+
+package() {
+	make -C "${source_dir}" O="${PWD}" \
+		CONFIG_PREFIX="${dest_dir}" \
+		install
+}

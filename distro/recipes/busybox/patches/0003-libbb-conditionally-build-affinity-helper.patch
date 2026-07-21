@@ -1,0 +1,14 @@
+diff --git a/libbb/Kbuild.src b/libbb/Kbuild.src
+index cb8d2c2..b9a3590 100644
+--- a/libbb/Kbuild.src
++++ b/libbb/Kbuild.src
+@@ -10,7 +10,8 @@ lib-y:=
+ 
+ INSERT
+ 
+-lib-y += alloc_affinity.o
++lib-$(CONFIG_NPROC) += alloc_affinity.o
++lib-$(CONFIG_TASKSET) += alloc_affinity.o
+ lib-y += appletlib.o
+ lib-y += ask_confirmation.o
+ lib-y += bb_askpass.o

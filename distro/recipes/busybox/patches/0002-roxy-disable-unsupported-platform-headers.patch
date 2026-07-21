@@ -1,0 +1,14 @@
+diff --git a/include/platform.h b/include/platform.h
+index c449075..c9a5fb4 100644
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -429,9 +429,7 @@ typedef unsigned smalluint;
+ #define HAVE_UNLOCKED_LINE_OPS 1
+ #define HAVE_GETLINE 1
+ #define HAVE_XTABS 1
+-#define HAVE_MNTENT_H 1
+ #define HAVE_NET_ETHERNET_H 1
+-#define HAVE_SYS_STATFS_H 1
+ #define HAVE_PRINTF_PERCENTM 1
+ #define HAVE_WAIT3 1
+ #define HAVE_DEV_FD 1
