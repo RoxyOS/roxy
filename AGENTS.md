@@ -5,6 +5,8 @@
 - Read `STYLE.md` before changing source code. It defines repository-wide coding conventions.
 - Read `WORKFLOW.md` for task-specific procedures, including mlibc development, distro package
   patching, source/recipe updates, and rootfs validation.
+- Read `REVIEW.md` before reviewing changes. It defines the required review scope, checks, and
+  finding format.
 - When changing a subsystem, also look for and follow a subsystem-local style guide such as
   `kernel/syscall/STYLE.md` when one exists.
 - Treat `STYLE.md` as the sole source of truth for coding style; consult it instead of duplicating
