@@ -157,6 +157,12 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::Geteuid)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Getuid)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {

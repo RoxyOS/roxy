@@ -27,8 +27,8 @@ owned by the current thread's process and does not expose scheduler thread IDs t
 returns `0` for directly spawned or orphaned processes.
 
 The current process model has no stored credentials and treats every process as the root identity.
-`geteuid` therefore returns effective user ID `0` without consulting process state. Credential
-storage, mutation, and permission enforcement remain outside the supported ABI.
+`getuid` and `geteuid` therefore return real and effective user ID `0` without consulting process
+state. Credential storage, mutation, and permission enforcement remain outside the supported ABI.
 
 ## Userspace memory contract
 
