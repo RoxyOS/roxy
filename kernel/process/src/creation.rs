@@ -1,6 +1,7 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use roxy_thread::{Thread, ThreadCreateError, ThreadId, scheduler};
+use roxy_vfs::ResolvedPath;
 use roxy_vm::AddrSpaceHandle;
 
 use crate::{
@@ -45,6 +46,7 @@ impl Process {
             parent_process_id: None,
             addrspace: Some(addrspace),
             main_thread_id,
+            working_directory: ResolvedPath::root(),
             fds,
             state: ProcessState::Running,
         }
@@ -54,6 +56,7 @@ impl Process {
         parent_process_id: ProcessId,
         main_thread_id: ThreadId,
         addrspace: AddrSpaceHandle,
+        working_directory: ResolvedPath,
         fds: roxy_fd::FdTable,
     ) -> Self {
         Self {
@@ -61,6 +64,7 @@ impl Process {
             parent_process_id: Some(parent_process_id),
             addrspace: Some(addrspace),
             main_thread_id,
+            working_directory,
             fds,
             state: ProcessState::Running,
         }

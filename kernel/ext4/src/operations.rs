@@ -2,13 +2,13 @@ use alloc::{boxed::Box, vec::Vec};
 
 use ext4plus::file::File;
 use roxy_vfs::{
-    CreationMode, DirEntry, FileHandle, FileSystem, Metadata, OpenOptions, VfsError, VfsPath,
+    CreationMode, DirEntry, FileHandle, FileSystem, Metadata, OpenOptions, VfsError, ResolvedPath,
 };
 
 use crate::{Ext4FileSystem, error::map_ext4, file::Ext4File, metadata};
 
 impl FileSystem for Ext4FileSystem {
-    fn open(&self, path: &VfsPath, options: OpenOptions) -> Result<Box<dyn FileHandle>, VfsError> {
+    fn open(&self, path: &ResolvedPath, options: OpenOptions) -> Result<Box<dyn FileHandle>, VfsError> {
         let _mutation = self.mutation.lock();
 
         let inode = match self.resolve_inode(path, true) {
@@ -43,12 +43,12 @@ impl FileSystem for Ext4FileSystem {
         }))
     }
 
-    fn metadata(&self, path: &VfsPath, follow_symlink: bool) -> Result<Metadata, VfsError> {
+    fn metadata(&self, path: &ResolvedPath, follow_symlink: bool) -> Result<Metadata, VfsError> {
         self.resolve_inode(path, follow_symlink)
             .map(|inode| metadata::from_inode(&inode))
     }
 
-    fn read_dir(&self, path: &VfsPath) -> Result<Vec<DirEntry>, VfsError> {
+    fn read_dir(&self, path: &ResolvedPath) -> Result<Vec<DirEntry>, VfsError> {
         self.filesystem
             .read_dir(path.as_bytes())
             .map_err(map_ext4)?
@@ -63,44 +63,44 @@ impl FileSystem for Ext4FileSystem {
             .collect()
     }
 
-    fn mkdir(&self, path: &VfsPath) -> Result<(), VfsError> {
+    fn mkdir(&self, path: &ResolvedPath) -> Result<(), VfsError> {
         let _mutation = self.mutation.lock();
 
         self.mkdir_inner(path)
     }
 
-    fn rmdir(&self, path: &VfsPath) -> Result<(), VfsError> {
+    fn rmdir(&self, path: &ResolvedPath) -> Result<(), VfsError> {
         let _mutation = self.mutation.lock();
 
         self.rmdir_inner(path)
     }
 
-    fn unlink(&self, path: &VfsPath) -> Result<(), VfsError> {
+    fn unlink(&self, path: &ResolvedPath) -> Result<(), VfsError> {
         let _mutation = self.mutation.lock();
 
         self.unlink_inner(path)
     }
 
-    fn hard_link(&self, source: &VfsPath, destination: &VfsPath) -> Result<(), VfsError> {
+    fn hard_link(&self, source: &ResolvedPath, destination: &ResolvedPath) -> Result<(), VfsError> {
         let _mutation = self.mutation.lock();
 
         self.hard_link_inner(source, destination)
     }
 
-    fn symlink(&self, target: &[u8], link: &VfsPath) -> Result<(), VfsError> {
+    fn symlink(&self, target: &[u8], link: &ResolvedPath) -> Result<(), VfsError> {
         let _mutation = self.mutation.lock();
 
         self.symlink_inner(target, link)
     }
 
-    fn read_link(&self, path: &VfsPath) -> Result<Vec<u8>, VfsError> {
+    fn read_link(&self, path: &ResolvedPath) -> Result<Vec<u8>, VfsError> {
         self.filesystem
             .read_link(path.as_bytes())
             .map(|path| path.as_ref().into())
             .map_err(map_ext4)
     }
 
-    fn rename(&self, source: &VfsPath, destination: &VfsPath) -> Result<(), VfsError> {
+    fn rename(&self, source: &ResolvedPath, destination: &ResolvedPath) -> Result<(), VfsError> {
         let _mutation = self.mutation.lock();
 
         self.rename_inner(source, destination)

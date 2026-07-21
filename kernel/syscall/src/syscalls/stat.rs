@@ -5,7 +5,7 @@ use core::{
 
 use roxy_fd::{Fd, FileError, FileMetadata, FileType as FdFileType};
 use roxy_memory::UserAddress;
-use roxy_vfs::{FileType as VfsFileType, Metadata as VfsMetadata, VfsError, VfsPath};
+use roxy_vfs::{FileType as VfsFileType, Metadata as VfsMetadata, VfsError, ResolvedPath};
 
 use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
 
@@ -90,10 +90,10 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
 fn path_metadata(path: u64) -> Result<StatData, Errno> {
     let address = UserAddress::new(path).ok_or(Errno::Fault)?;
     let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
-    let path = crate::user::read_c_string(&addrspace, address, VfsPath::MAX_LEN)?;
+    let path = crate::user::read_c_string(&addrspace, address, ResolvedPath::MAX_LEN)?;
 
-    if path.first() != Some(&b'/') {
-        return Err(unsupported("stat.relative_path", 0));
+    if path.is_empty() {
+        return Err(Errno::NotFound);
     }
 
     roxy_vfs::metadata(path)

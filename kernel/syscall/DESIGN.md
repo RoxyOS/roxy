@@ -16,6 +16,11 @@ Handlers follow three stages: parse raw values into typed data, validate all use
 state, then call the owning subsystem. The implementation stage should remain a small delegation,
 not a second copy of subsystem policy.
 
+Path-based `stat` and `open` copy the userspace byte string before passing it to the global VFS
+interface. The VFS leaves absolute paths independent of cwd and obtains the process-owned cwd
+through its registered provider only for relative paths. Syscall handlers do not duplicate path
+normalization or process-state lookup.
+
 Process-identity queries delegate to the process subsystem. `getpid` returns the stable process ID
 owned by the current thread's process and does not expose scheduler thread IDs through the ABI.
 `getppid` returns the recorded fork parent while that process remains in the process table and

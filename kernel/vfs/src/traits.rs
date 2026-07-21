@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use crate::{DirEntry, Metadata, OpenOptions, SeekFrom, VfsError, VfsPath};
+use crate::{DirEntry, Metadata, OpenOptions, SeekFrom, VfsError, ResolvedPath};
 
 pub trait FileHandle: Send {
     fn read(&mut self, destination: &mut [u8]) -> Result<usize, VfsError>;
@@ -12,15 +12,15 @@ pub trait FileHandle: Send {
 }
 
 pub trait FileSystem: Send + Sync {
-    fn open(&self, path: &VfsPath, options: OpenOptions) -> Result<Box<dyn FileHandle>, VfsError>;
-    fn metadata(&self, path: &VfsPath, follow_symlink: bool) -> Result<Metadata, VfsError>;
-    fn read_dir(&self, path: &VfsPath) -> Result<Vec<DirEntry>, VfsError>;
-    fn mkdir(&self, path: &VfsPath) -> Result<(), VfsError>;
-    fn rmdir(&self, path: &VfsPath) -> Result<(), VfsError>;
-    fn unlink(&self, path: &VfsPath) -> Result<(), VfsError>;
-    fn hard_link(&self, source: &VfsPath, destination: &VfsPath) -> Result<(), VfsError>;
-    fn symlink(&self, target: &[u8], link: &VfsPath) -> Result<(), VfsError>;
-    fn read_link(&self, path: &VfsPath) -> Result<Vec<u8>, VfsError>;
-    fn rename(&self, source: &VfsPath, destination: &VfsPath) -> Result<(), VfsError>;
+    fn open(&self, path: &ResolvedPath, options: OpenOptions) -> Result<Box<dyn FileHandle>, VfsError>;
+    fn metadata(&self, path: &ResolvedPath, follow_symlink: bool) -> Result<Metadata, VfsError>;
+    fn read_dir(&self, path: &ResolvedPath) -> Result<Vec<DirEntry>, VfsError>;
+    fn mkdir(&self, path: &ResolvedPath) -> Result<(), VfsError>;
+    fn rmdir(&self, path: &ResolvedPath) -> Result<(), VfsError>;
+    fn unlink(&self, path: &ResolvedPath) -> Result<(), VfsError>;
+    fn hard_link(&self, source: &ResolvedPath, destination: &ResolvedPath) -> Result<(), VfsError>;
+    fn symlink(&self, target: &[u8], link: &ResolvedPath) -> Result<(), VfsError>;
+    fn read_link(&self, path: &ResolvedPath) -> Result<Vec<u8>, VfsError>;
+    fn rename(&self, source: &ResolvedPath, destination: &ResolvedPath) -> Result<(), VfsError>;
     fn sync(&self) -> Result<(), VfsError>;
 }

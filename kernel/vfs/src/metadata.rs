@@ -1,4 +1,4 @@
-use crate::{FilePermissions, Vfs, VfsError, VfsPath};
+use crate::{FilePermissions, Vfs, VfsError, ResolvedPath};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileType {
@@ -23,7 +23,7 @@ pub struct Metadata {
 
 impl Vfs {
     pub fn metadata(&self, path: impl AsRef<[u8]>) -> Result<Metadata, VfsError> {
-        let path = VfsPath::new(path)?;
+        let path = ResolvedPath::resolve(path)?;
         let resolved = self.resolve(&path)?;
 
         resolved.filesystem.metadata(&resolved.local_path, true)

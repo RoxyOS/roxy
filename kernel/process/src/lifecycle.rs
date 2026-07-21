@@ -1,17 +1,19 @@
 use roxy_thread::{ThreadId, scheduler};
 
 use crate::{
-    ExitStatus, InitialFdInjector, ProcessId, ProcessState, initial_fds,
+    ExitStatus, InitialFdInjector, ProcessId, ProcessState, cwd, initial_fds,
     table::{PROCESS_TABLE, ProcessTable},
 };
 
-/// Initializes process integration and registers the initial descriptor policy.
+/// Initializes process integration and registers its VFS and descriptor hooks.
 ///
 /// # Panics
 ///
 /// Panics when the process subsystem was already initialized.
 pub fn initialize(initial_fd_injector: InitialFdInjector) {
     initial_fds::register(initial_fd_injector);
+    roxy_vfs::register_working_directory_provider(cwd::current_working_directory)
+        .expect("VFS working-directory provider already registered");
     scheduler::register_user_dispatch_hook(activate_addrspace);
     scheduler::register_reaped_handler(on_thread_reaped);
 }
@@ -76,6 +78,7 @@ mod tests {
     use roxy_memory::statistics;
     use roxy_test::kernel_test;
     use roxy_thread::Thread;
+    use roxy_vfs::ResolvedPath;
     use roxy_vm::AddrSpace;
 
     use super::ProcessTable;
@@ -90,17 +93,21 @@ mod tests {
         let process = Process::new(thread_id, addrspace.clone(), roxy_fd::FdTable::new());
         let process_id = process.id;
         assert_eq!(process.parent_process_id, None);
+        assert_eq!(process.working_directory.as_bytes(), b"/");
 
         let child_addrspace = AddrSpace::new().unwrap().into_handle();
         let child_thread = Thread::new(unused_thread).unwrap();
+        let child_working_directory = ResolvedPath::resolve(b"/usr").unwrap();
         let child_process = Process::from_fork(
             process_id,
             child_thread.id(),
             child_addrspace.clone(),
+            child_working_directory,
             roxy_fd::FdTable::new(),
         );
         let child_process_id = child_process.id;
         assert_eq!(child_process.parent_process_id, Some(process_id));
+        assert_eq!(child_process.working_directory.as_bytes(), b"/usr");
 
         table.insert(process);
         table.insert(child_process);
@@ -146,6 +153,10 @@ mod tests {
             );
             assert_eq!(table.processes[&process_id].main_thread_id, thread_id);
             assert_eq!(table.processes[&process_id].id, process_id);
+            assert_eq!(
+                table.processes[&process_id].working_directory.as_bytes(),
+                b"/"
+            );
         }
     );
 

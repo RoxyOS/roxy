@@ -3,6 +3,7 @@
 extern crate alloc;
 
 mod creation;
+mod cwd;
 mod execve;
 mod fork;
 mod image;
@@ -27,6 +28,7 @@ use alloc::sync::Arc;
 
 use roxy_fd::{Fd, FdTable, OpenFile};
 use roxy_thread::ThreadId;
+use roxy_vfs::ResolvedPath;
 use roxy_vm::AddrSpaceHandle;
 
 /// Long-lived process metadata owned by the process table.
@@ -38,6 +40,7 @@ struct Process {
     parent_process_id: Option<ProcessId>,
     addrspace: Option<AddrSpaceHandle>,
     main_thread_id: ThreadId,
+    working_directory: ResolvedPath,
     fds: FdTable,
     state: ProcessState,
 }

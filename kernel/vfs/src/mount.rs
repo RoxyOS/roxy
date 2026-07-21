@@ -2,7 +2,7 @@ use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 
 use roxy_utils::Lock;
 
-use crate::{FileSystem, VfsError, VfsPath, file::ActiveHandles};
+use crate::{FileSystem, VfsError, ResolvedPath, file::ActiveHandles};
 
 struct Mount {
     filesystem: Arc<dyn FileSystem>,
@@ -10,14 +10,14 @@ struct Mount {
 }
 
 pub(crate) struct ResolvedMount {
-    pub(crate) mount_path: VfsPath,
-    pub(crate) local_path: VfsPath,
+    pub(crate) mount_path: ResolvedPath,
+    pub(crate) local_path: ResolvedPath,
     pub(crate) filesystem: Arc<dyn FileSystem>,
     pub(crate) active: Arc<ActiveHandles>,
 }
 
 pub struct Vfs {
-    mounts: Lock<BTreeMap<VfsPath, Mount>>,
+    mounts: Lock<BTreeMap<ResolvedPath, Mount>>,
 }
 
 impl Vfs {
@@ -33,7 +33,7 @@ impl Vfs {
         path: impl AsRef<[u8]>,
         filesystem: Arc<dyn FileSystem>,
     ) -> Result<(), VfsError> {
-        let path = VfsPath::new(path)?;
+        let path = ResolvedPath::resolve(path)?;
         let mut mounts = self.mounts.lock();
 
         if mounts.contains_key(&path) {
@@ -52,7 +52,7 @@ impl Vfs {
     }
 
     pub fn unmount(&self, path: impl AsRef<[u8]>) -> Result<Arc<dyn FileSystem>, VfsError> {
-        let path = VfsPath::new(path)?;
+        let path = ResolvedPath::resolve(path)?;
         let mut mounts = self.mounts.lock();
         let mount = mounts.get(&path).ok_or(VfsError::NotFound)?;
 
@@ -80,7 +80,7 @@ impl Vfs {
         Ok(())
     }
 
-    pub(crate) fn resolve(&self, path: &VfsPath) -> Result<ResolvedMount, VfsError> {
+    pub(crate) fn resolve(&self, path: &ResolvedPath) -> Result<ResolvedMount, VfsError> {
         let mounts = self.mounts.lock();
         let (mount_path, mount) = mounts
             .iter()

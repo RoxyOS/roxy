@@ -12,6 +12,13 @@ Each process owns exactly one optional `AddrSpaceHandle`, one main thread id in 
 single-thread model, and one `FdTable`. The process table maps thread ids to process ids so the
 thread scheduler can request address-space activation without depending on this crate.
 
+Each process owns one normalized absolute working directory. Directly spawned processes start at
+the VFS root, fork children clone the parent's directory, and `execve` preserves it with the other
+process metadata. Process initialization registers a VFS working-directory provider that clones the
+current directory under the process-table lock. The VFS invokes it only for relative global
+operations and receives an owned snapshot, so no process-table lock spans path normalization or
+filesystem access.
+
 Each process also records an optional parent process ID. Directly spawned processes have no parent;
 fork children record the caller's process ID. This relationship is informational and does not own
 either process. An exited parent remains visible while its process-table entry is retained. Removing
@@ -51,6 +58,7 @@ FD table remain unchanged. A failed build leaves the old image untouched.
 
 - A running process has a process-table entry, a thread-owner mapping, and an address space.
 - A directly spawned process receives its completed initial descriptor table before publication.
+- A directly spawned process starts in `/`; fork inherits cwd and `execve` does not change it.
 - Address-space replacement is process-level; it is never performed by mutating a scheduler entry.
 - A dying process retains its address space until its thread is safely reaped on another kernel
   stack.
@@ -64,4 +72,5 @@ FD table remain unchanged. A failed build leaves the old image untouched.
 The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
 survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
 multi-threaded exec cleanup, credentials, signals, process groups, PID 1 reparenting, and child
-process collections are not. Process-identity callers encode an absent parent as PID 0.
+process collections are not. Process-identity callers encode an absent parent as PID 0. The
+working directory cannot yet be changed because `chdir` and `fchdir` are not implemented.

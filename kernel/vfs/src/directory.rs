@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::{FileSystem, FileType, Vfs, VfsError, VfsPath};
+use crate::{FileSystem, FileType, Vfs, VfsError, ResolvedPath};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DirEntry {
@@ -10,7 +10,7 @@ pub struct DirEntry {
 
 impl Vfs {
     pub fn read_dir(&self, path: impl AsRef<[u8]>) -> Result<Vec<DirEntry>, VfsError> {
-        let path = VfsPath::new(path)?;
+        let path = ResolvedPath::resolve(path)?;
         let resolved = self.resolve(&path)?;
 
         resolved.filesystem.read_dir(&resolved.local_path)
@@ -39,11 +39,11 @@ impl Vfs {
     ) -> Result<(), VfsError> {
         let target = target.as_ref();
 
-        if target.is_empty() || target.len() > VfsPath::MAX_LEN || target.contains(&0) {
+        if target.is_empty() || target.len() > ResolvedPath::MAX_LEN || target.contains(&0) {
             return Err(VfsError::InvalidPath);
         }
 
-        let link = VfsPath::new(link)?;
+        let link = ResolvedPath::resolve(link)?;
         let resolved = self.resolve(&link)?;
 
         resolved.filesystem.symlink(target, &resolved.local_path)
@@ -72,9 +72,9 @@ impl Vfs {
     fn mutate_path<T>(
         &self,
         path: impl AsRef<[u8]>,
-        operation: impl FnOnce(&dyn FileSystem, &VfsPath) -> Result<T, VfsError>,
+        operation: impl FnOnce(&dyn FileSystem, &ResolvedPath) -> Result<T, VfsError>,
     ) -> Result<T, VfsError> {
-        let path = VfsPath::new(path)?;
+        let path = ResolvedPath::resolve(path)?;
         let resolved = self.resolve(&path)?;
         let metadata = resolved.filesystem.metadata(&resolved.local_path, false)?;
 
@@ -88,9 +88,9 @@ impl Vfs {
     fn with_path<T>(
         &self,
         path: impl AsRef<[u8]>,
-        operation: impl FnOnce(&dyn FileSystem, &VfsPath) -> Result<T, VfsError>,
+        operation: impl FnOnce(&dyn FileSystem, &ResolvedPath) -> Result<T, VfsError>,
     ) -> Result<T, VfsError> {
-        let path = VfsPath::new(path)?;
+        let path = ResolvedPath::resolve(path)?;
         let resolved = self.resolve(&path)?;
 
         operation(&*resolved.filesystem, &resolved.local_path)
@@ -100,10 +100,10 @@ impl Vfs {
         &self,
         source: impl AsRef<[u8]>,
         destination: impl AsRef<[u8]>,
-        operation: impl FnOnce(&dyn FileSystem, &VfsPath, &VfsPath) -> Result<T, VfsError>,
+        operation: impl FnOnce(&dyn FileSystem, &ResolvedPath, &ResolvedPath) -> Result<T, VfsError>,
     ) -> Result<T, VfsError> {
-        let source = VfsPath::new(source)?;
-        let destination = VfsPath::new(destination)?;
+        let source = ResolvedPath::resolve(source)?;
+        let destination = ResolvedPath::resolve(destination)?;
         let from = self.resolve(&source)?;
         let to = self.resolve(&destination)?;
 

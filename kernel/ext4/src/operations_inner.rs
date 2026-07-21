@@ -1,10 +1,10 @@
 use ext4plus::{dir::Dir, path::PathBuf};
-use roxy_vfs::{FilePermissions, FileType, VfsError, VfsPath};
+use roxy_vfs::{FilePermissions, FileType, VfsError, ResolvedPath};
 
 use crate::{Ext4FileSystem, error::map_ext4, metadata};
 
 impl Ext4FileSystem {
-    pub(crate) fn mkdir_inner(&self, path: &VfsPath) -> Result<(), VfsError> {
+    pub(crate) fn mkdir_inner(&self, path: &ResolvedPath) -> Result<(), VfsError> {
         match self.resolve_inode(path, false) {
             Ok(_) => return Err(VfsError::AlreadyExists),
             Err(VfsError::NotFound) => {}
@@ -19,7 +19,7 @@ impl Ext4FileSystem {
         parent.link(name, directory.inode_mut()).map_err(map_ext4)
     }
 
-    pub(crate) fn rmdir_inner(&self, path: &VfsPath) -> Result<(), VfsError> {
+    pub(crate) fn rmdir_inner(&self, path: &ResolvedPath) -> Result<(), VfsError> {
         let inode = self.resolve_inode(path, false)?;
 
         if metadata::from_inode(&inode).file_type != FileType::Directory {
@@ -38,7 +38,7 @@ impl Ext4FileSystem {
         Ok(())
     }
 
-    pub(crate) fn unlink_inner(&self, path: &VfsPath) -> Result<(), VfsError> {
+    pub(crate) fn unlink_inner(&self, path: &ResolvedPath) -> Result<(), VfsError> {
         let inode = self.resolve_inode(path, false)?;
 
         if metadata::from_inode(&inode).file_type == FileType::Directory {
@@ -55,8 +55,8 @@ impl Ext4FileSystem {
 
     pub(crate) fn hard_link_inner(
         &self,
-        source: &VfsPath,
-        destination: &VfsPath,
+        source: &ResolvedPath,
+        destination: &ResolvedPath,
     ) -> Result<(), VfsError> {
         let mut inode = self.resolve_inode(source, false)?;
 
@@ -75,7 +75,7 @@ impl Ext4FileSystem {
         parent.link(name, &mut inode).map_err(map_ext4)
     }
 
-    pub(crate) fn symlink_inner(&self, target: &[u8], link: &VfsPath) -> Result<(), VfsError> {
+    pub(crate) fn symlink_inner(&self, target: &[u8], link: &ResolvedPath) -> Result<(), VfsError> {
         match self.resolve_inode(link, false) {
             Ok(_) => return Err(VfsError::AlreadyExists),
             Err(VfsError::NotFound) => {}
@@ -93,8 +93,8 @@ impl Ext4FileSystem {
 
     pub(crate) fn rename_inner(
         &self,
-        source: &VfsPath,
-        destination: &VfsPath,
+        source: &ResolvedPath,
+        destination: &ResolvedPath,
     ) -> Result<(), VfsError> {
         if source == destination {
             return Ok(());

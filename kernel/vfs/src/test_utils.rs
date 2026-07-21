@@ -4,7 +4,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use roxy_utils::Lock;
 
 use crate::{
-    DirEntry, FileHandle, FileSystem, FileType, Metadata, OpenOptions, SeekFrom, VfsError, VfsPath,
+    DirEntry, FileHandle, FileSystem, FileType, Metadata, OpenOptions, SeekFrom, VfsError, ResolvedPath,
 };
 
 pub(crate) struct MockFileSystem {
@@ -42,47 +42,47 @@ impl MockFileSystem {
 }
 
 impl FileSystem for MockFileSystem {
-    fn open(&self, path: &VfsPath, _options: OpenOptions) -> Result<Box<dyn FileHandle>, VfsError> {
+    fn open(&self, path: &ResolvedPath, _options: OpenOptions) -> Result<Box<dyn FileHandle>, VfsError> {
         *self.last_path.lock() = path.as_bytes().into();
 
         Ok(Box::new(MockFile(self.metadata_value())))
     }
 
-    fn metadata(&self, path: &VfsPath, _follow: bool) -> Result<Metadata, VfsError> {
+    fn metadata(&self, path: &ResolvedPath, _follow: bool) -> Result<Metadata, VfsError> {
         *self.last_path.lock() = path.as_bytes().into();
 
         Ok(self.metadata_value())
     }
 
-    fn read_dir(&self, _path: &VfsPath) -> Result<Vec<DirEntry>, VfsError> {
+    fn read_dir(&self, _path: &ResolvedPath) -> Result<Vec<DirEntry>, VfsError> {
         Ok(Vec::new())
     }
 
-    fn mkdir(&self, _path: &VfsPath) -> Result<(), VfsError> {
+    fn mkdir(&self, _path: &ResolvedPath) -> Result<(), VfsError> {
         Ok(())
     }
 
-    fn rmdir(&self, _path: &VfsPath) -> Result<(), VfsError> {
+    fn rmdir(&self, _path: &ResolvedPath) -> Result<(), VfsError> {
         Ok(())
     }
 
-    fn unlink(&self, _path: &VfsPath) -> Result<(), VfsError> {
+    fn unlink(&self, _path: &ResolvedPath) -> Result<(), VfsError> {
         Ok(())
     }
 
-    fn hard_link(&self, _source: &VfsPath, _destination: &VfsPath) -> Result<(), VfsError> {
+    fn hard_link(&self, _source: &ResolvedPath, _destination: &ResolvedPath) -> Result<(), VfsError> {
         Ok(())
     }
 
-    fn symlink(&self, _target: &[u8], _link: &VfsPath) -> Result<(), VfsError> {
+    fn symlink(&self, _target: &[u8], _link: &ResolvedPath) -> Result<(), VfsError> {
         Ok(())
     }
 
-    fn read_link(&self, _path: &VfsPath) -> Result<Vec<u8>, VfsError> {
+    fn read_link(&self, _path: &ResolvedPath) -> Result<Vec<u8>, VfsError> {
         Err(VfsError::Unsupported)
     }
 
-    fn rename(&self, _source: &VfsPath, _destination: &VfsPath) -> Result<(), VfsError> {
+    fn rename(&self, _source: &ResolvedPath, _destination: &ResolvedPath) -> Result<(), VfsError> {
         Ok(())
     }
 

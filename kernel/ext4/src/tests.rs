@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use roxy_block::RamDisk;
 use roxy_vfs::{
     CreationMode, FilePermissions, FileType, OpenAccess, OpenOptions, SeekFrom, Vfs, VfsError,
-    VfsPath,
+    ResolvedPath,
 };
 use spin::Once;
 
@@ -38,7 +38,7 @@ roxy_test::kernel_test!(
 
         assert_eq!(
             filesystem
-                .resolve_inode(&VfsPath::new(b"/a/file").unwrap(), true)
+                .resolve_inode(&ResolvedPath::resolve(b"/a/file").unwrap(), true)
                 .unwrap()
                 .mode()
                 .bits()

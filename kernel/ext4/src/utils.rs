@@ -4,7 +4,7 @@ use ext4plus::{
     inode::{Inode, InodeCreationOptions, InodeFlags, InodeMode},
     path::Path,
 };
-use roxy_vfs::{FilePermissions, FileType, VfsError, VfsPath};
+use roxy_vfs::{FilePermissions, FileType, VfsError, ResolvedPath};
 
 use crate::{Ext4FileSystem, error::map_ext4};
 
@@ -15,7 +15,7 @@ impl Ext4FileSystem {
     /// symbolic link. Symbolic links in intermediate components are always followed.
     pub(crate) fn resolve_inode(
         &self,
-        path: &VfsPath,
+        path: &ResolvedPath,
         follow_final_symlink: bool,
     ) -> Result<Inode, VfsError> {
         let path = Path::try_from(path.as_bytes()).map_err(|_| VfsError::InvalidPath)?;
@@ -32,7 +32,7 @@ impl Ext4FileSystem {
 
     pub(crate) fn parent<'a>(
         &self,
-        path: &'a VfsPath,
+        path: &'a ResolvedPath,
     ) -> Result<(Dir, ext4plus::DirEntryName<'a>), VfsError> {
         let bytes = path.as_bytes();
         let separator = bytes
@@ -46,7 +46,7 @@ impl Ext4FileSystem {
         } else {
             &bytes[..separator]
         };
-        let parent = VfsPath::new(parent_bytes)?;
+        let parent = ResolvedPath::resolve(parent_bytes)?;
         let inode = self.resolve_inode(&parent, true)?;
 
         Ok((
@@ -81,7 +81,7 @@ impl Ext4FileSystem {
 
     pub(crate) fn create_regular(
         &self,
-        path: &VfsPath,
+        path: &ResolvedPath,
         permissions: FilePermissions,
     ) -> Result<(), VfsError> {
         let (mut parent, name) = self.parent(path)?;
@@ -90,7 +90,7 @@ impl Ext4FileSystem {
         parent.link(name, &mut inode).map_err(map_ext4)
     }
 
-    pub(crate) fn empty_directory(&self, path: &VfsPath) -> Result<bool, VfsError> {
+    pub(crate) fn empty_directory(&self, path: &ResolvedPath) -> Result<bool, VfsError> {
         for entry in self
             .filesystem
             .read_dir(path.as_bytes())

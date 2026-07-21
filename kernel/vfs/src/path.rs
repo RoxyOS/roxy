@@ -1,27 +1,79 @@
 use alloc::vec::Vec;
 use core::fmt;
+use spin::Once;
 
 use crate::VfsError;
 
 #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
-pub struct VfsPath(Vec<u8>);
+pub struct ResolvedPath(Vec<u8>);
 
-impl VfsPath {
+pub type WorkingDirectoryProvider = fn() -> ResolvedPath;
+
+static WORKING_DIRECTORY_PROVIDER: Once<WorkingDirectoryProvider> = Once::new();
+
+pub fn register_working_directory_provider(
+    provider: WorkingDirectoryProvider,
+) -> Result<(), VfsError> {
+    if WORKING_DIRECTORY_PROVIDER.get().is_some() {
+        return Err(VfsError::Busy);
+    }
+
+    WORKING_DIRECTORY_PROVIDER.call_once(|| provider);
+
+    Ok(())
+}
+
+impl ResolvedPath {
     pub const MAX_LEN: usize = 4096;
     pub const MAX_COMPONENT_LEN: usize = 255;
 
-    pub fn new(path: impl AsRef<[u8]>) -> Result<Self, VfsError> {
+    pub fn resolve(path: impl AsRef<[u8]>) -> Result<Self, VfsError> {
         let path = path.as_ref();
-        if path.first() != Some(&b'/') || path.contains(&0) {
+        if path.contains(&0) {
             return Err(VfsError::InvalidPath);
         }
 
+        if path.first() == Some(&b'/') {
+            return Self::normalize(path, false);
+        }
+
+        let provider = WORKING_DIRECTORY_PROVIDER
+            .get()
+            .ok_or(VfsError::NotInitialized)?;
+        let working_directory = provider();
+
+        Self::with_base(path, &working_directory)
+    }
+
+    /// Applies an absolute base directory to raw caller path bytes and normalizes the result.
+    ///
+    /// Absolute paths ignore `base`; relative paths are appended to `base`. The returned
+    /// `ResolvedPath` is always absolute.
+    pub(crate) fn with_base(path: impl AsRef<[u8]>, base: &Self) -> Result<Self, VfsError> {
+        let path = path.as_ref();
+        if path.first() == Some(&b'/') {
+            return Self::normalize(path, false);
+        }
+        if path.contains(&0) {
+            return Err(VfsError::InvalidPath);
+        }
+
+        let mut absolute = base.0.clone();
+        absolute.push(b'/');
+        absolute.extend_from_slice(path);
+
+        Self::normalize(&absolute, true)
+    }
+
+    fn normalize(path: &[u8], stay_at_root: bool) -> Result<Self, VfsError> {
         let mut components: Vec<&[u8]> = Vec::new();
         for component in path.split(|byte| *byte == b'/') {
             match component {
                 b"" | b"." => {}
                 b".." => {
-                    components.pop().ok_or(VfsError::InvalidPath)?;
+                    if components.pop().is_none() && !stay_at_root {
+                        return Err(VfsError::InvalidPath);
+                    }
                 }
                 value if value.len() > Self::MAX_COMPONENT_LEN => {
                     return Err(VfsError::InvalidPath);
@@ -84,7 +136,7 @@ impl VfsPath {
     }
 }
 
-impl fmt::Debug for VfsPath {
+impl fmt::Debug for ResolvedPath {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}", StringBytes(&self.0))
     }
@@ -106,7 +158,7 @@ impl fmt::Display for StringBytes<'_> {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use super::VfsPath;
+    use super::ResolvedPath;
     use crate::VfsError;
 
     roxy_test::kernel_test!(
@@ -114,11 +166,72 @@ mod tests {
         normalizes_absolute_byte_paths,
         {
             assert_eq!(
-                VfsPath::new(b"//usr/./lib/../bin/").unwrap().as_bytes(),
+                ResolvedPath::resolve(b"//usr/./lib/../bin/").unwrap().as_bytes(),
                 b"/usr/bin"
             );
-            assert_eq!(VfsPath::new(b"/../../etc"), Err(VfsError::InvalidPath));
-            assert_eq!(VfsPath::new(b"relative"), Err(VfsError::InvalidPath));
+            assert_eq!(ResolvedPath::resolve(b"/../../etc"), Err(VfsError::InvalidPath));
+            assert_eq!(ResolvedPath::resolve(b"relative"), Err(VfsError::InvalidPath));
+        }
+    );
+
+    roxy_test::kernel_test!(
+        "roxy-vfs::resolves-relative-byte-paths",
+        resolves_relative_byte_paths,
+        {
+            let root = ResolvedPath::root();
+            let working_directory = ResolvedPath::resolve(b"/usr/lib").unwrap();
+
+            assert_eq!(ResolvedPath::with_base(b".", &root).unwrap().as_bytes(), b"/");
+            assert_eq!(ResolvedPath::with_base(b"..", &root).unwrap().as_bytes(), b"/");
+            assert_eq!(
+                ResolvedPath::with_base(b"foo", &root).unwrap().as_bytes(),
+                b"/foo"
+            );
+            assert_eq!(
+                ResolvedPath::with_base(b"./child", &working_directory)
+                    .unwrap()
+                    .as_bytes(),
+                b"/usr/lib/child"
+            );
+            assert_eq!(
+                ResolvedPath::with_base(b"../bin", &working_directory)
+                    .unwrap()
+                    .as_bytes(),
+                b"/usr/bin"
+            );
+            assert_eq!(
+                ResolvedPath::with_base(b"/etc", &working_directory)
+                    .unwrap()
+                    .as_bytes(),
+                b"/etc"
+            );
+        }
+    );
+
+    roxy_test::kernel_test!(
+        "roxy-vfs::rejects-invalid-relative-byte-paths",
+        rejects_invalid_relative_byte_paths,
+        {
+            let working_directory = ResolvedPath::resolve(b"/usr").unwrap();
+            let long_component = [b'a'; ResolvedPath::MAX_COMPONENT_LEN + 1];
+            let long_path = alloc::vec![b'a'; ResolvedPath::MAX_LEN];
+
+            assert_eq!(
+                ResolvedPath::with_base(b"child\0name", &working_directory),
+                Err(VfsError::InvalidPath)
+            );
+            assert_eq!(
+                ResolvedPath::with_base(long_component, &working_directory),
+                Err(VfsError::InvalidPath)
+            );
+            assert_eq!(
+                ResolvedPath::with_base(long_path, &working_directory),
+                Err(VfsError::InvalidPath)
+            );
+            assert_eq!(
+                ResolvedPath::with_base(b"/../../etc", &working_directory),
+                Err(VfsError::InvalidPath)
+            );
         }
     );
 
@@ -126,10 +239,10 @@ mod tests {
         "roxy-vfs::matches-component-boundaries",
         matches_component_boundaries,
         {
-            let mount = VfsPath::new(b"/mnt").unwrap();
+            let mount = ResolvedPath::resolve(b"/mnt").unwrap();
 
-            assert!(mount.contains(&VfsPath::new(b"/mnt/a").unwrap()));
-            assert!(!mount.contains(&VfsPath::new(b"/mnt2").unwrap()));
+            assert!(mount.contains(&ResolvedPath::resolve(b"/mnt/a").unwrap()));
+            assert!(!mount.contains(&ResolvedPath::resolve(b"/mnt2").unwrap()));
         }
     );
 }

@@ -43,6 +43,6 @@ pub use interface::{
 };
 pub use metadata::{FileType, Metadata};
 pub use mount::Vfs;
-pub use path::VfsPath;
+pub use path::{ResolvedPath, WorkingDirectoryProvider, register_working_directory_provider};
 pub use permissions::FilePermissions;
 pub use traits::{FileHandle, FileSystem};

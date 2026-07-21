@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use roxy_memory::UserAddress;
-use roxy_vfs::{CreationMode, FilePermissions, OpenAccess, OpenOptions, VfsError, VfsPath};
+use roxy_vfs::{CreationMode, FilePermissions, OpenAccess, OpenOptions, VfsError, ResolvedPath};
 
 use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
 
@@ -95,14 +95,10 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
     let request = OpenRequest::parse(arguments[1], arguments[2])?;
 
     let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
-    let path = crate::user::read_c_string(&addrspace, path_address, VfsPath::MAX_LEN)?;
+    let path = crate::user::read_c_string(&addrspace, path_address, ResolvedPath::MAX_LEN)?;
 
     if path.is_empty() {
         return Err(Errno::NotFound);
-    }
-
-    if path.first() != Some(&b'/') {
-        return Err(unsupported("open.relative_path", 0));
     }
 
     let options = request.options()?;
@@ -128,7 +124,7 @@ fn map_vfs_error(error: VfsError) -> Errno {
         VfsError::NoSpace => Errno::NoSpace,
         VfsError::Busy => Errno::Busy,
         VfsError::CrossDevice => Errno::CrossDevice,
-        VfsError::Unsupported => Errno::NotSupported,
+        VfsError::Unsupported => unsupported("open.filesystem", 0),
     }
 }
 

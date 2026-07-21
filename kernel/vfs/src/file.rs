@@ -2,7 +2,7 @@ use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
 
 use roxy_utils::Lock;
 
-use crate::{FileHandle, FilePermissions, Metadata, Vfs, VfsError, VfsPath};
+use crate::{FileHandle, FilePermissions, Metadata, Vfs, VfsError, ResolvedPath};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum OpenAccess {
@@ -169,7 +169,7 @@ impl VfsFile {
 impl Vfs {
     pub fn open(&self, path: impl AsRef<[u8]>, options: OpenOptions) -> Result<VfsFile, VfsError> {
         options.validate()?;
-        let path = VfsPath::new(path)?;
+        let path = ResolvedPath::resolve(path)?;
         let resolved = self.resolve(&path)?;
         let handle = resolved.filesystem.open(&resolved.local_path, options)?;
         let file_id = handle.metadata()?.file_id;
