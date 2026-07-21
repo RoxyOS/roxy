@@ -24,6 +24,7 @@ pub(crate) enum SyscallNumber {
     Getppid = 20,
     Geteuid = 21,
     Getuid = 22,
+    Getgid = 23,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -54,6 +55,7 @@ impl TryFrom<u64> for SyscallNumber {
             20 => Ok(Self::Getppid),
             21 => Ok(Self::Geteuid),
             22 => Ok(Self::Getuid),
+            23 => Ok(Self::Getgid),
             _ => Err(()),
         }
     }
@@ -88,6 +90,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(20), Ok(SyscallNumber::Getppid));
         assert_eq!(SyscallNumber::try_from(21), Ok(SyscallNumber::Geteuid));
         assert_eq!(SyscallNumber::try_from(22), Ok(SyscallNumber::Getuid));
-        assert!(SyscallNumber::try_from(23).is_err());
+        assert_eq!(SyscallNumber::try_from(23), Ok(SyscallNumber::Getgid));
+        assert!(SyscallNumber::try_from(24).is_err());
     });
 }
