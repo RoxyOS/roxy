@@ -94,8 +94,8 @@ mod tests {
     }
 
     kernel_test!("roxy-fbterm::controls", updates_cursor, {
-        let mut storage = vec![0u8; 16 * 64];
-        let mut console = console(&mut storage, 16, 16);
+        let mut storage = vec![0u8; 32 * 64];
+        let mut console = console(&mut storage, 16, 32);
 
         console.write(b"A\rB\x08\n");
 
@@ -104,8 +104,8 @@ mod tests {
     });
 
     kernel_test!("roxy-fbterm::wrap", wraps_at_last_column, {
-        let mut storage = vec![0u8; 16 * 64];
-        let mut console = console(&mut storage, 16, 16);
+        let mut storage = vec![0u8; 32 * 64];
+        let mut console = console(&mut storage, 16, 32);
 
         console.write(b"AB");
 
@@ -114,8 +114,8 @@ mod tests {
     });
 
     kernel_test!("roxy-fbterm::ignored-byte", ignores_non_ascii, {
-        let mut storage = vec![0u8; 16 * 64];
-        let mut console = console(&mut storage, 16, 16);
+        let mut storage = vec![0u8; 32 * 64];
+        let mut console = console(&mut storage, 16, 32);
 
         console.write(&[0xff]);
 

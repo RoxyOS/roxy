@@ -12,8 +12,9 @@ anyhow = "1"
 bitflags = "2"
 buddy_system_allocator = { version = "0.13", default-features = false, features = ["alloc"] }
 clap = { version = "4", features = ["derive"] }
+embedded-bitmap-fonts = { version = "0.1", default-features = false, features = ["terminus"] }
+embedded-graphics = "0.8"
 ext4plus = { version = "0.1.0-rc.2", default-features = false, features = ["multi-threaded", "sync"] }
-font8x8 = { version = "0.3", default-features = false }
 heapless = "0.9"
 limine = "0.6"
 linkme = "0.3"

@@ -18,13 +18,14 @@ initialization attempt violates the core startup contract and panics.
 
 ## Terminal behavior
 
-The endpoint renders printable ASCII with the `font8x8` crate's fixed 8x8 bitmap font. The crate is
-used without its standard-library feature and supplies the required public-domain glyph data. LF
-advances a row, CR returns
-to column zero, backspace clears the preceding cell, and tab advances to the next eight-column
-stop. Reaching the bottom scrolls the framebuffer by one glyph row. Input is unsupported; the
-endpoint emits the required unsupported-operation diagnostic with the current process and thread,
-then returns the generic bad-operation error for normal syscall error mapping.
+The endpoint renders printable ASCII with the regular Terminus 8x16 bitmap font from
+`embedded-bitmap-fonts`. Only that crate's `terminus` feature is enabled. It is `no_std`, uses the
+Apache-2.0 license, and provides a fixed bitmap whose dimensions match the cell renderer without
+font parsing, allocation, or scaling. LF advances a row, CR returns to column zero, backspace
+clears the preceding cell, and tab advances to the next eight-column stop. Reaching the bottom
+scrolls the framebuffer by one glyph row. Input is unsupported; the endpoint emits the required
+unsupported-operation diagnostic with the current process and thread, then returns the generic
+bad-operation error for normal syscall error mapping.
 
 Only Limine RGB 32-bit modes are accepted. Color masks determine packed foreground/background
 pixels. Full ANSI parsing, Unicode, keyboard input, PTYs, and diagnostic mirroring are outside the
@@ -43,12 +44,14 @@ mapping, physical pixel dimensions, pitch, and RGB channel layout. It converts R
 native pixels and provides bounded pixel, rectangle, and pixel-row operations. It has no concept of
 characters, cells, cursors, or terminal control bytes.
 
-`TextRenderer` interprets the framebuffer as a grid of fixed 8x8 cells. It derives and owns the
+`TextRenderer` interprets the framebuffer as a grid of fixed 8x16 cells. It derives and owns the
 grid's total `columns` and `rows` from the framebuffer dimensions; a partial cell at the right or
 bottom edge is outside the text grid. The renderer owns the foreground and background colors and
-the conversion of a printable ASCII byte into font pixels inside one selected cell. It can draw or
-clear a cell and scroll the complete text region upward by one cell row. It does not own a current
-cell, advance a cursor, or interpret control bytes.
+adapts Terminus's binary glyph output to pixels inside one selected cell. The adapter remains
+private to the rendering layer, so neither the framebuffer boundary nor the terminal state machine
+depends on third-party graphics types. The renderer can draw or clear a cell and scroll the
+complete text region upward by one cell row. It does not own a current cell, advance a cursor, or
+interpret control bytes.
 
 `Console` is the byte-level terminal state machine. It owns only the current cursor `column` and
 `row`, while querying `TextRenderer` for the grid bounds. Printable ASCII draws into the current
