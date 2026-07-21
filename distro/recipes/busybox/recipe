@@ -23,19 +23,22 @@ configure() {
 	make -C "${source_dir}" O="${PWD}" oldconfig < /dev/null
 }
 
-build() {
-	make -C "${source_dir}" O="${PWD}" \
+busybox_make() {
+	make -C "${PWD}" -f "${source_dir}/Makefile" \
+		KBUILD_SRC="${source_dir}" \
 		ARCH=x86_64 \
 		CC="clang --target=x86_64-unknown-roxy --sysroot=/sysroot" \
 		HOSTCC=clang \
 		AR=llvm-ar \
 		NM=llvm-nm \
 		STRIP=llvm-strip \
-		-j "${parallelism}"
+		"$@"
+}
+
+build() {
+	busybox_make -j "${parallelism}"
 }
 
 package() {
-	make -C "${source_dir}" O="${PWD}" \
-		CONFIG_PREFIX="${dest_dir}" \
-		install
+	busybox_make CONFIG_PREFIX="${dest_dir}" install
 }
