@@ -78,10 +78,7 @@ fn install_base(workspace: &Path, staging: &Path) -> Result<()> {
             .context("failed to initialize Jinx build directory")?;
     }
 
-    println!("==> Building base package");
-    xshell::cmd!(&shell, "jinx build base")
-        .run()
-        .context("failed to build base package")?;
+    build_base(&shell)?;
 
     reset_staging(staging)?;
 
@@ -89,6 +86,28 @@ fn install_base(workspace: &Path, staging: &Path) -> Result<()> {
     xshell::cmd!(&shell, "jinx install {staging} base")
         .run()
         .context("failed to install base package")
+}
+
+fn build_base(shell: &Shell) -> Result<()> {
+    let pending = xshell::cmd!(shell, "jinx dry-run base")
+        .read()
+        .context("failed to determine outdated base dependencies")?;
+    let dependencies: Vec<_> = pending
+        .split_whitespace()
+        .filter(|package| *package != "base")
+        .collect();
+
+    if !dependencies.is_empty() {
+        println!("==> Building outdated base dependencies");
+        xshell::cmd!(shell, "jinx build {dependencies...}")
+            .run()
+            .context("failed to build outdated base dependencies")?;
+    }
+
+    println!("==> Building base package");
+    xshell::cmd!(shell, "jinx build base")
+        .run()
+        .context("failed to build base package")
 }
 
 fn reset_staging(staging: &Path) -> Result<()> {

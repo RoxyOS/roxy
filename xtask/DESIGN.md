@@ -12,7 +12,8 @@ contain kernel runtime behavior or duplicate the build logic owned by external t
   ext4 root image, replacing any existing image.
 - `image` reuses an existing rootfs image or builds one when absent, builds the release kernel, then
   creates a bootable image.
-- `run` uses the same cached-rootfs behavior and launches the configured emulator path.
+- `run` uses the same cached-rootfs behavior and launches QEMU with its default graphical display
+  so framebuffer output is visible while serial remains attached to the invoking terminal.
 - `test` uses the same cached-rootfs behavior, builds the kernel-test image, and runs the harness.
 - `check` runs formatting, workspace checks, Clippy, release kernel checks, test-kernel checks, and
   diff whitespace validation without building userspace or rootfs artifacts.
