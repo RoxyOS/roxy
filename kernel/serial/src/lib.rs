@@ -12,16 +12,6 @@ pub use logging::{emergency_print, print};
 pub use terminal::terminal;
 
 #[macro_export]
-macro_rules! s_println {
-    () => {
-        $crate::print(format_args!("\n"))
-    };
-    ($($arguments:tt)*) => {
-        $crate::print(format_args!("{}\n", format_args!($($arguments)*)))
-    };
-}
-
-#[macro_export]
 macro_rules! e_println {
     () => {
         $crate::emergency_print(format_args!("\n"))

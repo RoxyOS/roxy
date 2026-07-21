@@ -37,8 +37,9 @@ creation sequence without depending on a terminal or hardware backend.
 
 Fork does not invoke the injector: it clones the parent's open-file references. `execve` also does
 not invoke it and preserves the current descriptor table. Closing an injected descriptor therefore
-does not cause it to reappear. The current composition connects every directly spawned process to
-one shared serial endpoint; selecting separate terminals remains composition policy.
+does not cause it to reappear. The current composition connects all three initial descriptors to
+the kernel terminal selected by core and stored by the terminal subsystem; selecting separate
+endpoints remains composition policy.
 
 ## Image and exec flow
 

@@ -1,5 +1,5 @@
 use qemu_exit::{QEMUExit, X86};
-use roxy_serial::s_println;
+use roxy_terminal::println;
 
 const SUCCESS_STATUS: u32 = 33;
 const EXIT: X86 = {
@@ -8,15 +8,15 @@ const EXIT: X86 = {
 };
 
 pub(crate) fn run() -> ! {
-    s_println!("==> Running {} kernel tests", roxy_test::TESTS.len());
+    println!("==> Running {} kernel tests", roxy_test::TESTS.len());
 
     for test in roxy_test::TESTS {
-        s_println!("[ RUN      ] {}", test.name);
+        println!("[ RUN      ] {}", test.name);
         (test.run)();
-        s_println!("[       OK ] {}", test.name);
+        println!("[       OK ] {}", test.name);
     }
 
-    s_println!("==> Kernel tests passed: {}", roxy_test::TESTS.len());
+    println!("==> Kernel tests passed: {}", roxy_test::TESTS.len());
     EXIT.exit_success()
 }
 

@@ -587,6 +587,8 @@ dependencies = [
  "linkme",
  "roxy-fd",
  "roxy-test",
+ "roxy-utils",
+ "spin 0.12.2",
 ]
 
 [[package]]

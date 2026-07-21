@@ -31,9 +31,7 @@ pub extern "C" fn _start() -> ! {
 
     CurrentArchitectureBackend::initialize(exception::handler, interrupt::handler);
     roxy_memory::initialize(&boot_info);
-    if let Err(error) = roxy_fbterm::initialize(&boot_info) {
-        roxy_serial::e_println!("fbterm unavailable: {error:?}; using serial terminal");
-    }
+    select_kernel_terminal(&boot_info);
     roxy_time::initialize(boot_info.unix_seconds_at_boot);
     rootfs::initialize(&boot_info).expect("initialize root filesystem");
     roxy_cpu::current_cpu().initialize();
@@ -47,6 +45,24 @@ pub extern "C" fn _start() -> ! {
 
     #[cfg(not(feature = "kernel-test"))]
     kernel_main()
+}
+
+#[cfg(feature = "kernel-test")]
+fn select_kernel_terminal(_boot_info: &BootInfo) {
+    roxy_terminal::select_kernel_terminal(roxy_serial::terminal());
+}
+
+#[cfg(not(feature = "kernel-test"))]
+fn select_kernel_terminal(boot_info: &BootInfo) {
+    let terminal = match roxy_fbterm::initialize(boot_info) {
+        Ok(()) => roxy_fbterm::terminal().expect("initialized fbterm must publish its endpoint"),
+        Err(error) => {
+            roxy_serial::e_println!("fbterm unavailable: {error:?}; using serial terminal");
+            roxy_serial::terminal()
+        }
+    };
+
+    roxy_terminal::select_kernel_terminal(terminal);
 }
 
 #[cfg(not(feature = "kernel-test"))]

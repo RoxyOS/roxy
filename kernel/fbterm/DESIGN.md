@@ -8,11 +8,12 @@ process descriptors, keyboard input, terminal line discipline, or kernel diagnos
 
 ## Ownership and initialization
 
-Core initializes `fbterm` after boot metadata and kernel memory are ready. The endpoint uses the
-first Limine framebuffer and its HHDM virtual address for the kernel lifetime. Unsupported modes
-are reported to core, which selects the serial terminal instead. Each open file retains an `Arc`
-to the same synchronized endpoint. A successful initialization publishes that `Arc` exactly once;
-a mode-validation failure leaves the global endpoint uninitialized, while a second successful
+In normal builds, core initializes `fbterm` after boot metadata and kernel memory are ready. Kernel
+test builds select serial directly and do not require framebuffer initialization. The endpoint uses
+the first Limine framebuffer and its HHDM virtual address for the kernel lifetime. Unsupported modes
+are reported to core, which selects the serial terminal instead. Each open file retains an `Arc` to
+the same synchronized endpoint. A successful initialization publishes that `Arc` exactly once; a
+mode-validation failure leaves the global endpoint uninitialized, while a second successful
 initialization attempt violates the core startup contract and panics.
 
 ## Terminal behavior

@@ -2,10 +2,9 @@
 
 ## Purpose and scope
 
-`roxy-terminal` adapts shared terminal endpoints to the file-descriptor subsystem. It owns the
-terminal endpoint contract and the common open-file behavior for terminals. It does not select the
-active console, own hardware drivers, assign process descriptor numbers, or implement syscall ABI
-policy.
+`roxy-terminal` defines shared terminal endpoints, adapts them to the file-descriptor subsystem,
+and owns the kernel terminal selected by the composition root. It does not choose a hardware
+backend, own hardware drivers, assign process descriptor numbers, or implement syscall ABI policy.
 
 Canonical input, echo, terminal attributes, pseudo-terminals, job control, and signal generation
 are not implemented. They must extend this subsystem rather than introduce terminal-specific paths
@@ -21,6 +20,22 @@ same endpoint.
 The adapter reports terminal identity, delegates metadata and byte I/O, and rejects seeking. It
 does not interpret descriptor numbers or retain a file position. Concrete endpoints own their
 blocking, buffering, output transformation, synchronization, and failure policies.
+
+## Kernel terminal
+
+Core selects exactly one `Arc<dyn TerminalDevice>` as the kernel terminal after the candidate
+hardware endpoints are ready. The terminal subsystem stores that selection for the kernel lifetime;
+selection is not a runtime-switching interface, and selecting twice or accessing it before selection
+is a startup-contract violation. The subsystem does not know whether the selected endpoint is serial,
+framebuffer-backed, or another future implementation.
+
+Ordinary formatted kernel output and the initial process descriptors use the selected endpoint.
+Formatting is serialized under a preemption-disabling lock so all fragments produced by one
+formatting operation reach the endpoint without interleaving with another ordinary kernel print on
+the same or another CPU. Endpoint implementations still serialize their device state against
+userspace writes. Panic, allocation-failure, exception, and mandatory unsupported-operation
+diagnostics bypass the kernel terminal and retain their serial emergency or diagnostic paths so they
+do not depend on the selected endpoint or its locks.
 
 ## Concurrency and extension contract
 
