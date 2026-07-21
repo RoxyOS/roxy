@@ -13,8 +13,14 @@ hostdeps="roxy-llvm"
 imagedeps="gcc libc6-dev make"
 
 configure() {
-	KCONFIG_ALLCONFIG="${source_dir}/configs/roxy_defconfig" \
-		make -C "${source_dir}" O="${PWD}" allnoconfig
+	make -C "${source_dir}" O="${PWD}" allnoconfig
+
+	while IFS= read -r setting; do
+		option="${setting%%=*}"
+		sed -i "s/^# ${option} is not set$/${setting}/" .config
+	done < "${source_dir}/configs/roxy_defconfig"
+
+	make -C "${source_dir}" O="${PWD}" oldconfig < /dev/null
 }
 
 build() {
