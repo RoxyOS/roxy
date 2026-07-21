@@ -15,7 +15,8 @@ relevant.
 
 Before reviewing source code:
 
-1. Read `AGENTS.md`, `STYLE.md`, and the applicable parts of `WORKFLOW.md`.
+1. Read `AGENTS.md`, `agent-instructions/STYLE.md`, and the applicable parts of
+   `agent-instructions/WORKFLOW.md`.
 2. Find every `AGENTS.md`, `STYLE.md`, and `DESIGN.md` whose scope covers a changed file. More
    specific documents supplement or override broader guidance as described by `AGENTS.md`.
 3. Read affected manifests, public interfaces, tests, and important callers. For cross-subsystem
@@ -23,8 +24,8 @@ Before reviewing source code:
 4. Use repository history when the intent or an invariant cannot be established from the current
    tree. Do not treat old code as proof that a pattern is correct today.
 
-`STYLE.md` is the sole source of truth for coding style. Apply it directly; do not replace it with
-personal preferences or generic Rust conventions.
+`agent-instructions/STYLE.md` is the sole source of truth for coding style. Apply it directly; do
+not replace it with personal preferences or generic Rust conventions.
 
 ## Establish the review scope
 
@@ -84,7 +85,7 @@ change:
   boolean mode combinations, overly broad visibility, and abstractions whose invariants cannot be
   stated clearly.
 - Require names, types, enums, newtypes, RAII guards, and state transitions to make important units,
-  lifetimes, ownership, and invalid states visible as directed by `STYLE.md`.
+  lifetimes, ownership, and invalid states visible as directed by `agent-instructions/STYLE.md`.
 - Check that public interfaces are the smallest interface needed by current callers and that a
   refactor migrates every caller and removes the obsolete path unless an explicit migration plan
   exists.
@@ -97,8 +98,9 @@ change:
 
 Review file organization as part of maintainability, not as a cosmetic concern:
 
-- Apply the source-file and function limits from `STYLE.md`, counting non-blank lines where needed.
-  A file approaching a hard limit must still have a coherent reason to remain intact.
+- Apply the source-file and function limits from `agent-instructions/STYLE.md`, counting non-blank
+  lines where needed. A file approaching a hard limit must still have a coherent reason to remain
+  intact.
 - Prefer modules split by responsibility, behavior, or lifecycle phase. Reject arbitrary line-count
   splits, large files separated only by section comments, and catch-all modules with unrelated
   responsibilities.
@@ -108,7 +110,7 @@ Review file organization as part of maintainability, not as a cosmetic concern:
   and a discoverable public entry point. A split that only moves complexity without clarifying a
   boundary is not an improvement.
 - Confirm utility code is genuinely shared and owned by the narrowest appropriate subsystem. Apply
-  the repository naming rule for general utility modules from `STYLE.md`.
+  the repository naming rule for general utility modules from `agent-instructions/STYLE.md`.
 
 ## Dependencies, manifests, and external code
 
@@ -117,14 +119,14 @@ Review file organization as part of maintainability, not as a cosmetic concern:
   documented, including target and `no_std` support, maintenance, soundness, license, and API fit
   when those factors apply.
 - Check that dependencies are declared in the root workspace table and inherited by members, with
-  versions, features, grouping, and ordering conforming to `STYLE.md`.
+  versions, features, grouping, and ordering conforming to `agent-instructions/STYLE.md`.
 - Review feature selection and default features for unwanted allocation, standard-library,
   platform, or transitive behavior. Ensure a lockfile change is explained by its manifest change.
 - Do not accept kernel code copied from Seele, placeholder crates, or local reimplementations that
   create an avoidable maintenance burden.
-- For distro changes, follow `WORKFLOW.md`: verify recipe ownership, patch placement and ordering,
-  revision updates, clean-tree applicability, generated-artifact exclusions, and affected
-  dependent packages.
+- For distro changes, follow `agent-instructions/WORKFLOW.md`: verify recipe ownership, patch
+  placement and ordering, revision updates, clean-tree applicability, generated-artifact
+  exclusions, and affected dependent packages.
 
 ## ABI and compatibility
 
