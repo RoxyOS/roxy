@@ -31,6 +31,57 @@ pub enum LocalInterruptKind {
     Spurious,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IrqLine(u8);
+
+impl IrqLine {
+    pub const ISA_COUNT: u8 = 16;
+
+    #[must_use]
+    pub const fn new(number: u8) -> Option<Self> {
+        if number < Self::ISA_COUNT {
+            Some(Self(number))
+        } else {
+            None
+        }
+    }
+
+    #[must_use]
+    pub const fn number(self) -> u8 {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Interrupt {
+    Local(LocalInterruptKind),
+    Irq(IrqLine),
+}
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use super::{Architecture, CurrentArchitectureBackend, Interrupt, IrqLine, LocalInterruptKind};
+
+    roxy_test::kernel_test!("roxy-arch::irq-line-validation", irq_line_validation, {
+        assert_eq!(IrqLine::new(0).unwrap().number(), 0);
+        assert_eq!(IrqLine::new(15).unwrap().number(), 15);
+        assert!(IrqLine::new(16).is_none());
+    });
+
+    roxy_test::kernel_test!("roxy-arch::irq-vector-mapping", irq_vector_mapping, {
+        assert_eq!(
+            CurrentArchitectureBackend::interrupt_vector(Interrupt::Irq(IrqLine::new(12).unwrap())),
+            0x2c
+        );
+        assert_eq!(
+            CurrentArchitectureBackend::interrupt_vector(Interrupt::Local(
+                LocalInterruptKind::Timer
+            )),
+            0xf0
+        );
+    });
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct ExceptionContext {
     pub vector: ExceptionVector,
@@ -45,7 +96,7 @@ pub struct ExceptionContext {
 }
 
 pub type ExceptionHandler = fn(&ExceptionContext) -> !;
-pub type LocalInterruptHandler = fn(LocalInterruptKind);
+pub type InterruptDispatcher = fn(Interrupt);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -66,15 +117,15 @@ pub type SyscallHandler = fn(RawSyscall) -> u64;
 pub trait Architecture: sealed::Sealed {
     fn initialize(exception_handler: ExceptionHandler);
 
-    /// Registers the callback invoked by local-interrupt entry stubs.
+    /// Registers the callback invoked by interrupt entry stubs.
     ///
-    /// The backend converts the architecture-specific vector into a `LocalInterruptKind` before
-    /// invoking `dispatcher`. Registration must happen exactly once while interrupts are disabled
-    /// and before interrupts are enabled. The architecture layer owns entry mechanics only; the
-    /// dispatcher owns interrupt policy and handler routing.
-    fn register_local_interrupt_dispatcher(dispatcher: LocalInterruptHandler);
+    /// The backend converts the architecture-specific vector into an `Interrupt` before invoking
+    /// `dispatcher`. Registration must happen exactly once while interrupts are disabled and before
+    /// interrupts are enabled. The architecture layer owns entry mechanics only; the dispatcher
+    /// owns interrupt policy and handler routing.
+    fn register_interrupt_dispatcher(dispatcher: InterruptDispatcher);
 
-    fn local_interrupt_vector(kind: LocalInterruptKind) -> u8;
+    fn interrupt_vector(interrupt: Interrupt) -> u8;
 
     fn current_cpu_id() -> CpuId;
 

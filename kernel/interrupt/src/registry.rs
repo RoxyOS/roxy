@@ -1,8 +1,8 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use roxy_arch::LocalInterruptKind;
+use roxy_arch::{IrqLine, LocalInterruptKind};
 
-use crate::LocalHandler;
+use crate::Handler;
 
 const MAX_HANDLERS: usize = 4;
 
@@ -12,6 +12,7 @@ struct Registry {
     timer: HandlerList,
     error: HandlerList,
     spurious: HandlerList,
+    irq: [HandlerList; IrqLine::ISA_COUNT as usize],
 }
 
 impl Registry {
@@ -20,15 +21,20 @@ impl Registry {
             timer: HandlerList::new(),
             error: HandlerList::new(),
             spurious: HandlerList::new(),
+            irq: [const { HandlerList::new() }; IrqLine::ISA_COUNT as usize],
         }
     }
 
-    fn list(&self, kind: LocalInterruptKind) -> &HandlerList {
+    fn local(&self, kind: LocalInterruptKind) -> &HandlerList {
         match kind {
             LocalInterruptKind::Timer => &self.timer,
             LocalInterruptKind::Error => &self.error,
             LocalInterruptKind::Spurious => &self.spurious,
         }
+    }
+
+    fn irq(&self, line: IrqLine) -> &HandlerList {
+        &self.irq[usize::from(line.number())]
     }
 }
 
@@ -43,20 +49,18 @@ impl HandlerList {
         }
     }
 
-    fn register(&self, handler: LocalHandler) {
+    fn register(&self, handler: Handler) {
         let address = handler as usize;
-
         for slot in &self.slots {
             match slot.compare_exchange(0, address, Ordering::AcqRel, Ordering::Acquire) {
                 Ok(_) => return,
                 Err(existing) if existing == address => {
-                    panic!("local interrupt handler registered twice")
+                    panic!("interrupt handler registered twice")
                 }
                 Err(_) => {}
             }
         }
-
-        panic!("local interrupt handler list is full");
+        panic!("interrupt handler list is full");
     }
 
     fn notify(&self) {
@@ -65,19 +69,27 @@ impl HandlerList {
             if address == 0 {
                 continue;
             }
-            // SAFETY: register stores only valid LocalHandler function pointers in nonzero slots.
-            let handler: LocalHandler = unsafe { core::mem::transmute(address) };
+            // SAFETY: all lists accept only Handler function pointers.
+            let handler: Handler = unsafe { core::mem::transmute(address) };
             handler();
         }
     }
 }
 
-pub(crate) fn register(kind: LocalInterruptKind, handler: LocalHandler) {
-    REGISTRY.list(kind).register(handler);
+pub(crate) fn register_local(kind: LocalInterruptKind, handler: Handler) {
+    REGISTRY.local(kind).register(handler);
 }
 
-pub(crate) fn notify(kind: LocalInterruptKind) {
-    REGISTRY.list(kind).notify();
+pub(crate) fn notify_local(kind: LocalInterruptKind) {
+    REGISTRY.local(kind).notify();
+}
+
+pub(crate) fn register_irq(line: IrqLine, handler: Handler) {
+    REGISTRY.irq(line).register(handler);
+}
+
+pub(crate) fn notify_irq(line: IrqLine) {
+    REGISTRY.irq(line).notify();
 }
 
 #[cfg(feature = "kernel-test")]
@@ -96,6 +108,14 @@ mod tests {
         CALLS.fetch_add(10, Ordering::Relaxed);
     }
 
+    fn irq_first() {
+        CALLS.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn irq_second() {
+        CALLS.fetch_add(10, Ordering::Relaxed);
+    }
+
     roxy_test::kernel_test!(
         "roxy-interrupt::handler-list-notifies-in-order",
         handler_list,
@@ -105,6 +125,21 @@ mod tests {
 
             handlers.register(first);
             handlers.register(second);
+            handlers.notify();
+
+            assert_eq!(CALLS.load(Ordering::Relaxed), 11);
+        }
+    );
+
+    roxy_test::kernel_test!(
+        "roxy-interrupt::irq-handlers-notify-in-order",
+        irq_handlers,
+        {
+            let handlers = HandlerList::new();
+            CALLS.store(0, Ordering::Relaxed);
+
+            handlers.register(irq_first);
+            handlers.register(irq_second);
             handlers.notify();
 
             assert_eq!(CALLS.load(Ordering::Relaxed), 11);

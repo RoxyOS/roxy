@@ -1,14 +1,21 @@
 use core::sync::atomic::Ordering;
 
-use roxy_arch::LocalInterruptKind;
+use roxy_arch::{Interrupt, IrqLine, LocalInterruptKind};
 
 use crate::{
     arch::{CurrentInterruptBackend, InterruptBackend},
     registry,
-    state::INTERRUPT_STATE,
+    state::{self, INTERRUPT_STATE},
 };
 
-pub(crate) fn handle(kind: LocalInterruptKind) {
+pub(crate) fn handle(interrupt: Interrupt) {
+    match interrupt {
+        Interrupt::Local(kind) => dispatch_local(kind),
+        Interrupt::Irq(line) => dispatch_irq(line),
+    }
+}
+
+fn dispatch_local(kind: LocalInterruptKind) {
     {
         let _guard = InterruptGuard::new();
         if requires_eoi(kind) {
@@ -16,7 +23,14 @@ pub(crate) fn handle(kind: LocalInterruptKind) {
         }
     }
 
-    registry::notify(kind);
+    registry::notify_local(kind);
+}
+
+fn dispatch_irq(line: IrqLine) {
+    let _guard = InterruptGuard::new();
+    registry::notify_irq(line);
+    state::record_irq(line);
+    CurrentInterruptBackend::end_of_interrupt();
 }
 
 const fn requires_eoi(kind: LocalInterruptKind) -> bool {

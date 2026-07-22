@@ -8,11 +8,15 @@ use self::x86_64::X86_64Interrupt;
 pub(crate) type CurrentInterruptBackend = X86_64Interrupt;
 
 pub(crate) trait InterruptBackend: sealed::Sealed {
-    fn initialize() -> u32;
+    fn initialize(platform: crate::InterruptPlatformInfo) -> u32;
 
     fn end_of_interrupt();
 
     fn error_flags() -> u8;
+
+    fn mask_irq(line: roxy_arch::IrqLine);
+
+    fn unmask_irq(line: roxy_arch::IrqLine);
 }
 
 mod sealed {

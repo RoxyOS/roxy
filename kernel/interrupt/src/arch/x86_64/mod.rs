@@ -1,10 +1,13 @@
+mod ioapic;
+
 use x2apic::lapic::{LocalApic, LocalApicBuilder};
 
-use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
+use roxy_arch::{Architecture, CurrentArchitectureBackend, Interrupt, IrqLine, LocalInterruptKind};
 use roxy_cpu::CpuLocal;
 use roxy_utils::Lock;
 
 use super::{InterruptBackend, sealed};
+use crate::InterruptPlatformInfo;
 
 static LOCAL_APIC: CpuLocal<Lock<X2Apic>> = CpuLocal::new();
 
@@ -20,7 +23,7 @@ unsafe impl Send for X2Apic {}
 impl sealed::Sealed for X86_64Interrupt {}
 
 impl InterruptBackend for X86_64Interrupt {
-    fn initialize() -> u32 {
+    fn initialize(platform: InterruptPlatformInfo) -> u32 {
         assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
         let mut local_apic = build_local_apic();
@@ -32,6 +35,7 @@ impl InterruptBackend for X86_64Interrupt {
         }
         // SAFETY: The local controller is enabled and uniquely borrowed.
         let hardware_id = unsafe { local_apic.id() };
+        ioapic::initialize(platform, hardware_id);
         LOCAL_APIC.initialize_current(Lock::new(X2Apic { local_apic }));
         hardware_id
     }
@@ -49,20 +53,28 @@ impl InterruptBackend for X86_64Interrupt {
             unsafe { local_apic.error_flags().bits() }
         })
     }
+
+    fn mask_irq(line: IrqLine) {
+        ioapic::mask(line);
+    }
+
+    fn unmask_irq(line: IrqLine) {
+        ioapic::unmask(line);
+    }
 }
 
 fn build_local_apic() -> LocalApic {
     let mut builder = LocalApicBuilder::new();
     builder
-        .timer_vector(usize::from(
-            CurrentArchitectureBackend::local_interrupt_vector(LocalInterruptKind::Timer),
-        ))
-        .error_vector(usize::from(
-            CurrentArchitectureBackend::local_interrupt_vector(LocalInterruptKind::Error),
-        ))
-        .spurious_vector(usize::from(
-            CurrentArchitectureBackend::local_interrupt_vector(LocalInterruptKind::Spurious),
-        ));
+        .timer_vector(usize::from(CurrentArchitectureBackend::interrupt_vector(
+            Interrupt::Local(LocalInterruptKind::Timer),
+        )))
+        .error_vector(usize::from(CurrentArchitectureBackend::interrupt_vector(
+            Interrupt::Local(LocalInterruptKind::Error),
+        )))
+        .spurious_vector(usize::from(CurrentArchitectureBackend::interrupt_vector(
+            Interrupt::Local(LocalInterruptKind::Spurious),
+        )));
     builder.build().unwrap()
 }
 

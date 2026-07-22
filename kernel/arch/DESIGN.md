@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-`roxy-arch` is the architecture boundary for kernel entry, exception and local-interrupt entry
+`roxy-arch` is the architecture boundary for kernel entry, exception and interrupt entry
 stubs, CPU identity, user contexts, and privileged user transitions. Architecture-independent
 crates depend on its contracts instead of accessing registers, descriptor tables, or assembly
 directly.
@@ -15,6 +15,8 @@ ownership rules.
 
 - The selected backend owns architecture entry code, descriptor tables, interrupt vector numbers,
   syscall instructions, and architecture-specific saved-context layout.
+- `Interrupt` distinguishes local-controller events from ISA IRQ lines while keeping one callback
+  contract for IDT entry. x86_64 currently installs IRQ0..IRQ15 at vectors `0x20..0x2f`.
 - `RawSyscall` is the normalized boundary value passed from the backend to the syscall subsystem.
 - `UserContext` describes the user resume state needed by fork and ordinary syscall return.
 - The architecture layer does not own process address spaces, file descriptors, or syscall policy.
@@ -22,8 +24,9 @@ ownership rules.
 ## Invariants and flows
 
 Architecture initialization installs the exception callback and IDT before interrupts are enabled.
-`roxy-interrupt` separately registers its local-interrupt dispatcher through the architecture
-contract, then owns local-controller lifecycle and callback policy after entry dispatch.
+`roxy-interrupt` separately registers its interrupt dispatcher through the architecture contract,
+then owns controller lifecycle and callback policy after entry dispatch. IRQ entry stubs only
+normalize vectors; they do not acknowledge devices or route handlers themselves.
 The x86_64 backend also enables x87/SSE execution, establishes the default FXSAVE state, and makes
 that state type available to the thread subsystem. Long mode guarantees the required x87, FXSAVE,
 and SSE2 capabilities.

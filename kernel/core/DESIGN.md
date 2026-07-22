@@ -13,9 +13,13 @@ The startup sequence is intentionally ordered:
 
 ```text
 clear BSS → serial → BootInfo → architecture → memory → select kernel terminal → time → rootfs
-→ interrupt controller → CPU-local state → periodic timer backend → process → futex → syscall
+→ interrupt controller (ACPI MADT/IOAPIC) → CPU-local state → periodic timer backend → process → futex → syscall
 → scheduler timer handler → start timer → enable interrupts → run/test
 ```
+
+Core converts Limine's HHDM-mapped RSDP pointer back to a physical address, then passes it and the
+HHDM offset to `roxy-interrupt`; it parses the MADT and configures IOAPIC routing before any
+external line is unmasked.
 
 Each subsystem must publish the global state required by later steps before the next step begins.
 In particular, the periodic timer remains masked until time and scheduler handlers are registered,

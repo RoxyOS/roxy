@@ -15,6 +15,7 @@ use core::{alloc::Layout, panic::PanicInfo};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_boot::BootInfo;
+use roxy_interrupt::InterruptPlatformInfo;
 use roxy_serial::e_println;
 
 #[cfg(not(feature = "kernel-test"))]
@@ -33,7 +34,14 @@ pub extern "C" fn _start() -> ! {
     select_kernel_terminal(&boot_info);
     roxy_time::initialize(boot_info.unix_seconds_at_boot);
     rootfs::initialize(&boot_info).expect("initialize root filesystem");
-    let interrupt_init_result = roxy_interrupt::initialize();
+    let rsdp_address = boot_info
+        .rsdp_address
+        .checked_sub(boot_info.hhdm_offset)
+        .expect("Limine RSDP address is outside the HHDM");
+    let interrupt_init_result = roxy_interrupt::initialize(InterruptPlatformInfo {
+        rsdp_address,
+        hhdm_offset: boot_info.hhdm_offset,
+    });
     roxy_cpu::current_cpu().initialize(interrupt_init_result.hardware_id());
     roxy_time::initialize_periodic_timer();
     roxy_process::initialize(initial_fds::inject);

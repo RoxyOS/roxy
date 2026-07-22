@@ -131,6 +131,22 @@ fn create_idt() -> InterruptDescriptorTable {
         idt[interrupt::TIMER_VECTOR].set_handler_fn(interrupt::timer);
         idt[interrupt::ERROR_VECTOR].set_handler_fn(interrupt::error);
         idt[interrupt::SPURIOUS_VECTOR].set_handler_fn(interrupt::spurious);
+        idt[interrupt::IRQ_VECTOR_BASE].set_handler_fn(interrupt::irq0);
+        idt[interrupt::IRQ_VECTOR_BASE + 1].set_handler_fn(interrupt::irq1);
+        idt[interrupt::IRQ_VECTOR_BASE + 2].set_handler_fn(interrupt::irq2);
+        idt[interrupt::IRQ_VECTOR_BASE + 3].set_handler_fn(interrupt::irq3);
+        idt[interrupt::IRQ_VECTOR_BASE + 4].set_handler_fn(interrupt::irq4);
+        idt[interrupt::IRQ_VECTOR_BASE + 5].set_handler_fn(interrupt::irq5);
+        idt[interrupt::IRQ_VECTOR_BASE + 6].set_handler_fn(interrupt::irq6);
+        idt[interrupt::IRQ_VECTOR_BASE + 7].set_handler_fn(interrupt::irq7);
+        idt[interrupt::IRQ_VECTOR_BASE + 8].set_handler_fn(interrupt::irq8);
+        idt[interrupt::IRQ_VECTOR_BASE + 9].set_handler_fn(interrupt::irq9);
+        idt[interrupt::IRQ_VECTOR_BASE + 10].set_handler_fn(interrupt::irq10);
+        idt[interrupt::IRQ_VECTOR_BASE + 11].set_handler_fn(interrupt::irq11);
+        idt[interrupt::IRQ_VECTOR_BASE + 12].set_handler_fn(interrupt::irq12);
+        idt[interrupt::IRQ_VECTOR_BASE + 13].set_handler_fn(interrupt::irq13);
+        idt[interrupt::IRQ_VECTOR_BASE + 14].set_handler_fn(interrupt::irq14);
+        idt[interrupt::IRQ_VECTOR_BASE + 15].set_handler_fn(interrupt::irq15);
 
         // SAFETY: The configured IST entry points at the static double-fault stack.
         unsafe {

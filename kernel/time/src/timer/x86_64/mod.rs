@@ -2,7 +2,7 @@ mod pit;
 
 use x2apic::lapic::{LocalApic, LocalApicBuilder, TimerDivide, TimerMode};
 
-use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
+use roxy_arch::{Architecture, CurrentArchitectureBackend, Interrupt, LocalInterruptKind};
 use roxy_cpu::CpuLocal;
 use roxy_utils::Lock;
 
@@ -48,15 +48,15 @@ impl TimerBackend for X86_64Timer {
 fn build_local_apic() -> LocalApic {
     let mut builder = LocalApicBuilder::new();
     builder
-        .timer_vector(usize::from(
-            CurrentArchitectureBackend::local_interrupt_vector(LocalInterruptKind::Timer),
-        ))
-        .error_vector(usize::from(
-            CurrentArchitectureBackend::local_interrupt_vector(LocalInterruptKind::Error),
-        ))
-        .spurious_vector(usize::from(
-            CurrentArchitectureBackend::local_interrupt_vector(LocalInterruptKind::Spurious),
-        ))
+        .timer_vector(usize::from(CurrentArchitectureBackend::interrupt_vector(
+            Interrupt::Local(LocalInterruptKind::Timer),
+        )))
+        .error_vector(usize::from(CurrentArchitectureBackend::interrupt_vector(
+            Interrupt::Local(LocalInterruptKind::Error),
+        )))
+        .spurious_vector(usize::from(CurrentArchitectureBackend::interrupt_vector(
+            Interrupt::Local(LocalInterruptKind::Spurious),
+        )))
         .timer_mode(TimerMode::OneShot)
         .timer_divide(TimerDivide::Div16)
         .timer_initial(u32::MAX);

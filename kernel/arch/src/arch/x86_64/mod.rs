@@ -10,7 +10,7 @@ pub use syscall::X86_64UserContext;
 
 use ::x86_64::{VirtAddr, registers::model_specific::FsBase};
 
-use crate::{CpuId, ExceptionHandler, LocalInterruptHandler, LocalInterruptKind, SyscallHandler};
+use crate::{CpuId, ExceptionHandler, Interrupt, InterruptDispatcher, SyscallHandler};
 
 use super::{Architecture, sealed};
 
@@ -23,12 +23,12 @@ impl Architecture for X86_64 {
         init::initialize(exception_handler);
     }
 
-    fn register_local_interrupt_dispatcher(dispatcher: LocalInterruptHandler) {
+    fn register_interrupt_dispatcher(dispatcher: InterruptDispatcher) {
         interrupt::register(dispatcher);
     }
 
-    fn local_interrupt_vector(kind: LocalInterruptKind) -> u8 {
-        interrupt::vector(kind)
+    fn interrupt_vector(interrupt: Interrupt) -> u8 {
+        interrupt::vector(interrupt)
     }
 
     fn current_cpu_id() -> CpuId {
