@@ -55,8 +55,8 @@ impl TerminalDevice for FbTerminal {
                 return Ok(count);
             }
 
-            assert!(CurrentArchitectureBackend::interrupts_enabled());
-            CurrentArchitectureBackend::halt();
+            assert!(!CurrentArchitectureBackend::interrupts_enabled());
+            CurrentArchitectureBackend::wait_for_interrupt();
         }
     }
 

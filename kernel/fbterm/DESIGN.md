@@ -29,11 +29,12 @@ the framebuffer console itself only owns output rendering.
 
 Only Limine RGB 32-bit modes are accepted. Color masks determine packed foreground/background
 pixels. Reads delegate directly to `roxy-ps2` and return its raw ASCII byte stream. The endpoint
-polls until at least one byte is available, halting the CPU between empty checks so IRQs can make
-progress. It does not echo, buffer lines, translate newlines, or hold the console lock while
-waiting. Full
-ANSI parsing, Unicode, alternate input devices, PTYs, and diagnostic mirroring are outside the
-current contract.
+polls until at least one byte is available. Empty reads run with interrupts disabled and use the
+architecture's atomic interrupt wait, which temporarily enables delivery while halted and restores
+the disabled state before rechecking the queue. This permits keyboard IRQ delivery without making
+the syscall path interruptible while it holds kernel locks. It does not echo, buffer lines,
+translate newlines, or hold the console lock while waiting. Full ANSI parsing, Unicode, alternate
+input devices, PTYs, and diagnostic mirroring are outside the current contract.
 
 ## Rendering model
 
