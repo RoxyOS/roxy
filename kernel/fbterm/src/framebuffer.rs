@@ -91,6 +91,36 @@ impl Framebuffer {
         }
     }
 
+    pub(crate) fn xor_rect(
+        &mut self,
+        left: usize,
+        top: usize,
+        width: usize,
+        height: usize,
+        mask: u32,
+    ) {
+        let right = left
+            .checked_add(width)
+            .expect("framebuffer rectangle overflow");
+        let bottom = top
+            .checked_add(height)
+            .expect("framebuffer rectangle overflow");
+        assert!(right <= self.width && bottom <= self.height);
+
+        for pixel_y in top..bottom {
+            for pixel_x in left..right {
+                let offset = pixel_y * self.pitch + pixel_x * BYTES_PER_PIXEL;
+
+                // SAFETY: construction validates the full pitch * height mapping, and the
+                // rectangle assertions keep this four-byte pixel inside its visible row.
+                unsafe {
+                    let pixel = ptr::read_unaligned(self.address.add(offset).cast::<u32>());
+                    ptr::write_unaligned(self.address.add(offset).cast::<u32>(), pixel ^ mask);
+                }
+            }
+        }
+    }
+
     pub(crate) fn scroll_rows_up(
         &mut self,
         pixel_rows: usize,

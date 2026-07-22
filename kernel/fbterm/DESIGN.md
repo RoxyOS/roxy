@@ -49,17 +49,20 @@ grid's total `columns` and `rows` from the framebuffer dimensions; a partial cel
 bottom edge is outside the text grid. The renderer owns the foreground and background colors and
 adapts Terminus's binary glyph output to pixels inside one selected cell. The adapter remains
 private to the rendering layer, so neither the framebuffer boundary nor the terminal state machine
-depends on third-party graphics types. The renderer can draw or clear a cell and scroll the
-complete text region upward by one cell row. It does not own a current cell, advance a cursor, or
-interpret control bytes.
+depends on third-party graphics types. The renderer can draw or clear a cell, reversibly invert a
+selected cell for cursor display, and scroll the complete text region upward by one cell row. It
+does not own a current cell, advance a cursor, or interpret control bytes.
 
 `Console` is the byte-level terminal state machine. It owns only the current cursor `column` and
 `row`, while querying `TextRenderer` for the grid bounds. Printable ASCII draws into the current
-cell and advances the cursor. Reaching the final column wraps to the next row. LF selects column
-zero of the next row, CR selects column zero without changing rows, backspace moves left and clears
-that cell when possible, and tab emits spaces until the next eight-column stop. Moving beyond the
-last row asks `TextRenderer` to scroll one cell row and leaves the cursor on the new final row.
-Ignored bytes neither draw nor move the cursor.
+cell and advances the cursor. The current cell is shown as a reversible full-cell inverse cursor
+while the console is idle; batched writes hide it before processing and restore it at the final
+position. Reaching the final column wraps to the next row. LF selects column zero of the next row,
+CR selects column zero without changing rows, backspace moves left and clears that cell when
+possible, and tab emits spaces until the next eight-column stop. Moving beyond the last row asks
+`TextRenderer` to scroll one cell row and leaves the cursor on the new final row. Cursor inversion
+uses the renderer's foreground/background XOR mask, so moving away from a cell restores its glyph
+instead of clearing it. Ignored bytes neither draw nor move the cursor.
 
 The output path is therefore:
 

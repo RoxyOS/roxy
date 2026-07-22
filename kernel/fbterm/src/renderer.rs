@@ -88,6 +88,18 @@ impl TextRenderer {
         );
     }
 
+    /// Removes the cursor when this cell has one, or draws it when it is absent.
+    pub(crate) fn toggle_cursor(&mut self, column: usize, row: usize) {
+        assert!(column < self.columns && row < self.rows);
+        self.framebuffer.xor_rect(
+            column * GLYPH_WIDTH,
+            row * GLYPH_HEIGHT,
+            GLYPH_WIDTH,
+            GLYPH_HEIGHT,
+            self.foreground ^ self.background,
+        );
+    }
+
     pub(crate) fn scroll_line(&mut self) {
         let text_height = self.rows * GLYPH_HEIGHT;
 

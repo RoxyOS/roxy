@@ -7,7 +7,9 @@ pub(crate) struct Console {
 }
 
 impl Console {
-    pub(crate) fn new(renderer: TextRenderer) -> Self {
+    pub(crate) fn new(mut renderer: TextRenderer) -> Self {
+        renderer.toggle_cursor(0, 0);
+
         Self {
             renderer,
             column: 0,
@@ -16,6 +18,12 @@ impl Console {
     }
 
     pub(crate) fn write(&mut self, input: &[u8]) {
+        if input.is_empty() {
+            return;
+        }
+
+        self.toggle_cursor();
+
         for byte in input {
             match byte {
                 b'\n' => self.newline(),
@@ -26,6 +34,12 @@ impl Console {
                 _ => {}
             }
         }
+
+        self.toggle_cursor();
+    }
+
+    fn toggle_cursor(&mut self) {
+        self.renderer.toggle_cursor(self.column, self.row);
     }
 
     fn put(&mut self, byte: u8) {
@@ -65,13 +79,16 @@ impl Console {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use alloc::vec;
+    use alloc::{vec, vec::Vec};
 
     use roxy_boot::FramebufferInfo;
     use roxy_test::kernel_test;
 
     use super::Console;
-    use crate::{framebuffer::Framebuffer, renderer::TextRenderer};
+    use crate::{
+        framebuffer::Framebuffer,
+        renderer::{GLYPH_HEIGHT, GLYPH_WIDTH, TextRenderer},
+    };
 
     fn console(storage: &mut [u8], width: u64, height: u64) -> Console {
         let info = FramebufferInfo {
@@ -92,6 +109,48 @@ mod tests {
 
         Console::new(TextRenderer::new(framebuffer).unwrap())
     }
+
+    fn cell_bytes(storage: &[u8], pitch: usize, column: usize, row: usize) -> Vec<u8> {
+        let left = column * GLYPH_WIDTH * 4;
+        let top = row * GLYPH_HEIGHT;
+
+        (top..top + GLYPH_HEIGHT)
+            .flat_map(|pixel_row| {
+                storage[pixel_row * pitch + left..pixel_row * pitch + left + 32]
+                    .iter()
+                    .copied()
+            })
+            .collect()
+    }
+
+    fn is_solid_foreground(storage: &[u8], pitch: usize, column: usize, row: usize) -> bool {
+        cell_bytes(storage, pitch, column, row)
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|pixel| *pixel == [0xff, 0xff, 0xff, 0])
+    }
+
+    kernel_test!("roxy-fbterm::cursor-initial", shows_current_cell, {
+        let mut storage = vec![0u8; 32 * 64];
+        let mut console = console(&mut storage, 16, 32);
+
+        assert!(is_solid_foreground(&storage, 64, 0, 0));
+        console.write(b"A");
+        assert!(!is_solid_foreground(&storage, 64, 0, 0));
+        assert!(is_solid_foreground(&storage, 64, 1, 0));
+    });
+
+    kernel_test!("roxy-fbterm::cursor-restore", restores_cell_after_move, {
+        let mut storage = vec![0u8; 32 * 64];
+        let mut console = console(&mut storage, 16, 32);
+
+        console.write(b"A");
+        let glyph = cell_bytes(&storage, 64, 0, 0);
+        console.write(b"\r\n");
+
+        assert_eq!(cell_bytes(&storage, 64, 0, 0), glyph);
+    });
 
     kernel_test!("roxy-fbterm::controls", updates_cursor, {
         let mut storage = vec![0u8; 32 * 64];
