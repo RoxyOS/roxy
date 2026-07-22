@@ -14,9 +14,12 @@ drivers, timekeeping, or scheduler state.
 ## Ownership and boundaries
 
 The x86_64 backend owns local APIC operations and parses the ACPI MADT to configure the first IOAPIC
-covering ISA IRQ0..IRQ15. Redirection entries use fixed vectors, physical BSP delivery, edge/high
-polarity, and remain masked until a consumer unmasks a line. The legacy PIC is masked when APIC mode
-is selected. Hardware types from `acpi`, `x2apic`, and `x86_64` remain private to this backend.
+covering ISA IRQ0..IRQ15. The MADT's reserved physical IOAPIC page is mapped through
+`roxy_memory::map_mmio` before `x2apic::ioapic::IoApic` is constructed; the interrupt backend does
+not assume that Limine's HHDM includes device MMIO. Redirection entries use fixed vectors, physical
+BSP delivery, edge/high polarity, and remain masked until a consumer unmasks a line. The legacy PIC
+is masked when APIC mode is selected. Hardware types from `acpi`, `x2apic`, and `x86_64` remain
+private to this backend.
 
 `initialize` enables the local controller with timer delivery masked and returns the hardware CPU
 identifier for `roxy-cpu`. Consumers register local handlers with `register_local_handler` and

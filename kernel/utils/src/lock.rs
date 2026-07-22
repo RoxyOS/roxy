@@ -36,6 +36,7 @@ impl<T: ?Sized> Lock<T> {
     pub fn try_lock(&self) -> Option<LockGuard<'_, T>> {
         let preemption = preemption::disable();
         let guard = self.inner.try_lock()?;
+
         Some(LockGuard {
             guard,
             _preemption: preemption,

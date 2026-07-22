@@ -21,9 +21,11 @@ impl Decoder {
                 return None;
             }
         };
+
         if matches!(event.state, pc_keyboard::KeyState::Up) {
             return None;
         }
+
         match self.keyboard.process_keyevent(event) {
             Some(DecodedKey::Unicode(character)) if character.is_ascii() => Some(character as u8),
             _ => None,

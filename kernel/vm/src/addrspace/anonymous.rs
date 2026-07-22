@@ -116,9 +116,11 @@ impl AddrSpace {
 
         for page in self.pages.keys().rev() {
             let address = page.start_address().as_u64();
+
             if address >= end || address < ANONYMOUS_START {
                 continue;
             }
+
             if let Some(start) = end.checked_sub(bytes)
                 && start > address
             {
@@ -128,6 +130,7 @@ impl AddrSpace {
         }
 
         let start = end.checked_sub(bytes).ok_or(VmError::OutOfMemory)?;
+
         if start < ANONYMOUS_START {
             return Err(VmError::OutOfMemory);
         }

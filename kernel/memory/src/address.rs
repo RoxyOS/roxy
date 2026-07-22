@@ -55,6 +55,7 @@ impl VirtualAddress {
     pub const fn new(value: u64) -> Option<Self> {
         let sign = (value >> 47) & 1;
         let upper = value >> 48;
+
         if (sign == 0 && upper == 0) || (sign == 1 && upper == 0xffff) {
             Some(Self(value))
         } else {

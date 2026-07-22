@@ -80,6 +80,7 @@ impl I8042FirstPort {
                 // SAFETY: The output-full status bit guarantees a byte is available at 0x60.
                 return Ok(unsafe { self.data.read() });
             }
+
             spin_loop();
         }
         Err(InitError::Timeout)
@@ -90,6 +91,7 @@ impl I8042FirstPort {
             if self.read_status() & STATUS_INPUT_FULL == 0 {
                 return Ok(());
             }
+
             spin_loop();
         }
         Err(InitError::Timeout)
@@ -109,6 +111,7 @@ impl I8042FirstPort {
         self.wait_input_clear()?;
         // SAFETY: The command port is fixed by the i8042 specification and exclusively owned here.
         unsafe { self.command.write(command) };
+
         Ok(())
     }
 
@@ -116,6 +119,7 @@ impl I8042FirstPort {
         self.wait_input_clear()?;
         // SAFETY: The data port is fixed by the i8042 specification and exclusively owned here.
         unsafe { self.data.write(data) };
+
         Ok(())
     }
 
@@ -149,6 +153,7 @@ impl I8042FirstPort {
                     .then_some(())
                     .ok_or(InitError::EnableFailed);
             }
+
             spin_loop();
         }
 

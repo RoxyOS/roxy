@@ -35,6 +35,7 @@ impl AddrSpace {
             let PageState::Mapped { frame, permissions } = state else {
                 return Err(VmError::NotMapped);
             };
+
             if !permissions.writable() {
                 return Err(VmError::PermissionDenied);
             }
@@ -68,6 +69,7 @@ fn visit_chunks(
     mut visitor: impl FnMut(UserPage, usize, core::ops::Range<usize>) -> Result<(), VmError>,
 ) -> Result<(), VmError> {
     let mut consumed = 0;
+
     while consumed < length {
         let current = address
             .checked_add(u64::try_from(consumed).unwrap())

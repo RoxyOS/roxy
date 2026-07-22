@@ -48,6 +48,7 @@ impl Scheduler {
     /// scheduler lock; no context switch occurs in this method.
     pub(super) fn prepare_dispatch(&mut self) -> ScheduleResult {
         let reaped = self.reap_pending();
+
         if self.entries.is_empty() {
             return ScheduleResult {
                 pending_switch: None,
@@ -99,6 +100,7 @@ impl Scheduler {
                 exiting: None,
             };
         };
+
         if next == current {
             return ScheduleResult {
                 pending_switch: None,
@@ -140,10 +142,12 @@ impl Scheduler {
             return false;
         };
         let entry = self.entry(index);
+
         if entry.state != ThreadState::Blocked {
             return false;
         }
         entry.state = ThreadState::Runnable;
+
         true
     }
 

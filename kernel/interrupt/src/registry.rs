@@ -51,6 +51,7 @@ impl HandlerList {
 
     fn register(&self, handler: Handler) {
         let address = handler as usize;
+
         for slot in &self.slots {
             match slot.compare_exchange(0, address, Ordering::AcqRel, Ordering::Acquire) {
                 Ok(_) => return,
@@ -66,6 +67,7 @@ impl HandlerList {
     fn notify(&self) {
         for slot in &self.slots {
             let address = slot.load(Ordering::Acquire);
+
             if address == 0 {
                 continue;
             }

@@ -49,6 +49,7 @@ impl SegmentMapping<'_> {
         let page_count = page_count(start, end)?;
         let memory_size = usize::try_from(size).map_err(|_| ElfError::InvalidSegment)?;
         let region = UserRegion::new(start, page_count).ok_or(ElfError::InvalidSegment)?;
+
         Ok(Some(Self {
             address,
             memory_size,

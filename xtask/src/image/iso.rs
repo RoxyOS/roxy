@@ -23,6 +23,7 @@ pub(super) fn build(
     stage_limine(&staging, limine)?;
     create(&staging, &output)?;
     fs::remove_dir_all(staging).context("failed to remove the ISO staging directory")?;
+
     Ok(output)
 }
 
@@ -51,6 +52,7 @@ fn create(staging: &Path, output: &Path) -> Result<()> {
     crate::cmd!(
         "xorriso -as mkisofs -V ROXY --efi-boot boot/limine/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label {staging} -o {output}"
     )?;
+
     Ok(())
 }
 
@@ -59,12 +61,14 @@ fn reset_directory(path: &Path) -> Result<()> {
         fs::remove_dir_all(path).context("failed to remove the ISO staging directory")?;
     }
     fs::create_dir_all(path).context("failed to create the ISO staging directory")?;
+
     Ok(())
 }
 
 fn copy(source: &Path, destination: &Path) -> Result<()> {
     fs::create_dir_all(destination.parent().unwrap()).context("failed to create ISO directory")?;
     fs::copy(source, destination).context("failed to stage ISO file")?;
+
     Ok(())
 }
 

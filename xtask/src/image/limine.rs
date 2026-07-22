@@ -6,6 +6,7 @@ const REVISION: &str = "5be26a73d7b7b4d4477d18be94e1d16e615adf56";
 
 pub(super) fn prepare(root: &Path) -> Result<PathBuf> {
     let cache = root.join("cache/limine");
+
     if assets_exist(&cache) {
         return Ok(cache);
     }
@@ -13,6 +14,7 @@ pub(super) fn prepare(root: &Path) -> Result<PathBuf> {
     reset_cache(&cache)?;
     fetch(&cache)?;
     ensure!(assets_exist(&cache), "fixed Limine revision is incomplete");
+
     Ok(cache)
 }
 
@@ -28,6 +30,7 @@ fn reset_cache(cache: &Path) -> Result<()> {
         fs::remove_dir_all(cache).context("failed to remove incomplete Limine cache")?;
     }
     fs::create_dir_all(cache).context("failed to create Limine cache directory")?;
+
     Ok(())
 }
 
@@ -39,5 +42,6 @@ fn fetch(cache: &Path) -> Result<()> {
     )?;
     crate::cmd!("git -C {cache} fetch --depth 1 origin {REVISION}")?;
     crate::cmd!("git -C {cache} checkout --quiet --detach FETCH_HEAD")?;
+
     Ok(())
 }

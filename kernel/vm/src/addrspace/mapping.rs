@@ -15,6 +15,7 @@ impl AddrSpace {
         permissions: Permissions,
     ) -> Result<(), VmError> {
         self.ensure_available(region)?;
+
         for (mapped, page) in region.pages().enumerate() {
             if let Err(error) = self.map_zeroed_page(page, permissions) {
                 self.rollback(region, mapped);
@@ -52,6 +53,7 @@ impl AddrSpace {
 
         self.pages
             .insert(page, PageState::Mapped { frame, permissions });
+
         Ok(())
     }
 

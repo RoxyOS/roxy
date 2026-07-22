@@ -69,6 +69,7 @@ impl KernelAllocator {
 unsafe impl GlobalAlloc for KernelAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.attempts.fetch_add(1, Ordering::Relaxed);
+
         if !self.initialized.load(Ordering::Acquire) {
             return ptr::null_mut();
         }

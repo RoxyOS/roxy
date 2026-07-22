@@ -29,6 +29,7 @@ impl FileHandle for Ext4File {
         }
 
         let _mutation = self.mutation.lock();
+
         if self.options.append {
             self.file
                 .seek_to(self.file.inode().size_in_bytes())

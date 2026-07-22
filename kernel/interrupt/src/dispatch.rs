@@ -18,6 +18,7 @@ pub(crate) fn handle(interrupt: Interrupt) {
 fn dispatch_local(kind: LocalInterruptKind) {
     {
         let _guard = InterruptGuard::new();
+
         if requires_eoi(kind) {
             CurrentInterruptBackend::end_of_interrupt();
         }
@@ -82,6 +83,7 @@ mod tests {
                 .load(Ordering::Relaxed),
             0
         );
+
         {
             let _outer = InterruptGuard::new();
             assert_eq!(
@@ -91,6 +93,7 @@ mod tests {
                     .load(Ordering::Relaxed),
                 1
             );
+
             {
                 let _inner = InterruptGuard::new();
                 assert_eq!(
@@ -101,6 +104,7 @@ mod tests {
                     2
                 );
             }
+
             assert_eq!(
                 INTERRUPT_STATE
                     .get()
@@ -109,6 +113,7 @@ mod tests {
                 1
             );
         }
+
         assert_eq!(
             INTERRUPT_STATE
                 .get()

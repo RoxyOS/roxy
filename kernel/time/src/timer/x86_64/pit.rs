@@ -27,6 +27,7 @@ pub(super) fn wait_calibration_window() {
         channel.write(low);
         channel.write(high);
         speaker.write((original & !SPEAKER_DATA) | GATE_TWO);
+
         while speaker.read() & OUTPUT_TWO == 0 {
             spin_loop();
         }

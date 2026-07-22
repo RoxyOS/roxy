@@ -30,6 +30,7 @@ impl Thread {
     pub fn new(entry: fn() -> !) -> Result<Self, ThreadCreateError> {
         let kernel_stack = KernelStack::new().ok_or(ThreadCreateError::OutOfMemory)?;
         let context = SavedContext::new(&kernel_stack, entry);
+
         Ok(Self {
             id: ThreadId::new(),
             kernel_stack,
@@ -52,6 +53,7 @@ impl Thread {
         let kernel_stack = KernelStack::new().ok_or(ThreadCreateError::OutOfMemory)?;
         let context =
             SavedContext::new_user(&kernel_stack, user_instruction_pointer, user_stack_pointer);
+
         Ok(Self {
             id: ThreadId::new(),
             kernel_stack,
@@ -67,6 +69,7 @@ impl Thread {
     pub fn new_user_resume(context: UserContext) -> Result<Self, ThreadCreateError> {
         let kernel_stack = KernelStack::new().ok_or(ThreadCreateError::OutOfMemory)?;
         let context = SavedContext::new_user_resume(&kernel_stack, context);
+
         Ok(Self {
             id: ThreadId::new(),
             kernel_stack,

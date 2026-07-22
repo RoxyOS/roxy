@@ -49,6 +49,7 @@ fn handle_irq() {
 pub fn inject_for_test(input_bytes: &[u8]) {
     CurrentArchitectureBackend::without_interrupts(|| {
         let mut input = KEYBOARD_INPUT.lock();
+
         for &byte in input_bytes {
             input.enqueue_byte(byte);
         }

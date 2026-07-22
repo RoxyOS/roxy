@@ -27,6 +27,7 @@ fn kernel_path() -> Result<PathBuf> {
         "kernel ELF was not produced at {}",
         kernel.display()
     );
+
     Ok(kernel)
 }
 

@@ -44,6 +44,7 @@ impl SerialDevice {
         };
 
         let _ = uart.write_fmt(arguments);
+
         true
     }
 }
@@ -65,6 +66,7 @@ pub(super) fn emergency_write(arguments: fmt::Arguments<'_>) {
 
     // SAFETY: This fallback is used only with interrupts disabled after normal
     // logging became unavailable. No concurrent COM1 access can occur locally.
+
     if let Ok(mut serial) = unsafe { Com1::new_port(0x3f8, Config::default()) } {
         let _ = serial.write_fmt(arguments);
     }

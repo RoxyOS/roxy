@@ -10,7 +10,7 @@ use x86_64::{
 };
 
 use crate::{
-    OwnedFrame, VirtualAddress, frame,
+    OwnedFrame, PhysicalAddress, VirtualAddress, frame,
     tlb::{self, TlbInvalidation},
 };
 
@@ -39,6 +39,14 @@ impl KernelPageTableBackend for X86_64KernelPageTableBackend {
     fn map_page(address: VirtualAddress, frame: OwnedFrame, flags: MappingFlags) {
         MAPPER.get().unwrap().lock().map_page(address, frame, flags);
     }
+
+    fn map_mmio_page(address: VirtualAddress, physical_address: PhysicalAddress) {
+        MAPPER
+            .get()
+            .unwrap()
+            .lock()
+            .map_mmio_page(address, physical_address);
+    }
 }
 
 impl X86_64KernelPageTableBackend {
@@ -57,24 +65,42 @@ impl X86_64KernelPageTableBackend {
     }
 
     fn map_page(&mut self, address: VirtualAddress, frame: OwnedFrame, flags: MappingFlags) {
+        let physical_address = frame.start_address();
+        let physical_frame =
+            PhysFrame::containing_address(x86_64::PhysAddr::new(physical_address.as_u64()));
+        self.map_physical_page(address, physical_frame, flags);
+        frame.transfer_to_mapping();
+    }
+
+    fn map_mmio_page(&mut self, address: VirtualAddress, physical_address: PhysicalAddress) {
+        let physical_frame =
+            PhysFrame::containing_address(x86_64::PhysAddr::new(physical_address.as_u64()));
+        self.map_physical_page(
+            address,
+            physical_frame,
+            MappingFlags::WRITABLE | MappingFlags::UNCACHEABLE,
+        );
+    }
+
+    fn map_physical_page(
+        &mut self,
+        address: VirtualAddress,
+        physical_frame: PhysFrame<Size4KiB>,
+        flags: MappingFlags,
+    ) {
         let page = Page::<Size4KiB>::containing_address(VirtAddr::new(address.as_u64()));
         assert!(
             self.mapper.translate_page(page).is_err(),
             "virtual page is already mapped"
         );
-
-        let physical_address = frame.start_address();
-        let physical_frame =
-            PhysFrame::containing_address(x86_64::PhysAddr::new(physical_address.as_u64()));
         let flags = page_table_flags(flags);
 
-        // SAFETY: The page is unmapped and the caller transfers unique ownership of the frame.
+        // SAFETY: The page is unmapped and the physical frame remains valid for the mapping.
         let flush = unsafe {
             self.mapper
                 .map_to(page, physical_frame, flags, &mut PageTableAllocator)
         }
         .unwrap();
-        frame.transfer_to_mapping();
         flush.ignore();
         tlb::invalidate(TlbInvalidation::Page(address));
     }
@@ -114,6 +140,10 @@ fn page_table_flags(flags: MappingFlags) -> PageTableFlags {
         PageTableFlags::USER_ACCESSIBLE,
         flags.contains(MappingFlags::USER),
     );
+    page_flags.set(
+        PageTableFlags::NO_CACHE,
+        flags.contains(MappingFlags::UNCACHEABLE),
+    );
     page_flags
 }
 
@@ -125,6 +155,7 @@ unsafe impl FrameAllocator<Size4KiB> for PageTableAllocator {
         let frame = frame::allocate()?;
         let address = frame.start_address();
         frame.transfer_to_mapping();
+
         Some(PhysFrame::containing_address(x86_64::PhysAddr::new(
             address.as_u64(),
         )))

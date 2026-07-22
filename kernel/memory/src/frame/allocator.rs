@@ -103,6 +103,7 @@ pub(super) fn allocate() -> Option<FrameIndex> {
     ALLOCATION_ATTEMPTS.fetch_add(1, Ordering::Relaxed);
     let frame = ALLOCATOR.get().unwrap().lock().allocate()?;
     poison(frame, ALLOCATED_POISON);
+
     Some(frame)
 }
 

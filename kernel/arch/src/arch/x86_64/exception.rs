@@ -34,6 +34,7 @@ fn dispatch(
     };
 
     let address = HANDLER.load(Ordering::Acquire);
+
     if address == 0 {
         X86_64::halt_forever();
     }

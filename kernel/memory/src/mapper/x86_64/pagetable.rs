@@ -61,6 +61,7 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
 
         // SAFETY: root_table is a valid, uniquely owned PML4 and hhdm_offset maps all frames.
         let mapper = unsafe { OffsetPageTable::new(root_table, VirtAddr::new(hhdm_offset())) };
+
         Ok(Self {
             mapper,
             root,
@@ -115,6 +116,7 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
         }
         .map_err(|error| map_error(&error))?;
         flush.ignore();
+
         Ok(())
     }
 
@@ -123,6 +125,7 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
             .mapper
             .unmap(page_from(page))
             .map_err(|error| unmap_error(&error))?;
+
         if flush_active {
             flush.flush();
         } else {
@@ -143,6 +146,7 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
                 .update_flags(page_from(page), user_page_flags(permissions))
         }
         .map_err(|error| flag_error(&error))?;
+
         if flush_active {
             flush.flush();
         } else {
@@ -243,6 +247,7 @@ unsafe impl FrameAllocator<Size4KiB> for TableFrameAllocator<'_> {
         frame.zero();
         let physical = frame.start_address();
         self.frames.push(frame);
+
         Some(PhysFrame::containing_address(PhysAddr::new(
             physical.as_u64(),
         )))

@@ -9,6 +9,7 @@ use x86_64::instructions::port::Port;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, Interrupt, IrqLine};
 use roxy_cpu::CpuLocal;
+use roxy_memory::PhysicalAddress;
 use roxy_utils::Lock;
 
 use crate::InterruptPlatformInfo;
@@ -61,7 +62,7 @@ pub(super) fn initialize(platform: InterruptPlatformInfo, destination: u32) {
         unsafe { AcpiTables::from_rsdp(handler, rsdp_address) }.expect("parse ACPI tables");
     let madt = tables.find_table::<Madt>().expect("ACPI MADT is missing");
 
-    let mut io_apic = find_io_apic(madt.get(), platform.hhdm_offset);
+    let mut io_apic = find_io_apic(madt.get());
 
     configure_redirection_table(&mut io_apic, destination);
     mask_legacy_pic();
@@ -69,8 +70,9 @@ pub(super) fn initialize(platform: InterruptPlatformInfo, destination: u32) {
     IO_APIC.initialize_current(Lock::new(io_apic));
 }
 
-fn find_io_apic(madt: core::pin::Pin<&Madt>, hhdm_offset: u64) -> ConfiguredIoApic {
+fn find_io_apic(madt: core::pin::Pin<&Madt>) -> ConfiguredIoApic {
     let mut selected = None;
+
     for entry in madt.entries() {
         match entry {
             MadtEntry::IoApic(entry) => {
@@ -78,10 +80,11 @@ fn find_io_apic(madt: core::pin::Pin<&Madt>, hhdm_offset: u64) -> ConfiguredIoAp
                 let gsi_base = entry.global_system_interrupt_base;
 
                 if gsi_base == 0 && selected.is_none() {
-                    let mapped_address = hhdm_offset
-                        .checked_add(u64::from(address))
-                        .expect("IOAPIC address overflows HHDM");
+                    let physical_address =
+                        PhysicalAddress::new(u64::from(address)).expect("invalid IOAPIC address");
+                    let mapped_address = roxy_memory::map_mmio(physical_address).as_u64();
 
+                    // SAFETY: map_mmio establishes a writable, uncacheable mapping for this page.
                     let mut io_apic = unsafe { IoApic::new(mapped_address) };
                     let max_entry = unsafe { io_apic.max_table_entry() };
 

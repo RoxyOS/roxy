@@ -45,6 +45,28 @@ pub fn initialize(boot_info: &BootInfo) {
     heap::initialize_permanent();
 }
 
+/// Maps one page of device MMIO into the higher-half direct map.
+///
+/// The physical address must be page-aligned and must remain valid for the kernel lifetime.
+///
+/// # Panics
+///
+/// Panics when the address is unaligned, not representable in the HHDM, or already mapped.
+#[must_use]
+pub fn map_mmio(physical_address: PhysicalAddress) -> VirtualAddress {
+    assert!(
+        physical_address.as_u64().is_multiple_of(PAGE_SIZE),
+        "MMIO physical address is not page-aligned"
+    );
+    let virtual_address = frame::hhdm_offset()
+        .checked_add(physical_address.as_u64())
+        .and_then(VirtualAddress::new)
+        .expect("MMIO physical address is outside the HHDM");
+
+    CurrentKernelPageTableBackend::map_mmio_page(virtual_address, physical_address);
+    virtual_address
+}
+
 #[must_use]
 pub fn statistics() -> MemoryStats {
     let (total_frames, allocated_frames, frame_attempts) = frame::statistics();

@@ -32,6 +32,7 @@ impl ResolvedPath {
     /// Resolves raw absolute or process-relative path bytes into a normalized absolute path.
     pub fn resolve(path: impl AsRef<[u8]>) -> Result<Self, VfsError> {
         let path = path.as_ref();
+
         if path.is_empty() || path.contains(&0) {
             return Err(VfsError::InvalidPath);
         }
@@ -54,9 +55,11 @@ impl ResolvedPath {
     /// `ResolvedPath` is always absolute.
     pub(crate) fn with_base(path: impl AsRef<[u8]>, base: &Self) -> Result<Self, VfsError> {
         let path = path.as_ref();
+
         if path.first() == Some(&b'/') {
             return Self::normalize(path, false);
         }
+
         if path.contains(&0) {
             return Err(VfsError::InvalidPath);
         }
@@ -70,6 +73,7 @@ impl ResolvedPath {
 
     fn normalize(path: &[u8], stay_at_root: bool) -> Result<Self, VfsError> {
         let mut components: Vec<&[u8]> = Vec::new();
+
         for component in path.split(|byte| *byte == b'/') {
             match component {
                 b"" | b"." => {}
@@ -88,12 +92,14 @@ impl ResolvedPath {
         let length = 1
             + components.iter().map(|value| value.len()).sum::<usize>()
             + components.len().saturating_sub(1);
+
         if length > Self::MAX_LEN {
             return Err(VfsError::InvalidPath);
         }
 
         let mut normalized = Vec::with_capacity(length);
         normalized.push(b'/');
+
         for (index, component) in components.into_iter().enumerate() {
             if index != 0 {
                 normalized.push(b'/');
@@ -131,6 +137,7 @@ impl ResolvedPath {
         if mount.is_root() {
             return self.clone();
         }
+
         if self == mount {
             return Self::root();
         }

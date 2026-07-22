@@ -19,9 +19,12 @@ reserved regions usable is a kernel fault.
 mapped pages. Page-table tokens and activation guards encode the lifetime of page-table state;
 unsafe activation must keep the selected hierarchy alive until restoration or replacement.
 
-The mapper owns kernel mappings and exposes a backend-neutral page-table API. Architecture-specific
-mapper code owns CR3/page-table encoding. Address newtypes validate canonicality and page alignment
-at the boundary rather than allowing raw integers throughout the subsystem.
+The mapper owns kernel mappings and exposes a backend-neutral page-table API. It also maps
+page-aligned device MMIO pages at their HHDM addresses when the bootloader did not include them in
+the direct map. Device frames remain externally owned: the physical-frame allocator never owns,
+poisons, or releases them. Architecture-specific mapper code owns CR3/page-table encoding. Address
+newtypes validate canonicality and page alignment at the boundary rather than allowing raw integers
+throughout the subsystem.
 
 ## Invariants
 
@@ -30,6 +33,8 @@ at the boundary rather than allowing raw integers throughout the subsystem.
   construction failure.
 - Kernel, bootloader, framebuffer, and other reserved physical ranges cannot be allocated as usable
   memory.
+- Device MMIO mappings are writable, non-executable, and uncacheable; their physical frames are
+  never transferred into allocator ownership.
 - Page-table activation is only valid while the page-table hierarchy remains alive.
 
 ## Limits

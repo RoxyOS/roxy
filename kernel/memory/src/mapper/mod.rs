@@ -2,7 +2,7 @@ mod pagetable;
 #[cfg(target_arch = "x86_64")]
 mod x86_64;
 
-use crate::{OwnedFrame, VirtualAddress};
+use crate::{OwnedFrame, PhysicalAddress, VirtualAddress};
 
 #[cfg(target_arch = "x86_64")]
 use self::x86_64::X86_64KernelPageTableBackend;
@@ -21,6 +21,8 @@ pub(crate) trait KernelPageTableBackend: sealed::Sealed {
     fn is_mapped(address: VirtualAddress) -> bool;
 
     fn map_page(address: VirtualAddress, frame: OwnedFrame, flags: MappingFlags);
+
+    fn map_mmio_page(address: VirtualAddress, physical_address: PhysicalAddress);
 }
 
 bitflags::bitflags! {
@@ -29,6 +31,7 @@ bitflags::bitflags! {
         const WRITABLE = 1 << 0;
         const EXECUTABLE = 1 << 1;
         const USER = 1 << 2;
+        const UNCACHEABLE = 1 << 3;
     }
 }
 

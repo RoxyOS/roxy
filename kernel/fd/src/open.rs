@@ -72,6 +72,7 @@ impl OpenFile {
         let mut state = self.state.lock();
         let current = state.position;
         let new_position = state.object.seek(current, position)?;
+
         if new_position > i64::MAX.cast_unsigned() {
             return Err(SeekError::Overflow);
         }

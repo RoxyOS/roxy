@@ -10,6 +10,7 @@ impl Vfs {
 
         loop {
             let read = file.read(&mut buffer)?;
+
             if read == 0 {
                 break;
             }
@@ -32,6 +33,7 @@ impl Vfs {
 
         while written < data.len() {
             let count = file.write(&data[written..])?;
+
             if count == 0 {
                 return Err(VfsError::Io);
             }

@@ -63,6 +63,7 @@ impl ProcessTable {
         };
 
         self.processes.remove(&process_id);
+
         for process in self.processes.values_mut() {
             if process.parent_process_id == Some(process_id) {
                 process.parent_process_id = None;

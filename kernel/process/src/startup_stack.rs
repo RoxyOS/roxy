@@ -124,6 +124,7 @@ fn push_auxiliary(
 
 fn append_strings(data: &mut Vec<u8>, path: &[u8], argv: &[Vec<u8>], envp: &[Vec<u8>]) {
     append_string(data, path);
+
     for string in argv.iter().chain(envp) {
         append_string(data, string);
     }
@@ -156,6 +157,7 @@ fn stack_pointer(stack: UserStack, data_size: usize) -> Result<UserAddress, Proc
         .map(|size| size / 16 * 16)
         .ok_or(ProcessError::ArgumentsTooLarge)?;
     let available = usize::try_from(stack.top.as_u64() - stack.bottom.as_u64()).unwrap();
+
     if aligned_size > available {
         return Err(ProcessError::ArgumentsTooLarge);
     }

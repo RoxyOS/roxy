@@ -37,6 +37,7 @@ impl RamDisk {
             .and_then(|index| index.checked_mul(LOGICAL_BLOCK_SIZE))
             .ok_or(BlockError::OutOfBounds)?;
         let end = start.checked_add(byte_len).ok_or(BlockError::OutOfBounds)?;
+
         if end > self.source.len() {
             return Err(BlockError::OutOfBounds);
         }

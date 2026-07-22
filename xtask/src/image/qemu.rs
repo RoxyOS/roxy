@@ -8,6 +8,7 @@ pub(super) fn run(image: &Path) -> Result<()> {
     let mut command = command(image)?;
     command.arg("-no-shutdown");
     ensure!(command.status()?.success(), "QEMU failed");
+
     Ok(())
 }
 
@@ -21,6 +22,7 @@ pub(super) fn test(image: &Path) -> Result<()> {
         "-display",
         "none",
     ]);
+
     match command.status()?.code() {
         Some(33) => Ok(()),
         Some(1) => bail!("kernel tests failed"),
@@ -32,6 +34,7 @@ fn command(image: &Path) -> Result<Command> {
     let firmware = firmware()?;
     let mut command = Command::new("qemu-system-x86_64");
     command.args(["-M", "q35"]);
+
     if cfg!(target_os = "linux") && Path::new("/dev/kvm").exists() {
         command.args(["-enable-kvm", "-cpu", "host"]);
     } else {
@@ -52,6 +55,7 @@ fn command(image: &Path) -> Result<Command> {
         "none",
         "-no-reboot",
     ]);
+
     Ok(command)
 }
 
@@ -63,5 +67,6 @@ fn firmware() -> Result<PathBuf> {
         firmware.is_some(),
         "OVMF_CODE must point to an OVMF code image"
     );
+
     Ok(firmware.unwrap())
 }

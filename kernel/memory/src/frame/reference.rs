@@ -84,6 +84,7 @@ impl PageRef {
 
         // SAFETY: validate_range keeps the read inside this live frame, which PageRef owns.
         unsafe { source.copy_to_nonoverlapping(output.as_mut_ptr(), output.len()) };
+
         Ok(())
     }
 

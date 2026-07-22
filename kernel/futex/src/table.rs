@@ -43,6 +43,7 @@ impl FutexTable {
     pub(super) fn dequeue(&mut self, key: FutexKey) -> Option<ThreadId> {
         let waiters = self.waiters.get_mut(&key)?;
         let thread_id = waiters.pop_front();
+
         if waiters.is_empty() {
             self.waiters.remove(&key);
         }

@@ -12,6 +12,7 @@ impl UserRegion {
     #[must_use]
     pub fn new(start: UserPage, page_count: NonZeroUsize) -> Option<Self> {
         start.checked_add(page_count.get() - 1)?;
+
         Some(Self { start, page_count })
     }
 

@@ -25,6 +25,7 @@ impl FdTable {
     /// Panics when every `u32` descriptor number is occupied.
     pub fn insert(&mut self, file: Arc<OpenFile>) -> Fd {
         let mut value = 0;
+
         loop {
             let fd = Fd::new(value);
 

@@ -261,6 +261,7 @@ mod tests {
 
     kernel_test!("roxy-vm::addrspace-teardown", addrspace_teardown, {
         let baseline = statistics().allocated_frames;
+
         {
             let mut space = AddrSpace::new().unwrap();
             space

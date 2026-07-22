@@ -17,6 +17,7 @@ pub fn allocate() -> Option<OwnedFrame> {
 pub fn allocate_zeroed() -> Option<PageRef> {
     let frame = allocate()?;
     frame.zero();
+
     Some(frame.into_page_ref())
 }
 

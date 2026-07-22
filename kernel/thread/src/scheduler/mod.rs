@@ -29,6 +29,7 @@ pub fn initialize() {
 pub fn spawn(entry: fn() -> !) -> Result<(), ThreadCreateError> {
     let thread = Thread::new(entry)?;
     enqueue_kernel(thread);
+
     Ok(())
 }
 
@@ -70,6 +71,7 @@ pub struct PendingBlock(switch::PendingContextSwitch);
 /// Panics when called outside a scheduled thread or with interrupts enabled.
 pub fn prepare_block_current() -> PendingBlock {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
+
     PendingBlock(SCHEDULER.lock().prepare_block())
 }
 

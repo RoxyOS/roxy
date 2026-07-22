@@ -64,6 +64,7 @@ fn mappings<'data>(
         if mapping.data.len() > mapping.memory_size {
             return Err(ElfError::InvalidSegment);
         }
+
         if mappings.iter().any(|existing| mapping.overlaps(existing)) {
             return Err(ElfError::OverlappingSegments);
         }

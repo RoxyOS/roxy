@@ -41,6 +41,7 @@ pub(super) fn notify_exit(exiting: Option<ThreadId>) {
         return;
     };
     let address = EXIT_HANDLER.load(Ordering::Acquire);
+
     if address == 0 {
         return;
     }
@@ -56,6 +57,7 @@ pub(super) fn notify_reaped(reaped: Option<ThreadId>) {
     };
 
     let address = REAPED_HANDLER.load(Ordering::Acquire);
+
     if address == 0 {
         return;
     }

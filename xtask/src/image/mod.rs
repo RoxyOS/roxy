@@ -16,6 +16,7 @@ pub(crate) fn build_iso(kernel: &Path, rootfs: &Path) -> Result<()> {
     println!("==> Building boot image");
 
     create_iso(kernel, rootfs, Mode::Production)?;
+
     Ok(())
 }
 

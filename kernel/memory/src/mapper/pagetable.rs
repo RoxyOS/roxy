@@ -209,6 +209,7 @@ mod tests {
 
     kernel_test!("roxy-memory::addrspace-page-table", addrspace_page_table, {
         let baseline = statistics().allocated_frames;
+
         {
             let mut table = AddrSpacePageTable::new().unwrap();
             assert!(table.0.has_empty_user_half());

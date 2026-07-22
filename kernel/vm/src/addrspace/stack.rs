@@ -37,6 +37,7 @@ impl AddrSpace {
 
         self.ensure_page_available(guard)?;
         self.pages.insert(guard, PageState::Guard);
+
         if let Err(error) = self.map_zeroed(region, Permissions::ReadWrite) {
             self.pages.remove(&guard);
             return Err(error);

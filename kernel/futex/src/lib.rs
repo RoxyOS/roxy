@@ -42,6 +42,7 @@ pub fn wait(
     addrspace
         .read_bytes(address, &mut value)
         .map_err(map_vm_error)?;
+
     if u32::from_ne_bytes(value) != expected {
         return Err(FutexError::Mismatch);
     }
@@ -68,10 +69,12 @@ pub fn wake(
     let key = FutexKey::new(addrspace.id(), address)?;
     let mut futexes = FUTEXES.lock();
     let mut woken = 0;
+
     while woken < count {
         let Some(thread_id) = futexes.dequeue(key) else {
             break;
         };
+
         if scheduler::wake(thread_id) {
             woken += 1;
         }

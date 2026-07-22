@@ -97,6 +97,7 @@ impl Ext4FileSystem {
             .map_err(map_ext4)?
         {
             let entry = entry.map_err(map_ext4)?;
+
             if entry.file_name() != "." && entry.file_name() != ".." {
                 return Ok(false);
             }

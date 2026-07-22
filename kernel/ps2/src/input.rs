@@ -42,6 +42,7 @@ mod tests {
     kernel_test!("roxy-ps2::queue-order-and-drop", queue_behavior, {
         let mut input = KeyboardInput::new();
         assert_eq!(input.read(), None);
+
         for value in 0..INPUT_CAPACITY {
             input.enqueue_byte(u8::try_from(value).unwrap());
         }

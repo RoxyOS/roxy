@@ -211,6 +211,7 @@ mod tests {
             for (limine_kind, expected) in known_kinds {
                 assert_eq!(map_memory_kind(limine_kind), expected);
             }
+
             assert_eq!(map_memory_kind(42), MemoryRegionKind::Unknown(42));
         }
     );

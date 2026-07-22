@@ -30,5 +30,6 @@ pub(crate) fn run() -> Result<()> {
     crate::cmd!("git diff --check")?;
 
     println!("==> All checks passed");
+
     Ok(())
 }
