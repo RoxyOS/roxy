@@ -91,6 +91,7 @@ impl Framebuffer {
         }
     }
 
+    /// Applies the XOR mask to every pixel in the rectangle.
     pub(crate) fn xor_rect(
         &mut self,
         left: usize,
