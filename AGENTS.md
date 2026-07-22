@@ -1,6 +1,8 @@
 # Repository Instructions
 
 - Read `agent-instructions/GENERAL.md` for every task.
+- Read `agent-instructions/COLLABORATION.md` for every task, even when no other agent or Codex
+  instance is visible. Follow its lock discovery procedure before every filesystem write.
 - Read `agent-instructions/STYLE.md` before changing source code.
 - Read `agent-instructions/WORKFLOW.md` when its task-specific procedures apply.
 - Read `agent-instructions/PLAN.md` before writing an implementation plan.
