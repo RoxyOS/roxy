@@ -48,6 +48,7 @@ pub extern "C" fn _start() -> ! {
     roxy_futex::initialize();
     roxy_syscall::initialize();
     roxy_thread::initialize();
+    roxy_ps2::initialize();
     roxy_time::start_periodic_timer();
     CurrentArchitectureBackend::enable_interrupts();
 

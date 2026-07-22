@@ -3,8 +3,9 @@
 ## Purpose and scope
 
 `roxy-fbterm` provides the framebuffer-backed implementation of the shared terminal endpoint.
-It owns text rendering state and framebuffer writes; it does not own boot protocol parsing,
-process descriptors, keyboard input, terminal line discipline, or kernel diagnostics.
+It owns text rendering state and framebuffer writes and adapts the PS/2 driver's input stream; it
+does not own boot protocol parsing, process descriptors, keyboard hardware, terminal line
+discipline, or kernel diagnostics.
 
 ## Ownership and initialization
 
@@ -23,12 +24,15 @@ The endpoint renders printable ASCII with the regular Terminus 8x16 bitmap font 
 Apache-2.0 license, and provides a fixed bitmap whose dimensions match the cell renderer without
 font parsing, allocation, or scaling. LF advances a row, CR returns to column zero, backspace
 clears the preceding cell, and tab advances to the next eight-column stop. Reaching the bottom
-scrolls the framebuffer by one glyph row. Input is unsupported; the endpoint emits the required
-unsupported-operation diagnostic with the current process and thread, then returns the generic
-bad-operation error for normal syscall error mapping.
+scrolls the framebuffer by one glyph row. Input is supplied by the PS/2 endpoint described below;
+the framebuffer console itself only owns output rendering.
 
 Only Limine RGB 32-bit modes are accepted. Color masks determine packed foreground/background
-pixels. Full ANSI parsing, Unicode, keyboard input, PTYs, and diagnostic mirroring are outside the
+pixels. Reads delegate directly to `roxy-ps2` and return its raw ASCII byte stream. The endpoint
+polls until at least one byte is available, halting the CPU between empty checks so IRQs can make
+progress. It does not echo, buffer lines, translate newlines, or hold the console lock while
+waiting. Full
+ANSI parsing, Unicode, alternate input devices, PTYs, and diagnostic mirroring are outside the
 current contract.
 
 ## Rendering model
@@ -80,8 +84,10 @@ raw pointer, pitch, or pixel format.
 
 ## Concurrency and safety
 
-All mutable console state and framebuffer writes are serialized by the endpoint's one lock. The
-framebuffer pointer and its `Send` implementation are confined to `Framebuffer`, which is
-constructed only after boot validation and memory initialization. Its safe operations enforce the
-validated pitch, dimensions, and byte range before entering local unsafe blocks. The mapping is
-never reclaimed while the kernel is running.
+All mutable console state and framebuffer writes are serialized by the endpoint's one output lock.
+Input polling does not take that lock or retain scheduler state: an empty read asserts interrupts
+are enabled, halts until the next interrupt, and checks `roxy-ps2` again. The framebuffer pointer
+and its `Send` implementation are confined to `Framebuffer`, which is constructed only after boot
+validation and memory initialization. Its safe operations enforce the validated pitch, dimensions,
+and byte range before entering local unsafe blocks. The mapping is never reclaimed while the kernel
+is running.

@@ -14,7 +14,7 @@ The startup sequence is intentionally ordered:
 ```text
 clear BSS → serial → BootInfo → architecture → memory → select kernel terminal → time → rootfs
 → interrupt controller (ACPI MADT/IOAPIC) → CPU-local state → periodic timer backend → process → futex → syscall
-→ scheduler timer handler → start timer → enable interrupts → run/test
+→ scheduler timer handler → PS/2 keyboard → start timer → enable interrupts → run/test
 ```
 
 Core converts Limine's HHDM-mapped RSDP pointer back to a physical address, then passes it and the
@@ -25,6 +25,12 @@ Each subsystem must publish the global state required by later steps before the 
 In particular, the periodic timer remains masked until time and scheduler handlers are registered,
 process registers its scheduler address-space hook before user threads can run, and syscall
 configures the architecture entry before interrupts are enabled.
+
+PS/2 initialization follows scheduler initialization and precedes both periodic timer startup and
+global interrupt enable. The PS/2 subsystem completes its controller and keyboard handshake,
+registers IRQ1, and unmasks the route in that window. This hardware is required on the supported
+platform; a missing controller or handshake timeout is boot-fatal rather than a reason to expose an
+output-only framebuffer terminal.
 
 After memory initialization, normal builds initialize `fbterm` and select it as the kernel terminal,
 falling back to serial after a serial diagnostic when the framebuffer mode is unavailable. Kernel-test
@@ -51,7 +57,7 @@ not a recoverable memory allocation path.
 ## Design limits
 
 The current image assumes one statically selected init program and the existing Limine/x86_64 boot
-path. Normal builds selecting `fbterm` therefore expose its unsupported input behavior through fd 0;
-kernel-test builds select serial for all three streams. Changes to initialization order, kernel
-terminal selection, or initial descriptor policy must update this document and the affected
-subsystem designs together.
+path. Normal builds selecting `fbterm` expose raw PS/2 ASCII bytes through fd 0; kernel-test builds
+select serial for all three streams while still initializing required PS/2 hardware and running its
+pure decoder and queue tests. Changes to initialization order, kernel terminal selection, or initial
+descriptor policy must update this document and the affected subsystem designs together.

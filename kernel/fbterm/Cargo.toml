@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-kernel-test = ["dep:linkme", "dep:roxy-test"]
+kernel-test = ["dep:linkme", "dep:roxy-test", "roxy-ps2/kernel-test"]
 
 [dependencies]
 embedded-bitmap-fonts.workspace = true
@@ -14,13 +14,12 @@ embedded-graphics.workspace = true
 linkme = { workspace = true, optional = true }
 spin.workspace = true
 
+roxy-arch.workspace = true
 roxy-boot.workspace = true
 roxy-fd.workspace = true
-roxy-process.workspace = true
+roxy-ps2.workspace = true
 roxy-terminal.workspace = true
 roxy-test = { workspace = true, optional = true }
-roxy-thread.workspace = true
-roxy-utils.workspace = true
 
 [lints]
 workspace = true

@@ -23,6 +23,7 @@ kernel-test = [
     "roxy-interrupt/kernel-test",
     "roxy-memory/kernel-test",
     "roxy-process/kernel-test",
+    "roxy-ps2/kernel-test",
     "roxy-syscall/kernel-test",
     "roxy-terminal/kernel-test",
     "roxy-thread/kernel-test",
@@ -55,6 +56,7 @@ roxy-futex.workspace = true
 roxy-interrupt.workspace = true
 roxy-memory.workspace = true
 roxy-process.workspace = true
+roxy-ps2.workspace = true
 roxy-serial.workspace = true
 roxy-syscall.workspace = true
 roxy-terminal.workspace = true
