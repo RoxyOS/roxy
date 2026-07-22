@@ -481,11 +481,8 @@ dependencies = [
  "linkme",
  "roxy-arch",
  "roxy-test",
- "roxy-time",
  "roxy-utils",
  "spin 0.12.2",
- "x2apic",
- "x86_64",
 ]
 
 [[package]]
@@ -553,6 +550,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-interrupt"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-arch",
+ "roxy-cpu",
+ "roxy-test",
+ "roxy-utils",
+ "spin 0.12.2",
+ "x2apic",
+ "x86_64",
+]
+
+[[package]]
 name = "roxy-kernel"
 version = "0.1.0"
 dependencies = [
@@ -567,6 +578,7 @@ dependencies = [
  "roxy-fbterm",
  "roxy-fd",
  "roxy-futex",
+ "roxy-interrupt",
  "roxy-memory",
  "roxy-process",
  "roxy-serial",
@@ -667,6 +679,7 @@ version = "0.1.0"
 dependencies = [
  "linkme",
  "roxy-arch",
+ "roxy-interrupt",
  "roxy-memory",
  "roxy-test",
  "roxy-utils",
@@ -678,7 +691,15 @@ dependencies = [
 name = "roxy-time"
 version = "0.1.0"
 dependencies = [
+ "linkme",
+ "roxy-arch",
+ "roxy-cpu",
+ "roxy-interrupt",
+ "roxy-test",
+ "roxy-utils",
  "spin 0.12.2",
+ "x2apic",
+ "x86_64",
 ]
 
 [[package]]

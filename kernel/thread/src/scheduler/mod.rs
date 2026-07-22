@@ -3,10 +3,10 @@ mod reap;
 mod state;
 mod switch;
 
-use roxy_arch::{Architecture, CurrentArchitectureBackend};
+use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
 use roxy_utils::Lock;
 
-pub use control::{exit_current, on_timer_interrupt, start};
+pub use control::{exit_current, start};
 pub use reap::{
     ThreadExitHandler, ThreadReapedHandler, register_exit_handler, register_reaped_handler,
 };
@@ -15,6 +15,11 @@ use self::state::{Scheduler, ThreadKind};
 use crate::{Thread, ThreadCreateError, ThreadId};
 
 static SCHEDULER: Lock<Scheduler> = Lock::new(Scheduler::new());
+
+/// Registers scheduler-owned interrupt consumers.
+pub fn initialize() {
+    roxy_interrupt::register_local_handler(LocalInterruptKind::Timer, control::on_timer_interrupt);
+}
 
 /// Creates and enqueues a permanently runnable kernel thread.
 ///

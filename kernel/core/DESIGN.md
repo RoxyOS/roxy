@@ -13,12 +13,14 @@ The startup sequence is intentionally ordered:
 
 ```text
 clear BSS → serial → BootInfo → architecture → memory → select kernel terminal → time → rootfs
-→ CPU → process → futex → syscall → enable interrupts → run/test
+→ interrupt controller → CPU-local state → periodic timer backend → process → futex → syscall
+→ scheduler timer handler → start timer → enable interrupts → run/test
 ```
 
 Each subsystem must publish the global state required by later steps before the next step begins.
-In particular, process registers its scheduler address-space hook before user threads can run, and
-syscall configures the architecture entry before interrupts are enabled.
+In particular, the periodic timer remains masked until time and scheduler handlers are registered,
+process registers its scheduler address-space hook before user threads can run, and syscall
+configures the architecture entry before interrupts are enabled.
 
 After memory initialization, normal builds initialize `fbterm` and select it as the kernel terminal,
 falling back to serial after a serial diagnostic when the framebuffer mode is unavailable. Kernel-test

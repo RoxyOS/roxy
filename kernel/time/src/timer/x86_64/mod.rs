@@ -3,68 +3,45 @@ mod pit;
 use x2apic::lapic::{LocalApic, LocalApicBuilder, TimerDivide, TimerMode};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
+use roxy_cpu::CpuLocal;
 use roxy_utils::Lock;
 
-use crate::{CpuLocal, timer::TIMER_HZ};
+use super::{TIMER_HZ, TimerBackend, sealed};
 
-use super::{CpuBackend, CpuInitResult, sealed};
+static APIC_TIMER: CpuLocal<Lock<X2ApicTimer>> = CpuLocal::new();
 
-static LOCAL_APIC: CpuLocal<Lock<X2Apic>> = CpuLocal::new();
+pub(super) struct X86_64Timer;
 
-pub(crate) struct X86_64Cpu;
-
-struct X2Apic {
+struct X2ApicTimer {
     local_apic: LocalApic,
 }
 
 // SAFETY: The builder receives no xAPIC base, so every successfully built value uses MSR-only x2APIC.
-unsafe impl Send for X2Apic {}
+unsafe impl Send for X2ApicTimer {}
 
-impl sealed::Sealed for X86_64Cpu {}
+impl sealed::Sealed for X86_64Timer {}
 
-impl CpuBackend for X86_64Cpu {
-    fn initialize() -> CpuInitResult {
+impl TimerBackend for X86_64Timer {
+    fn initialize() {
         assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
         let mut local_apic = build_local_apic();
-        // SAFETY: This is the BSP's unique local controller and interrupts remain disabled.
-        unsafe {
-            local_apic.enable();
-            local_apic.disable_timer();
-            assert!(local_apic.is_bsp());
-        }
         let initial_count = calibrate_timer(&mut local_apic);
         // SAFETY: The timer remains masked while its periodic configuration is installed.
         unsafe {
             local_apic.set_timer_mode(TimerMode::Periodic);
             local_apic.set_timer_divide(TimerDivide::Div16);
             local_apic.set_timer_initial(initial_count);
+            local_apic.disable_timer();
         }
-        // SAFETY: The local controller is enabled and uniquely borrowed.
-        let hardware_id = unsafe { local_apic.id() };
-        LOCAL_APIC.initialize_current(Lock::new(X2Apic { local_apic }));
-        CpuInitResult { hardware_id }
+        APIC_TIMER.initialize_current(Lock::new(X2ApicTimer { local_apic }));
     }
 
-    fn start_timer() {
-        with_local_apic(|local_apic| {
-            // SAFETY: CPU-local state and the timer handler are ready before unmasking the timer.
+    fn start() {
+        with_apic_timer(|local_apic| {
+            // SAFETY: All timer interrupt handlers are registered before unmasking the timer.
             unsafe { local_apic.enable_timer() };
         });
-    }
-
-    fn end_of_interrupt() {
-        with_local_apic(|local_apic| {
-            // SAFETY: This is called once for a delivered non-spurious local APIC interrupt.
-            unsafe { local_apic.end_of_interrupt() };
-        });
-    }
-
-    fn error_flags() -> u8 {
-        with_local_apic(|local_apic| {
-            // SAFETY: Reading the CPU-local APIC error register has no ownership side effects.
-            unsafe { local_apic.error_flags().bits() }
-        })
     }
 }
 
@@ -110,9 +87,9 @@ fn periodic_initial_count(elapsed: u32) -> Option<u32> {
     u32::try_from(count).ok().filter(|count| *count != 0)
 }
 
-fn with_local_apic<T>(function: impl FnOnce(&mut LocalApic) -> T) -> T {
+fn with_apic_timer<T>(function: impl FnOnce(&mut LocalApic) -> T) -> T {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
-    function(&mut LOCAL_APIC.get().lock().local_apic)
+    function(&mut APIC_TIMER.get().lock().local_apic)
 }
 
 #[cfg(feature = "kernel-test")]
@@ -120,7 +97,7 @@ mod tests {
     use super::periodic_initial_count;
 
     roxy_test::kernel_test!(
-        "roxy-cpu::apic-calibration-conversion",
+        "roxy-time::apic-calibration-conversion",
         apic_calibration_conversion,
         {
             assert_eq!(periodic_initial_count(0), None);

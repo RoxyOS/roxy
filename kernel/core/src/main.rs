@@ -6,7 +6,6 @@ extern crate alloc;
 
 mod exception;
 mod initial_fds;
-mod interrupt;
 mod misc;
 mod rootfs;
 #[cfg(feature = "kernel-test")]
@@ -29,15 +28,19 @@ pub extern "C" fn _start() -> ! {
 
     let boot_info = BootInfo::parse();
 
-    CurrentArchitectureBackend::initialize(exception::handler, interrupt::handler);
+    CurrentArchitectureBackend::initialize(exception::handler);
     roxy_memory::initialize(&boot_info);
     select_kernel_terminal(&boot_info);
     roxy_time::initialize(boot_info.unix_seconds_at_boot);
     rootfs::initialize(&boot_info).expect("initialize root filesystem");
-    roxy_cpu::current_cpu().initialize();
+    let interrupt_init_result = roxy_interrupt::initialize();
+    roxy_cpu::current_cpu().initialize(interrupt_init_result.hardware_id());
+    roxy_time::initialize_periodic_timer();
     roxy_process::initialize(initial_fds::inject);
     roxy_futex::initialize();
     roxy_syscall::initialize();
+    roxy_thread::initialize();
+    roxy_time::start_periodic_timer();
     CurrentArchitectureBackend::enable_interrupts();
 
     #[cfg(feature = "kernel-test")]

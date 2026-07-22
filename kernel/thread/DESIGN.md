@@ -43,6 +43,14 @@ address space currently stored by the process. It runs after the scheduler lock 
 with interrupts disabled. It must complete synchronously and cannot leave the wrong page table
 active. A kernel/control-context target bypasses the hook and activates the kernel page table.
 
+## Interrupt registration
+
+`roxy-thread::initialize` registers the scheduler's timer-preemption handler with
+`roxy-interrupt`. Registration occurs during boot with interrupts disabled and must complete before
+the time subsystem unmasks periodic timer delivery. The handler runs after interrupt accounting and
+EOI, with interrupts disabled, and may perform a context switch; the interrupt subsystem therefore
+does not retain scheduler policy or call this handler directly.
+
 ## Invariants and limits
 
 - Context switching never occurs while the scheduler lock is held.

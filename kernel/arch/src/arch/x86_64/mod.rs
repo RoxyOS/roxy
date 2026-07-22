@@ -19,11 +19,12 @@ pub struct X86_64;
 impl sealed::Sealed for X86_64 {}
 
 impl Architecture for X86_64 {
-    fn initialize(
-        exception_handler: ExceptionHandler,
-        local_interrupt_handler: LocalInterruptHandler,
-    ) {
-        init::initialize(exception_handler, local_interrupt_handler);
+    fn initialize(exception_handler: ExceptionHandler) {
+        init::initialize(exception_handler);
+    }
+
+    fn register_local_interrupt_dispatcher(dispatcher: LocalInterruptHandler) {
+        interrupt::register(dispatcher);
     }
 
     fn local_interrupt_vector(kind: LocalInterruptKind) -> u8 {

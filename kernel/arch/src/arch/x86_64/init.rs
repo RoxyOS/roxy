@@ -15,7 +15,7 @@ use x86_64::{
     },
 };
 
-use crate::{ExceptionHandler, LocalInterruptHandler};
+use crate::ExceptionHandler;
 
 use super::{exception, float, interrupt};
 
@@ -42,15 +42,11 @@ struct MutableTss(UnsafeCell<TaskStateSegment>);
 // SAFETY: Stage 8 runs only the BSP, and all mutation requires interrupts to be disabled.
 unsafe impl Sync for MutableTss {}
 
-pub(super) fn initialize(
-    exception_handler: ExceptionHandler,
-    local_interrupt_handler: LocalInterruptHandler,
-) {
+pub(super) fn initialize(exception_handler: ExceptionHandler) {
     x86_64::instructions::interrupts::disable();
     assert!(!IDT.is_completed(), "architecture initialized twice");
     float::initialize();
     exception::register(exception_handler);
-    interrupt::register(local_interrupt_handler);
 
     let tss = TSS.call_once(|| MutableTss(UnsafeCell::new(create_tss())));
     let (gdt, selectors) = GDT.call_once(|| {

@@ -2,9 +2,10 @@
 
 ## Purpose and scope
 
-`roxy-arch` is the architecture boundary for kernel entry, exceptions, local interrupts, CPU
-identity, user contexts, and privileged user transitions. Architecture-independent crates depend
-on its contracts instead of accessing registers, descriptor tables, or assembly directly.
+`roxy-arch` is the architecture boundary for kernel entry, exception and local-interrupt entry
+stubs, CPU identity, user contexts, and privileged user transitions. Architecture-independent
+crates depend on its contracts instead of accessing registers, descriptor tables, or assembly
+directly.
 
 The current backend is x86_64. Adding another architecture means implementing the sealed
 `Architecture` contract and its context types; it does not change process, syscall, or scheduler
@@ -12,15 +13,17 @@ ownership rules.
 
 ## Responsibilities and ownership
 
-- The selected backend owns architecture entry code, descriptor tables, syscall instructions, and
-  architecture-specific saved-context layout.
+- The selected backend owns architecture entry code, descriptor tables, interrupt vector numbers,
+  syscall instructions, and architecture-specific saved-context layout.
 - `RawSyscall` is the normalized boundary value passed from the backend to the syscall subsystem.
 - `UserContext` describes the user resume state needed by fork and ordinary syscall return.
 - The architecture layer does not own process address spaces, file descriptors, or syscall policy.
 
 ## Invariants and flows
 
-Initialization installs exception and local-interrupt callbacks before interrupts are enabled.
+Architecture initialization installs the exception callback and IDT before interrupts are enabled.
+`roxy-interrupt` separately registers its local-interrupt dispatcher through the architecture
+contract, then owns local-controller lifecycle and callback policy after entry dispatch.
 The x86_64 backend also enables x87/SSE execution, establishes the default FXSAVE state, and makes
 that state type available to the thread subsystem. Long mode guarantees the required x87, FXSAVE,
 and SSE2 capabilities.

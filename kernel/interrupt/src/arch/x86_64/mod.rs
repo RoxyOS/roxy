@@ -1,0 +1,72 @@
+use x2apic::lapic::{LocalApic, LocalApicBuilder};
+
+use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
+use roxy_cpu::CpuLocal;
+use roxy_utils::Lock;
+
+use super::{InterruptBackend, sealed};
+
+static LOCAL_APIC: CpuLocal<Lock<X2Apic>> = CpuLocal::new();
+
+pub(crate) struct X86_64Interrupt;
+
+struct X2Apic {
+    local_apic: LocalApic,
+}
+
+// SAFETY: The builder receives no xAPIC base, so every successfully built value uses MSR-only x2APIC.
+unsafe impl Send for X2Apic {}
+
+impl sealed::Sealed for X86_64Interrupt {}
+
+impl InterruptBackend for X86_64Interrupt {
+    fn initialize() -> u32 {
+        assert!(!CurrentArchitectureBackend::interrupts_enabled());
+
+        let mut local_apic = build_local_apic();
+        // SAFETY: This is the BSP's unique local controller and interrupts remain disabled.
+        unsafe {
+            local_apic.enable();
+            local_apic.disable_timer();
+            assert!(local_apic.is_bsp());
+        }
+        // SAFETY: The local controller is enabled and uniquely borrowed.
+        let hardware_id = unsafe { local_apic.id() };
+        LOCAL_APIC.initialize_current(Lock::new(X2Apic { local_apic }));
+        hardware_id
+    }
+
+    fn end_of_interrupt() {
+        with_local_apic(|local_apic| {
+            // SAFETY: This is called once for a delivered non-spurious local APIC interrupt.
+            unsafe { local_apic.end_of_interrupt() };
+        });
+    }
+
+    fn error_flags() -> u8 {
+        with_local_apic(|local_apic| {
+            // SAFETY: Reading the CPU-local APIC error register has no ownership side effects.
+            unsafe { local_apic.error_flags().bits() }
+        })
+    }
+}
+
+fn build_local_apic() -> LocalApic {
+    let mut builder = LocalApicBuilder::new();
+    builder
+        .timer_vector(usize::from(
+            CurrentArchitectureBackend::local_interrupt_vector(LocalInterruptKind::Timer),
+        ))
+        .error_vector(usize::from(
+            CurrentArchitectureBackend::local_interrupt_vector(LocalInterruptKind::Error),
+        ))
+        .spurious_vector(usize::from(
+            CurrentArchitectureBackend::local_interrupt_vector(LocalInterruptKind::Spurious),
+        ));
+    builder.build().unwrap()
+}
+
+fn with_local_apic<T>(function: impl FnOnce(&mut LocalApic) -> T) -> T {
+    assert!(!CurrentArchitectureBackend::interrupts_enabled());
+    function(&mut LOCAL_APIC.get().lock().local_apic)
+}

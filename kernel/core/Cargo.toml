@@ -20,11 +20,13 @@ kernel-test = [
     "roxy-ext4/kernel-test",
     "roxy-fbterm/kernel-test",
     "roxy-futex/kernel-test",
+    "roxy-interrupt/kernel-test",
     "roxy-memory/kernel-test",
     "roxy-process/kernel-test",
     "roxy-syscall/kernel-test",
     "roxy-terminal/kernel-test",
     "roxy-thread/kernel-test",
+    "roxy-time/kernel-test",
     "roxy-vfs/kernel-test",
     "roxy-vm/kernel-test",
 ]
@@ -50,6 +52,7 @@ roxy-ext4.workspace = true
 roxy-fbterm.workspace = true
 roxy-fd.workspace = true
 roxy-futex.workspace = true
+roxy-interrupt.workspace = true
 roxy-memory.workspace = true
 roxy-process.workspace = true
 roxy-serial.workspace = true

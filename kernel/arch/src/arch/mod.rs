@@ -64,10 +64,15 @@ const _: () = {
 pub type SyscallHandler = fn(RawSyscall) -> u64;
 
 pub trait Architecture: sealed::Sealed {
-    fn initialize(
-        exception_handler: ExceptionHandler,
-        local_interrupt_handler: LocalInterruptHandler,
-    );
+    fn initialize(exception_handler: ExceptionHandler);
+
+    /// Registers the callback invoked by local-interrupt entry stubs.
+    ///
+    /// The backend converts the architecture-specific vector into a `LocalInterruptKind` before
+    /// invoking `dispatcher`. Registration must happen exactly once while interrupts are disabled
+    /// and before interrupts are enabled. The architecture layer owns entry mechanics only; the
+    /// dispatcher owns interrupt policy and handler routing.
+    fn register_local_interrupt_dispatcher(dispatcher: LocalInterruptHandler);
 
     fn local_interrupt_vector(kind: LocalInterruptKind) -> u8;
 

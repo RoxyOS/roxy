@@ -9,3 +9,8 @@ mod thread;
 
 pub use context::SavedContext;
 pub use thread::{Thread, ThreadCreateError, ThreadId};
+
+/// Initializes scheduler-owned interrupt consumers.
+pub fn initialize() {
+    scheduler::initialize();
+}
