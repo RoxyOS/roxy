@@ -6,7 +6,7 @@
   `kernel/syscall/STYLE.md` when one exists.
 - Treat `agent-instructions/STYLE.md` as the sole source of truth for coding style; consult it
   instead of duplicating style rules in other instruction files.
-- Repository policy is written in English. Speak to the user in the language they use.
+- Repository policy is written in English. Always speak to the user in Chinese.
 
 ## Architecture and Dependencies
 
