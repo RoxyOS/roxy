@@ -102,6 +102,10 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
   repository-owned conversions. Add a type annotation or turbofish if `.into()` hides the target.
 - Prefer expressive code over explanatory comments. Comments should capture rationale,
   invariants, non-obvious constraints, or safety obligations rather than restating the code.
+- When a module, type, ownership boundary, lifecycle, registration path, or control/data-flow
+  structure is hard to understand from the code alone, add a focused nearby comment explaining
+  how the pieces fit together. Assume readers have not read `DESIGN.md`; source code plus its
+  comments must be sufficient to understand the local structure.
 
 ## Blank Lines
 

@@ -53,7 +53,9 @@
   Use compact diagrams or tables only when they clarify a relationship or sequence.
 - Do not duplicate `agent-instructions/STYLE.md`, API rustdoc, code comments, changelogs, temporary
   plans, TODO lists, or source line references in `DESIGN.md`. Design documentation complements
-  local API, safety, and invariant comments; it does not replace them.
+  local API, safety, and invariant comments; it does not replace them. Never rely on a maintainer
+  having read `DESIGN.md` to understand source structure: the code and its nearby comments must
+  explain non-obvious relationships on their own.
 
 ## Design and Safety
 
