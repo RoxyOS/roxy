@@ -3,9 +3,9 @@
 ## Purpose and scope
 
 `roxy-ps2` owns the x86_64 i8042 first port and ISA IRQ1. It converts Scan Code Set 1 keyboard
-traffic from a US 104-key keyboard into a bounded stream of ASCII bytes for the framebuffer
-terminal. It does not implement a terminal line discipline, echo, terminal attributes, control
-signals, layout selection, mouse input, or the i8042 second port.
+traffic from a US 104-key keyboard into a bounded `roxy-input::InputDevice` stream of ASCII bytes.
+It does not implement a terminal line discipline, echo, terminal attributes, control signals,
+layout selection, mouse input, or the i8042 second port.
 
 The driver uses `pc-keyboard` 0.9 with `PS2Keyboard<Us104Key, ScancodeSet1>` and
 `HandleControl::Ignore`. That crate is `no_std`, is licensed under MIT or Apache-2.0, maintains the
@@ -31,9 +31,9 @@ silently fall back to an output-only framebuffer terminal.
 
 Decoded input enters a fixed-capacity `heapless::Deque<u8, 256>`. IRQ handling never allocates or
 blocks. When the queue is full, the arriving byte is discarded without additional accounting;
-queued bytes retain their order. The public `read` operation removes at most one oldest byte and
-returns `None` when the queue is empty; it never blocks, wakes threads, or interprets a caller
-buffer.
+queued bytes retain their order. `InputDevice::read_byte` removes one oldest byte or returns `None`
+without waiting. It does not interpret a caller buffer, wait for interrupts, or apply terminal
+semantics; the TTY FD adapter owns those policies.
 
 ## Interrupt and locking contract
 

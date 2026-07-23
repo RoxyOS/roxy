@@ -4,9 +4,9 @@ use core::fmt::{self, Write};
 use roxy_utils::Lock;
 use spin::Once;
 
-use crate::TerminalDevice;
+use crate::TerminalOutput;
 
-static KERNEL_TERMINAL: Once<Arc<dyn TerminalDevice>> = Once::new();
+static KERNEL_TERMINAL: Once<Arc<dyn TerminalOutput>> = Once::new();
 static PRINT_LOCK: Lock<()> = Lock::new(());
 
 /// Selects the terminal used for ordinary kernel output.
@@ -14,7 +14,7 @@ static PRINT_LOCK: Lock<()> = Lock::new(());
 /// # Panics
 ///
 /// Panics when a kernel terminal has already been selected.
-pub fn select_kernel_terminal(terminal: Arc<dyn TerminalDevice>) {
+pub fn select_kernel_terminal(terminal: Arc<dyn TerminalOutput>) {
     assert!(
         KERNEL_TERMINAL.get().is_none(),
         "kernel terminal was already selected"
@@ -28,7 +28,7 @@ pub fn select_kernel_terminal(terminal: Arc<dyn TerminalDevice>) {
 ///
 /// Panics when core has not selected a kernel terminal.
 #[must_use]
-pub fn kernel_terminal() -> Arc<dyn TerminalDevice> {
+pub fn kernel_terminal() -> Arc<dyn TerminalOutput> {
     KERNEL_TERMINAL
         .get()
         .expect("kernel terminal must be selected before use")
@@ -49,7 +49,7 @@ pub fn print(arguments: fmt::Arguments<'_>) {
     let _ = TerminalWriter(terminal.as_ref()).write_fmt(arguments);
 }
 
-struct TerminalWriter<'a>(&'a dyn TerminalDevice);
+struct TerminalWriter<'a>(&'a dyn TerminalOutput);
 
 impl Write for TerminalWriter<'_> {
     fn write_str(&mut self, output: &str) -> fmt::Result {
@@ -76,33 +76,18 @@ mod tests {
     use alloc::{sync::Arc, vec::Vec};
     use core::fmt::Write;
 
-    use roxy_fd::{FileError, FileMetadata, FileType};
     use roxy_test::kernel_test;
     use spin::Mutex;
 
     use super::TerminalWriter;
-    use crate::TerminalDevice;
+    use crate::{OutputError, TerminalOutput};
 
     struct PartialTerminal {
         output: Mutex<Vec<u8>>,
     }
 
-    impl TerminalDevice for PartialTerminal {
-        fn metadata(&self) -> FileMetadata {
-            FileMetadata {
-                file_id: 9,
-                file_type: FileType::CharacterDevice,
-                permissions: 0o600,
-                size: 0,
-                hard_links: 1,
-            }
-        }
-
-        fn read(&self, _output: &mut [u8]) -> Result<usize, FileError> {
-            Err(FileError::BadOperation)
-        }
-
-        fn write(&self, input: &[u8]) -> Result<usize, FileError> {
+    impl TerminalOutput for PartialTerminal {
+        fn write(&self, input: &[u8]) -> Result<usize, OutputError> {
             let written = input.len().min(2);
             self.output.lock().extend_from_slice(&input[..written]);
 

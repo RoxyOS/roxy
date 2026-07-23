@@ -540,10 +540,7 @@ dependencies = [
  "embedded-bitmap-fonts",
  "embedded-graphics",
  "linkme",
- "roxy-arch",
  "roxy-boot",
- "roxy-fd",
- "roxy-ps2",
  "roxy-terminal",
  "roxy-test",
  "spin 0.12.2",
@@ -570,6 +567,10 @@ dependencies = [
  "roxy-utils",
  "roxy-vm",
 ]
+
+[[package]]
+name = "roxy-input"
+version = "0.1.0"
 
 [[package]]
 name = "roxy-interrupt"
@@ -602,6 +603,7 @@ dependencies = [
  "roxy-fbterm",
  "roxy-fd",
  "roxy-futex",
+ "roxy-input",
  "roxy-interrupt",
  "roxy-memory",
  "roxy-process",
@@ -612,6 +614,7 @@ dependencies = [
  "roxy-test",
  "roxy-thread",
  "roxy-time",
+ "roxy-ttyfd",
  "roxy-vfs",
  "roxy-vm",
  "spin 0.12.2",
@@ -657,9 +660,11 @@ dependencies = [
  "linkme",
  "pc-keyboard",
  "roxy-arch",
+ "roxy-input",
  "roxy-interrupt",
  "roxy-test",
  "roxy-utils",
+ "spin 0.12.2",
  "x86_64",
 ]
 
@@ -667,8 +672,6 @@ dependencies = [
 name = "roxy-serial"
 version = "0.1.0"
 dependencies = [
- "roxy-arch",
- "roxy-fd",
  "roxy-terminal",
  "roxy-utils",
  "spin 0.12.2",
@@ -699,7 +702,6 @@ name = "roxy-terminal"
 version = "0.1.0"
 dependencies = [
  "linkme",
- "roxy-fd",
  "roxy-test",
  "roxy-utils",
  "spin 0.12.2",
@@ -739,6 +741,19 @@ dependencies = [
  "spin 0.12.2",
  "x2apic",
  "x86_64",
+]
+
+[[package]]
+name = "roxy-ttyfd"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-arch",
+ "roxy-fd",
+ "roxy-input",
+ "roxy-terminal",
+ "roxy-test",
+ "spin 0.12.2",
 ]
 
 [[package]]

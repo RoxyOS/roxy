@@ -2,18 +2,18 @@
 
 ## Purpose and scope
 
-`roxy-fbterm` provides the framebuffer-backed implementation of the shared terminal endpoint.
-It owns text rendering state and framebuffer writes and adapts the PS/2 driver's input stream; it
-does not own boot protocol parsing, process descriptors, keyboard hardware, terminal line
-discipline, or kernel diagnostics.
+`roxy-fbterm` provides the framebuffer-backed implementation of the shared terminal output
+endpoint. It owns text rendering state and framebuffer writes; it does not own boot protocol
+parsing, process descriptors, keyboard hardware, input waiting, terminal line discipline, or kernel
+diagnostics.
 
 ## Ownership and initialization
 
 In normal builds, core initializes `fbterm` after boot metadata and kernel memory are ready. Kernel
-test builds select serial directly and do not require framebuffer initialization. The endpoint uses
+test builds select serial directly and do not require framebuffer initialization. The output uses
 the first Limine framebuffer and its HHDM virtual address for the kernel lifetime. Unsupported modes
-are reported to core, which selects the serial terminal instead. Each open file retains an `Arc` to
-the same synchronized endpoint. A successful initialization publishes that `Arc` exactly once; a
+are reported to core, which selects the serial terminal instead. A successful initialization
+publishes the output `Arc` exactly once; a
 mode-validation failure leaves the global endpoint uninitialized, while a second successful
 initialization attempt violates the core startup contract and panics.
 
@@ -24,17 +24,12 @@ The endpoint renders printable ASCII with the regular Terminus 8x16 bitmap font 
 Apache-2.0 license, and provides a fixed bitmap whose dimensions match the cell renderer without
 font parsing, allocation, or scaling. LF advances a row, CR returns to column zero, backspace
 clears the preceding cell, and tab advances to the next eight-column stop. Reaching the bottom
-scrolls the framebuffer by one glyph row. Input is supplied by the PS/2 endpoint described below;
-the framebuffer console itself only owns output rendering.
+scrolls the framebuffer by one glyph row. Input is supplied by `roxy-input` implementations through
+`roxy-ttyfd`; the framebuffer console itself only owns output rendering.
 
 Only Limine RGB 32-bit modes are accepted. Color masks determine packed foreground/background
-pixels. Reads delegate directly to `roxy-ps2` and return its raw ASCII byte stream. The endpoint
-polls until at least one byte is available. Empty reads run with interrupts disabled and use the
-architecture's atomic interrupt wait, which temporarily enables delivery while halted and restores
-the disabled state before rechecking the queue. This permits keyboard IRQ delivery without making
-the syscall path interruptible while it holds kernel locks. It does not echo, buffer lines,
-translate newlines, or hold the console lock while waiting. Full ANSI parsing, Unicode, alternate
-input devices, PTYs, and diagnostic mirroring are outside the current contract.
+pixels. Full ANSI parsing, Unicode, input devices, PTYs, and diagnostic mirroring are outside the
+current contract.
 
 ## Rendering model
 

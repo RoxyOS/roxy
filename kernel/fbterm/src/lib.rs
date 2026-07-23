@@ -9,7 +9,7 @@ mod renderer;
 
 use alloc::sync::Arc;
 use roxy_boot::BootInfo;
-use roxy_terminal::TerminalDevice;
+use roxy_terminal::TerminalOutput;
 use spin::Once;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -45,8 +45,8 @@ pub fn initialize(boot_info: &BootInfo) -> Result<(), InitError> {
 
 /// Returns the initialized framebuffer terminal, if the selected mode is supported.
 #[must_use]
-pub fn terminal() -> Option<Arc<dyn TerminalDevice>> {
+pub fn terminal() -> Option<Arc<dyn TerminalOutput>> {
     TERMINAL
         .get()
-        .map(|terminal| terminal.clone() as Arc<dyn TerminalDevice>)
+        .map(|terminal| terminal.clone() as Arc<dyn TerminalOutput>)
 }

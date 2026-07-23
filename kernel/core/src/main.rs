@@ -44,11 +44,12 @@ pub extern "C" fn _start() -> ! {
     });
     roxy_cpu::current_cpu().initialize(interrupt_init_result.hardware_id());
     roxy_time::initialize_periodic_timer();
+    roxy_thread::initialize();
+    roxy_ps2::initialize();
+    roxy_ttyfd::initialize(roxy_ps2::input_device(), roxy_terminal::kernel_terminal());
     roxy_process::initialize(initial_fds::inject);
     roxy_futex::initialize();
     roxy_syscall::initialize();
-    roxy_thread::initialize();
-    roxy_ps2::initialize();
     roxy_time::start_periodic_timer();
     CurrentArchitectureBackend::enable_interrupts();
 

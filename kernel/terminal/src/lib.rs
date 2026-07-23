@@ -3,11 +3,9 @@
 extern crate alloc;
 
 mod device;
-mod file;
 mod kernel_terminal;
 
-pub use device::TerminalDevice;
-pub use file::open;
+pub use device::{OutputError, TerminalOutput};
 #[doc(hidden)]
 pub use kernel_terminal::print;
 pub use kernel_terminal::{kernel_terminal, select_kernel_terminal};

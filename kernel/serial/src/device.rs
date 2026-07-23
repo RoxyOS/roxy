@@ -22,10 +22,6 @@ impl SerialDevice {
         }
     }
 
-    pub(super) fn receive(&self, output: &mut [u8]) -> usize {
-        self.uart.lock().inner_mut().receive_bytes(output)
-    }
-
     pub(super) fn send<'a>(&self, chunks: impl IntoIterator<Item = &'a [u8]>) {
         let mut uart = self.uart.lock();
 
