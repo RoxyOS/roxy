@@ -530,7 +530,6 @@ dependencies = [
  "roxy-time",
  "roxy-utils",
  "roxy-vfs",
- "spin 0.12.2",
 ]
 
 [[package]]
