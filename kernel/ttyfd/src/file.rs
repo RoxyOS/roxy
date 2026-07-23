@@ -5,14 +5,24 @@ use roxy_fd::{File, FileError, FileMetadata, FileType, OpenFile, SeekError, Seek
 use roxy_input::InputDevice;
 use roxy_terminal::{OutputError, TerminalOutput};
 
+use crate::encoder::{EncodedInputEvent, encode_input_event};
+
 pub(super) struct TtyFile {
     input: Arc<dyn InputDevice>,
     output: Arc<dyn TerminalOutput>,
+    // Holds encoded event bytes that did not fit in the previous read buffer.
+    pending: Option<EncodedInputEvent>,
+    pending_offset: usize,
 }
 
 #[must_use]
 pub fn open_file(input: Arc<dyn InputDevice>, output: Arc<dyn TerminalOutput>) -> Arc<OpenFile> {
-    OpenFile::new(Box::new(TtyFile { input, output }))
+    OpenFile::new(Box::new(TtyFile {
+        input,
+        output,
+        pending: None,
+        pending_offset: 0,
+    }))
 }
 
 impl File for TtyFile {
@@ -57,16 +67,33 @@ impl File for TtyFile {
 }
 
 impl TtyFile {
-    fn read_available(&self, output: &mut [u8]) -> usize {
-        let mut count = 0;
+    fn read_available(&mut self, output: &mut [u8]) -> usize {
+        let mut count = self.drain_pending(output);
 
         while count < output.len() {
-            let Some(byte) = self.input.read_byte() else {
+            let Some(event) = self.input.read_event() else {
                 break;
             };
 
-            output[count] = byte;
-            count += 1;
+            self.pending = encode_input_event(event);
+            count += self.drain_pending(&mut output[count..]);
+        }
+
+        count
+    }
+
+    fn drain_pending(&mut self, output: &mut [u8]) -> usize {
+        let Some(pending) = self.pending else {
+            return 0;
+        };
+        let remaining = &pending.as_bytes()[self.pending_offset..];
+        let count = output.len().min(remaining.len());
+        output[..count].copy_from_slice(&remaining[..count]);
+        self.pending_offset += count;
+
+        if self.pending_offset == pending.as_bytes().len() {
+            self.pending = None;
+            self.pending_offset = 0;
         }
 
         count
@@ -85,7 +112,7 @@ mod tests {
     use core::sync::atomic::{AtomicUsize, Ordering};
 
     use roxy_fd::{FileType, SeekError, SeekFrom};
-    use roxy_input::InputDevice;
+    use roxy_input::{InputDevice, InputEvent, KeyCode, KeyState};
     use roxy_terminal::{OutputError, TerminalOutput};
     use roxy_test::kernel_test;
     use spin::Mutex;
@@ -95,8 +122,20 @@ mod tests {
     struct MockInput;
 
     impl InputDevice for MockInput {
-        fn read_byte(&self) -> Option<u8> {
-            Some(b'x')
+        fn read_event(&self) -> Option<InputEvent> {
+            Some(InputEvent::Character('x'))
+        }
+    }
+
+    struct EventInput {
+        events: Mutex<Vec<InputEvent>>,
+    }
+
+    impl InputDevice for EventInput {
+        fn read_event(&self) -> Option<InputEvent> {
+            let mut events = self.events.lock();
+
+            (!events.is_empty()).then(|| events.remove(0))
         }
     }
 
@@ -139,5 +178,33 @@ mod tests {
         assert_eq!(&*output.bytes.lock(), b"onetwo");
         assert_eq!(first.seek(SeekFrom::Start(0)), Err(SeekError::NotSeekable));
         assert!(!Arc::ptr_eq(&first, &second));
+    });
+
+    kernel_test!("roxy-ttyfd::event-encoding", encodes_input_events, {
+        let input = Arc::new(EventInput {
+            events: Mutex::new(alloc::vec![
+                InputEvent::Character('é'),
+                InputEvent::Key {
+                    code: KeyCode::ArrowLeft,
+                    state: KeyState::Pressed,
+                },
+                InputEvent::Key {
+                    code: KeyCode::ArrowLeft,
+                    state: KeyState::Released,
+                },
+            ]),
+        });
+        let output = Arc::new(MockOutput {
+            written: AtomicUsize::new(0),
+            bytes: Mutex::new(Vec::new()),
+        });
+        let file = open_file(input, output);
+        let mut first = [0; 3];
+        let mut second = [0; 2];
+
+        assert_eq!(file.read(&mut first), Ok(3));
+        assert_eq!(&first, &[0xc3, 0xa9, 0x1b]);
+        assert_eq!(file.read(&mut second), Ok(2));
+        assert_eq!(&second, b"[D");
     });
 }

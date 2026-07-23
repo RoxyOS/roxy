@@ -63,7 +63,7 @@ fn handle_irq() {
 }
 
 impl InputDevice for Ps2InputDevice {
-    fn read_byte(&self) -> Option<u8> {
+    fn read_event(&self) -> Option<roxy_input::InputEvent> {
         CurrentArchitectureBackend::without_interrupts(|| KEYBOARD_INPUT.lock().read())
     }
 }
@@ -74,7 +74,7 @@ pub fn inject_for_test(input_bytes: &[u8]) {
         let mut input = KEYBOARD_INPUT.lock();
 
         for &byte in input_bytes {
-            input.enqueue_byte(byte);
+            input.enqueue_event(roxy_input::InputEvent::Character(char::from(byte)));
         }
     });
 }
@@ -86,8 +86,14 @@ mod tests {
     kernel_test!("roxy-ps2::input-device", reads_injected_bytes, {
         super::inject_for_test(b"ok");
 
-        assert_eq!(super::input_device().read_byte(), Some(b'o'));
-        assert_eq!(super::input_device().read_byte(), Some(b'k'));
-        assert_eq!(super::input_device().read_byte(), None);
+        assert_eq!(
+            super::input_device().read_event(),
+            Some(roxy_input::InputEvent::Character('o'))
+        );
+        assert_eq!(
+            super::input_device().read_event(),
+            Some(roxy_input::InputEvent::Character('k'))
+        );
+        assert_eq!(super::input_device().read_event(), None);
     });
 }

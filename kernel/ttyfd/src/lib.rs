@@ -2,6 +2,7 @@
 
 extern crate alloc;
 
+mod encoder;
 mod file;
 
 use alloc::sync::Arc;

@@ -9,7 +9,9 @@ documented policy.
 
 ## Contract and limits
 
-`InputDevice::read_byte` returns the oldest available byte or `None` without blocking. Drivers own
-only input production and queue synchronization; TTY adapters own buffer filling and waiting policy.
+`InputDevice::read_event` returns the oldest available `InputEvent` or `None` without blocking.
+`Character` carries Unicode text and control characters; `Key` carries non-character keys with
+pressed/released state. Drivers own only input production and queue synchronization; TTY adapters
+own byte encoding, buffer filling, and waiting policy.
 The current interface deliberately has no echo, canonical processing, terminal attributes, signals,
 blocking API, or device enumeration. Those are future TTY or line-discipline responsibilities.

@@ -10,12 +10,13 @@ FD adaptation; it does not own hardware, rendering, line discipline, or syscall 
 
 Initialization publishes one input/output pair before processes can receive their initial
 descriptors. Each `open` creates a distinct `OpenFile` that retains `Arc` references to that pair.
-Reads fill the caller buffer from raw input bytes and wait with the architecture's atomic interrupt
-wait when the input device has none available. Writes delegate directly to output, and seeks are
-rejected. The adapter defines the character-device metadata so hardware backends do not need to know
-user-facing file identity or permissions.
+Reads encode input events as UTF-8 characters or conventional terminal escape sequences, fill the
+caller buffer, and wait with the architecture's atomic interrupt wait when no event is available.
+Writes delegate directly to output, and seeks are rejected. The adapter defines the character-device
+metadata so hardware backends do not need to know user-facing file identity or permissions.
 
 ## Limits
 
-The adapter forwards raw bytes only. Echo, canonical mode, terminal attributes, ioctl handling,
+The adapter performs only event-to-byte encoding and forwards the resulting stream. Echo, canonical
+mode, terminal attributes, ioctl handling,
 PTYs, job control, and signals require a later line-discipline layer.

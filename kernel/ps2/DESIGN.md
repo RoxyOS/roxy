@@ -3,16 +3,17 @@
 ## Purpose and scope
 
 `roxy-ps2` owns the x86_64 i8042 first port and ISA IRQ1. It converts Scan Code Set 1 keyboard
-traffic from a US 104-key keyboard into a bounded `roxy-input::InputDevice` stream of ASCII bytes.
-It does not implement a terminal line discipline, echo, terminal attributes, control signals,
-layout selection, mouse input, or the i8042 second port.
+traffic from a US 104-key keyboard into a bounded `roxy-input::InputDevice` stream of character and
+special-key events. It does not implement a terminal line discipline, echo, terminal attributes,
+control signals, layout selection, mouse input, or the i8042 second port.
 
 The driver uses `pc-keyboard` 0.9 with `PS2Keyboard<Us104Key, ScancodeSet1>` and
 `HandleControl::Ignore`. That crate is `no_std`, is licensed under MIT or Apache-2.0, maintains the
 stateful Set 1 and modifier mapping required here, and keeps third-party decoder types inside this
-subsystem. Release events, raw non-character keys, and Unicode characters outside ASCII are
-discarded. Enter, backspace, tab, space, escape, letters, digits, and basic punctuation remain raw
-bytes; Ctrl does not synthesize control characters.
+subsystem. Character key presses become Unicode events; releases for character keys and unsupported
+raw keys are discarded. Navigation and function keys retain pressed/released state as repository-owned
+key codes. Enter, backspace, tab, space, escape, letters, digits, and basic punctuation remain
+character events; Ctrl does not synthesize control characters.
 
 ## Initialization and hardware ownership
 
@@ -29,11 +30,11 @@ silently fall back to an output-only framebuffer terminal.
 
 ## Buffering
 
-Decoded input enters a fixed-capacity `heapless::Deque<u8, 256>`. IRQ handling never allocates or
+Decoded input enters a fixed-capacity `heapless::Deque<InputEvent, 256>`. IRQ handling never allocates or
 blocks. When the queue is full, the arriving byte is discarded without additional accounting;
-queued bytes retain their order. `InputDevice::read_byte` removes one oldest byte or returns `None`
-without waiting. It does not interpret a caller buffer, wait for interrupts, or apply terminal
-semantics; the TTY FD adapter owns those policies.
+queued events retain their order. `InputDevice::read_event` removes one oldest event or returns
+`None` without waiting. It does not encode bytes, interpret a caller buffer, wait for interrupts, or
+apply terminal semantics; the TTY FD adapter owns those policies.
 
 ## Interrupt and locking contract
 
