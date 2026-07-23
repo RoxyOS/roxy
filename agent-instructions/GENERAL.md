@@ -8,6 +8,15 @@
   instead of duplicating style rules in other instruction files.
 - Repository policy is written in English. Always speak to the user in Chinese.
 
+## Git Operations
+
+- Read-only Git commands, including `status`, `log`, `diff`, `show`, and `reflog`, do not require
+  user confirmation.
+- Before running a Git command that modifies repository, index, branch, reference, remote, or
+  worktree state, ask the user for explicit confirmation. This includes `add`, `commit`, `switch`,
+  `checkout`, `restore`, `rebase`, `reset`, `stash`, `merge`, `pull`, `push`, `clean`, and commands
+  that invoke equivalent mutation through options or subcommands.
+
 ## Architecture and Dependencies
 
 - Before implementing functionality, search crates.io, lib.rs, and relevant upstream projects for
