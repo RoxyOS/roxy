@@ -4,13 +4,15 @@ use roxy_thread::ThreadId;
 use roxy_utils::Lock;
 use roxy_vm::AddrSpaceHandle;
 
-use crate::{Process, ProcessId};
+use crate::{Process, ProcessId, WaitTarget};
 
 pub(super) static PROCESS_TABLE: Lock<ProcessTable> = Lock::new(ProcessTable::new());
 
 pub(super) struct ProcessTable {
     pub(super) processes: BTreeMap<ProcessId, Process>,
     pub(super) thread_owners: BTreeMap<ThreadId, ProcessId>,
+    /// `ProcessId` is waiting for `WaitTarget`
+    pub(super) child_waiters: BTreeMap<ProcessId, WaitTarget>,
 }
 
 impl ProcessTable {
@@ -32,6 +34,7 @@ impl ProcessTable {
         Self {
             processes: BTreeMap::new(),
             thread_owners: BTreeMap::new(),
+            child_waiters: BTreeMap::new(),
         }
     }
 

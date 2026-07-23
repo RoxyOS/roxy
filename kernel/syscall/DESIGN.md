@@ -26,6 +26,13 @@ owned by the current thread's process and does not expose scheduler thread IDs t
 `getppid` returns the recorded fork parent while that process remains in the process table and
 returns `0` for directly spawned or orphaned processes.
 
+`waitpid` accepts a direct child PID or `-1` for any child, with optional `WNOHANG`. It validates a
+non-null status output before entering the process wait so `EFAULT` never consumes a zombie. Normal
+exit codes use the Linux wait-status layout expected by mlibc. A successful wait returns the reaped
+PID, a pending nonblocking wait returns zero, and absence of a matching child returns `ECHILD`.
+Process-group selectors, stopped or continued states, and resource usage remain unsupported and
+must use the centralized diagnostic path.
+
 The current process model has no stored credentials and treats every process as the root identity.
 `getuid`, `geteuid`, `getgid`, and `getegid` therefore return real and effective user and group IDs
 of `0` without consulting process state. Credential storage, mutation, and permission enforcement

@@ -29,19 +29,34 @@ impl AddrSpace {
     ///
     /// Returns an error before writing when any byte is outside a mapped page.
     pub fn write_bytes(&mut self, address: UserAddress, input: &[u8]) -> Result<(), VmError> {
-        self.preflight(address, input.len())?;
+        self.validate_writable(address, input.len())?;
         visit_chunks(address, input.len(), |page, offset, source| {
             let state = self.pages.get_mut(&page).ok_or(VmError::NotMapped)?;
-            let PageState::Mapped { frame, permissions } = state else {
+            let PageState::Mapped { frame, .. } = state else {
                 return Err(VmError::NotMapped);
             };
 
-            if !permissions.writable() {
-                return Err(VmError::PermissionDenied);
-            }
-
             // SAFETY: AddrSpace is mutably borrowed and exclusively owns every leaf frame.
             unsafe { frame.write(offset, &input[source]) }.map_err(|_| VmError::MappingFailed)
+        })
+    }
+
+    /// Validates that an entire byte range is mapped and writable.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error before mutation when the range is invalid, unmapped, or read-only.
+    pub fn validate_writable(&self, address: UserAddress, length: usize) -> Result<(), VmError> {
+        self.preflight(address, length)?;
+        visit_chunks(address, length, |page, _, _| {
+            let Some(PageState::Mapped { permissions, .. }) = self.pages.get(&page) else {
+                return Err(VmError::NotMapped);
+            };
+
+            permissions
+                .writable()
+                .then_some(())
+                .ok_or(VmError::PermissionDenied)
         })
     }
 
@@ -97,7 +112,7 @@ mod tests {
     kernel_test!("roxy-vm::zeroed-cross-page-io", zeroed_cross_page_io, {
         let mut space = AddrSpace::new().unwrap();
         let region = region_at(0x40_0000, 2);
-        space.map_zeroed(region, Permissions::ReadExecute).unwrap();
+        space.map_zeroed(region, Permissions::ReadWrite).unwrap();
         assert_eq!(
             space.map_zeroed(region, Permissions::ReadOnly),
             Err(VmError::AddressInUse)
@@ -120,7 +135,7 @@ mod tests {
         assert_eq!(output, input);
         assert_eq!(
             space.permissions(region.start),
-            Some(Permissions::ReadExecute)
+            Some(Permissions::ReadWrite)
         );
         space
             .read_bytes(UserAddress::new(0x70_0000).unwrap(), &mut [])
@@ -140,6 +155,34 @@ mod tests {
         space.read_bytes(address, &mut unchanged).unwrap();
         assert_eq!(unchanged, [0; 8]);
     });
+
+    kernel_test!(
+        "roxy-vm::read-only-tail-is-atomic",
+        read_only_tail_is_atomic,
+        {
+            let mut space = AddrSpace::new().unwrap();
+            space
+                .map_zeroed(region_at(0x60_0000, 1), Permissions::ReadWrite)
+                .unwrap();
+            space
+                .map_zeroed(region_at(0x60_1000, 1), Permissions::ReadOnly)
+                .unwrap();
+            let address = UserAddress::new(0x60_0ff8).unwrap();
+            let input = [0x5a; 16];
+
+            assert_eq!(
+                space.validate_writable(address, input.len()),
+                Err(VmError::PermissionDenied)
+            );
+            assert_eq!(
+                space.write_bytes(address, &input),
+                Err(VmError::PermissionDenied)
+            );
+            let mut unchanged = [0xff; 8];
+            space.read_bytes(address, &mut unchanged).unwrap();
+            assert_eq!(unchanged, [0; 8]);
+        }
+    );
 
     fn region_at(address: u64, pages: usize) -> UserRegion {
         let address = UserAddress::new(address).unwrap();

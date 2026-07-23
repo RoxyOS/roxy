@@ -20,11 +20,12 @@ mod seek;
 mod stat;
 mod tcb_set;
 mod vm;
+mod waitpid;
 mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 25] = [
+pub(super) const SYSCALLS: [Syscall; 26] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -50,4 +51,5 @@ pub(super) const SYSCALLS: [Syscall; 25] = [
     getuid::SYSCALL,
     getgid::SYSCALL,
     getegid::SYSCALL,
+    waitpid::SYSCALL,
 ];

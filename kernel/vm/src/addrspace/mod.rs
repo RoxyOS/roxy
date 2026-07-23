@@ -121,6 +121,19 @@ impl AddrSpaceHandle {
         self.0.lock().root_address()
     }
 
+    /// Validates that an entire userspace byte range is mapped and writable.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the range is invalid, unmapped, or read-only.
+    pub fn validate_writable(
+        &self,
+        address: roxy_memory::UserAddress,
+        length: usize,
+    ) -> Result<(), VmError> {
+        self.0.lock().validate_writable(address, length)
+    }
+
     /// Creates a private, zero-filled, writable anonymous allocation.
     ///
     /// # Errors

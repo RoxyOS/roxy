@@ -20,9 +20,9 @@ operations and receives an owned snapshot, so no process-table lock spans path n
 filesystem access.
 
 Each process also records an optional parent process ID. Directly spawned processes have no parent;
-fork children record the caller's process ID. This relationship is informational and does not own
-either process. An exited parent remains visible while its process-table entry is retained. Removing
-that entry clears every child's matching parent ID, making the child an orphan.
+fork children record the caller's process ID. Only that recorded parent may wait for and remove the
+child's exited process-table entry. An exited parent remains visible until its own parent waits for
+it; removing the entry clears every child's matching parent ID, making those children orphans.
 
 The scheduler owns threads and saved contexts, but never owns a process address-space handle. The
 ELF and VM crates provide construction primitives; process decides when a constructed image becomes
@@ -60,6 +60,19 @@ traverse deeply into VM and allocator code, so the caller-provided register snap
 only in transient ABI argument storage while that work runs. The child receives the preserved
 context with a zero syscall result before it is published to the scheduler.
 
+## Child wait flow
+
+Waiting checks child ownership and exit state while holding the process-table lock. In the current
+single-thread process model, a blocking wait registers one target for the parent process and
+prepares its scheduler block before releasing that lock. Thread reaping takes the same lock before
+publishing the child's `Exited` state and wakes the registered parent only when that child matches
+its target, so unrelated child exits do not cause spurious wakeups and an exit cannot be lost
+between the parent's check and block. The awakened parent rechecks state before reaping.
+
+A successful wait removes exactly one zombie. Waiting for any child chooses the lowest exited PID
+to keep selection deterministic without an additional exit-order queue. `WNOHANG` policy remains
+at the syscall boundary; process reports whether a matching child is pending or absent.
+
 ## Lifecycle invariants
 
 - A running process has a process-table entry, a thread-owner mapping, and an address space.
@@ -70,6 +83,9 @@ context with a zero syscall result before it is published to the scheduler.
   stack.
 - A child's parent ID remains stable through the parent's zombie state and becomes absent only when
   the parent is removed from the process table.
+- Only a direct parent removes a child's exited entry, and each exited entry is returned once.
+- Process-table inspection, waiter registration, scheduler block preparation, and exit publication
+  share one lock order: process table before scheduler.
 - The scheduler dispatch hook must activate the address space currently stored by the target
   process immediately before a user thread runs.
 
@@ -77,6 +93,7 @@ context with a zero syscall result before it is published to the scheduler.
 
 The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
 survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
-multi-threaded exec cleanup, credentials, signals, process groups, PID 1 reparenting, and child
-process collections are not. Process-identity callers encode an absent parent as PID 0. The
-working directory cannot yet be changed because `chdir` and `fchdir` are not implemented.
+multi-threaded exec cleanup, credentials, signals, process groups, and PID 1 reparenting are not.
+Orphan zombies are retained because no init reaper adopts them. Process-identity callers encode an
+absent parent as PID 0. The working directory cannot yet be changed because `chdir` and `fchdir`
+are not implemented.

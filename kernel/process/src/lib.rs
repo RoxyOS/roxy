@@ -12,17 +12,19 @@ mod lifecycle;
 mod memory;
 mod startup_stack;
 mod table;
+mod wait;
 
 pub use creation::spawn;
 pub use execve::execve_current;
 pub use fork::{ForkError, fork_current};
 pub use initial_fds::InitialFdInjector;
-pub use lifecycle::{exit_current, initialize, take_exit_status};
+pub use lifecycle::{exit_current, initialize};
 pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, protect_memory,
     unmap_anonymous,
 };
 pub use table::{current_parent_process_id, current_process_id};
+pub use wait::{WaitError, WaitResult, WaitTarget, wait_current};
 
 use alloc::sync::Arc;
 
@@ -45,6 +47,7 @@ struct Process {
     state: ProcessState,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProcessState {
     Running,
     Exiting(ExitStatus),
@@ -56,13 +59,30 @@ pub struct ProcessId(u64);
 
 impl ProcessId {
     #[must_use]
+    pub const fn new(value: u64) -> Option<Self> {
+        if value == 0 { None } else { Some(Self(value)) }
+    }
+
+    #[must_use]
     pub const fn as_u64(self) -> u64 {
         self.0
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ExitStatus(pub u64);
+pub struct ExitStatus(u8);
+
+impl ExitStatus {
+    #[must_use]
+    pub fn new(raw: u64) -> Self {
+        Self(raw.to_le_bytes()[0])
+    }
+
+    #[must_use]
+    pub const fn code(self) -> u8 {
+        self.0
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProcessError {

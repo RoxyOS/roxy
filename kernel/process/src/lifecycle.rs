@@ -1,7 +1,7 @@
 use roxy_thread::{ThreadId, scheduler};
 
 use crate::{
-    ExitStatus, InitialFdInjector, ProcessId, ProcessState, cwd, initial_fds,
+    ExitStatus, InitialFdInjector, ProcessState, cwd, initial_fds,
     table::{PROCESS_TABLE, ProcessTable},
 };
 
@@ -28,10 +28,6 @@ pub fn exit_current(status: ExitStatus) -> ! {
     scheduler::exit_current()
 }
 
-pub fn take_exit_status(process_id: ProcessId) -> Option<ExitStatus> {
-    PROCESS_TABLE.lock().take_exit_status(process_id)
-}
-
 fn on_thread_reaped(thread_id: ThreadId) {
     PROCESS_TABLE.lock().finish_thread_reap(thread_id);
 }
@@ -54,23 +50,7 @@ impl ProcessTable {
 
         process.addrspace = None;
         process.state = ProcessState::Exited(status);
-    }
-
-    fn take_exit_status(&mut self, process_id: ProcessId) -> Option<ExitStatus> {
-        let process = self.processes.get(&process_id)?;
-        let ProcessState::Exited(status) = process.state else {
-            return None;
-        };
-
-        self.processes.remove(&process_id);
-
-        for process in self.processes.values_mut() {
-            if process.parent_process_id == Some(process_id) {
-                process.parent_process_id = None;
-            }
-        }
-
-        Some(status)
+        self.wake_waiter(process_id);
     }
 }
 
@@ -113,9 +93,12 @@ mod tests {
         table.insert(process);
         table.insert(child_process);
 
-        table.begin_exit(thread_id, ExitStatus(42));
+        table.begin_exit(thread_id, ExitStatus::new(42));
         table.finish_thread_reap(thread_id);
-        assert_eq!(table.take_exit_status(process_id), Some(ExitStatus(42)));
+        assert_eq!(
+            table.reap_exited_process(process_id),
+            Some(ExitStatus::new(42))
+        );
         assert_eq!(table.processes[&child_process_id].parent_process_id, None);
         table.processes.remove(&child_process_id);
         assert!(statistics().allocated_frames > baseline);

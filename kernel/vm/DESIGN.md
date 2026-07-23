@@ -24,7 +24,8 @@ persistent process dispatch uses handle activation until another table is select
 - Mapping a multi-page region either succeeds completely or rolls back completed pages.
 - Anonymous free requires the exact original address and requested size; unmap rejects partial
   overlap with an allocation.
-- Byte reads require mapped readable pages; writes additionally require writable permissions.
+- Byte reads require mapped readable pages. Writes preflight the complete range and require every
+  covered page to be writable, so a failing cross-page write cannot partially mutate memory.
 - Permission changes cover a complete validated page-rounded range.
 
 ## Lifecycle flows

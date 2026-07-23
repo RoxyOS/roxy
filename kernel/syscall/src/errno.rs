@@ -6,6 +6,7 @@ pub(crate) enum Errno {
     ExecFormat = 8,
     Io = 5,
     BadFd = 9,
+    Child = 10,
     Again = 11,
     NoMem = 12,
     Access = 13,
