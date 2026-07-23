@@ -51,6 +51,7 @@ mod tests {
                 char::from_u32(u32::try_from(value).unwrap()).unwrap(),
             ));
         }
+
         input.enqueue_event(InputEvent::Character('\0'));
         assert_eq!(input.read(), Some(InputEvent::Character('\0')));
         assert_eq!(input.read(), Some(InputEvent::Character('\u{1}')));

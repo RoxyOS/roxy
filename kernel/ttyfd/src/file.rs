@@ -100,9 +100,11 @@ mod tests {
             if self.fail_next.swap(false, Ordering::Relaxed) {
                 return Err(OutputError::Io);
             }
+
             if self.zero_next.swap(false, Ordering::Relaxed) {
                 return Ok(0);
             }
+
             self.written.fetch_add(input.len(), Ordering::Relaxed);
             self.bytes.lock().extend_from_slice(input);
 

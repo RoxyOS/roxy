@@ -14,6 +14,7 @@ impl Vfs {
             if read == 0 {
                 break;
             }
+
             output.extend_from_slice(&buffer[..read]);
         }
 

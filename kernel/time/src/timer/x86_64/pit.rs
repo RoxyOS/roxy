@@ -31,6 +31,7 @@ pub(super) fn wait_calibration_window() {
         while speaker.read() & OUTPUT_TWO == 0 {
             spin_loop();
         }
+
         speaker.write(original);
     }
 }

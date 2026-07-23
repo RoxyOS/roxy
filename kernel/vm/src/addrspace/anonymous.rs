@@ -102,6 +102,7 @@ impl AddrSpace {
                 .map_err(super::mapping::mapping_error)?;
             self.pages.remove(&page).ok_or(VmError::MappingFailed)?;
         }
+
         self.anonymous.remove(&start);
 
         Ok(())

@@ -24,5 +24,6 @@ fn main() -> Result<()> {
             Arg::Test => action::test(),
         }?;
     }
+
     Ok(())
 }

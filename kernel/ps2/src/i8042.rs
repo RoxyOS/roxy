@@ -83,6 +83,7 @@ impl I8042FirstPort {
 
             spin_loop();
         }
+
         Err(InitError::Timeout)
     }
 
@@ -94,6 +95,7 @@ impl I8042FirstPort {
 
             spin_loop();
         }
+
         Err(InitError::Timeout)
     }
 
@@ -141,6 +143,7 @@ impl I8042FirstPort {
                 return Ok(());
             }
         }
+
         Err(InitError::ResetFailed)
     }
 

@@ -76,6 +76,7 @@ impl OpenFile {
         if new_position > i64::MAX.cast_unsigned() {
             return Err(SeekError::Overflow);
         }
+
         state.position = new_position;
 
         Ok(new_position)

@@ -146,6 +146,7 @@ impl Scheduler {
         if entry.state != ThreadState::Blocked {
             return false;
         }
+
         entry.state = ThreadState::Runnable;
 
         true

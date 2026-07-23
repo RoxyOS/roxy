@@ -34,6 +34,7 @@ impl TimerBackend for X86_64Timer {
             local_apic.set_timer_initial(initial_count);
             local_apic.disable_timer();
         }
+
         APIC_TIMER.initialize_current(Lock::new(X2ApicTimer { local_apic }));
     }
 

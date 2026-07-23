@@ -104,6 +104,7 @@ impl ResolvedPath {
             if index != 0 {
                 normalized.push(b'/');
             }
+
             normalized.extend_from_slice(component);
         }
 

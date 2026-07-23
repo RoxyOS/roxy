@@ -131,6 +131,7 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
         } else {
             flush.ignore();
         }
+
         Ok(())
     }
 
@@ -152,6 +153,7 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
         } else {
             flush.ignore();
         }
+
         Ok(())
     }
 

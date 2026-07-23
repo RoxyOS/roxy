@@ -40,6 +40,7 @@ fn command(image: &Path) -> Result<Command> {
     } else {
         command.args(["-accel", "tcg", "-cpu", "max"]);
     }
+
     command.arg("-drive").arg(format!(
         "if=pflash,unit=0,format=raw,file={},readonly=on",
         firmware.display()
