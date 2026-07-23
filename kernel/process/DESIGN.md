@@ -55,6 +55,11 @@ the new image independently, replaces the process table's address space with int
 activates it, and returns the new entry/stack pair to the architecture layer. PID, main thread, and
 FD table remain unchanged. A failed build leaves the old image untouched.
 
+Fork snapshots its child return context before copying process-owned state. Address-space cloning can
+traverse deeply into VM and allocator code, so the caller-provided register snapshot must not remain
+only in transient ABI argument storage while that work runs. The child receives the preserved
+context with a zero syscall result before it is published to the scheduler.
+
 ## Lifecycle invariants
 
 - A running process has a process-table entry, a thread-owner mapping, and an address space.
