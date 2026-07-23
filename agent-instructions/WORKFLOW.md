@@ -9,8 +9,13 @@ common development tasks. Read the applicable subsystem `DESIGN.md` before chang
 Use the persistent `distro/sources/mlibc-workdir` tree for local mlibc iteration. The mlibc recipe
 sets `clean_workdirs=no`, so this worktree is intentionally retained between builds.
 
+By default, limit mlibc work to local files in that worktree. Do not fetch, pull, rebase, switch,
+or otherwise synchronize with upstream mlibc or RoxyOS fork remotes. Do not create mlibc commits
+or push mlibc changes on the user's behalf; hand off the tested local changes so the user can
+commit and push them.
+
 1. Edit and test mlibc in `distro/sources/mlibc-workdir`. Do not update the recipe commit or fetch
-   upstream for every local change.
+   remote changes during local iteration.
 2. Build incrementally with:
 
    ```sh
@@ -30,10 +35,12 @@ sets `clean_workdirs=no`, so this worktree is intentionally retained between bui
    ```
 
    Kernel-only changes should reuse the existing rootfs and must not trigger an mlibc rebuild.
-4. Once behavior is stable, commit or export the mlibc change to the RoxyOS fork. Update
-   `distro/recipes/mlibc/recipe` with the fork commit and its `version`/`revision`, then perform
-   one clean package and rootfs build. Treat the result as reproducible only after that clean
-   build succeeds. Keep upstream pin changes out of the local iteration loop.
+4. Once behavior is stable, report the local diff and validation performed, then leave commit and
+   push to the user. Do not update the recipe to an unpublished local commit.
+5. Only after the user supplies a commit already pushed to the RoxyOS fork and explicitly requests
+   integration, update `distro/recipes/mlibc/recipe` with that commit and its `version`/`revision`,
+   then perform one clean package and rootfs build. Treat the result as reproducible only after
+   that clean build succeeds.
 
 ## Patching a distro package
 
