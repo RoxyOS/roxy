@@ -72,6 +72,7 @@ impl Architecture for X86_64 {
     }
 
     fn set_kernel_stack_top(kernel_stack_top: u64) {
+        user::set_kernel_stack_top(kernel_stack_top);
         syscall::set_kernel_stack_top(kernel_stack_top);
     }
 
@@ -98,4 +99,31 @@ impl Architecture for X86_64 {
             Self::halt();
         }
     }
+}
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use roxy_test::kernel_test;
+
+    use super::{Architecture, X86_64, syscall, user};
+
+    const TEST_STACK_TOP: u64 = 0xffff_8000_0000_1000;
+
+    kernel_test!(
+        "roxy-arch::privileged-entry-stack",
+        privileged_entry_stack,
+        {
+            X86_64::without_interrupts(|| {
+                let previous_tss = user::kernel_stack_top();
+                let previous_syscall = syscall::kernel_stack_top();
+
+                X86_64::set_kernel_stack_top(TEST_STACK_TOP);
+                assert_eq!(user::kernel_stack_top(), TEST_STACK_TOP);
+                assert_eq!(syscall::kernel_stack_top(), TEST_STACK_TOP);
+
+                user::set_kernel_stack_top(previous_tss);
+                syscall::set_kernel_stack_top(previous_syscall);
+            });
+        }
+    );
 }

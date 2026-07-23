@@ -155,6 +155,7 @@ pub trait Architecture: sealed::Sealed {
     /// Both addresses must be mapped as user-accessible in the active page table.
     unsafe fn resume_user(instruction_pointer: u64, stack_pointer: u64) -> !;
 
+    /// Selects the kernel stack used by every privileged entry from the active user thread.
     fn set_kernel_stack_top(kernel_stack_top: u64);
 
     fn user_thread_pointer() -> u64;

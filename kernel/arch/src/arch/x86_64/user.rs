@@ -10,9 +10,8 @@ pub(super) unsafe fn enter(
     kernel_stack_top: u64,
 ) -> ! {
     assert!(!x86_64::instructions::interrupts::are_enabled());
-    let tss = init::tss_pointer();
-    // SAFETY: interrupts are disabled on the single supported CPU, so TSS mutation is exclusive.
-    unsafe { (*tss).privilege_stack_table[0] = VirtAddr::new(kernel_stack_top) };
+
+    set_kernel_stack_top(kernel_stack_top);
 
     let (code_selector, data_selector) = init::user_selectors();
     // SAFETY: initialization installed these selectors and the caller validated both user mappings.
@@ -24,6 +23,23 @@ pub(super) unsafe fn enter(
             data_selector,
         )
     }
+}
+
+pub(super) fn set_kernel_stack_top(kernel_stack_top: u64) {
+    assert!(!x86_64::instructions::interrupts::are_enabled());
+
+    let tss = init::tss_pointer();
+
+    // SAFETY: interrupts are disabled on the single supported CPU, so TSS mutation is exclusive.
+    unsafe { (*tss).privilege_stack_table[0] = VirtAddr::new(kernel_stack_top) };
+}
+
+#[cfg(feature = "kernel-test")]
+pub(super) fn kernel_stack_top() -> u64 {
+    let tss = init::tss_pointer();
+
+    // SAFETY: tests read the permanent BSP TSS without concurrent mutation.
+    unsafe { (*tss).privilege_stack_table[0].as_u64() }
 }
 
 #[unsafe(naked)]

@@ -40,6 +40,11 @@ returning through the old userspace frame.
 Architecture methods that enter userspace require the active page table to map the supplied user
 addresses. Unsafe backend code must keep this obligation local and document it at the call site.
 
+Before dispatching a user thread, the scheduler supplies the top of that thread's owned kernel
+stack through the architecture boundary. The x86_64 backend updates both the software SYSCALL
+entry stack and TSS RSP0 while interrupts are disabled, so syscalls, interrupts, and exceptions
+from ring 3 all enter on the same thread-owned stack.
+
 ## Failure and limits
 
 Invalid CPU state, unsupported exception forms, non-canonical user pointers, and repeated

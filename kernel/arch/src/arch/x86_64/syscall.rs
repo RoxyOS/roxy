@@ -83,7 +83,9 @@ pub(super) fn configure(handler: SyscallHandler) {
         0,
         "syscall initialized twice"
     );
+
     let (user_code, user_data, kernel_code, kernel_data) = init::syscall_selectors();
+
     // SAFETY: architecture initialization established long mode and a permanent entry point.
     unsafe { Efer::update(|flags| flags.insert(EferFlags::SYSTEM_CALL_EXTENSIONS)) };
 
@@ -95,6 +97,11 @@ pub(super) fn configure(handler: SyscallHandler) {
 
 pub(super) fn set_kernel_stack_top(kernel_stack_top: u64) {
     KERNEL_STACK_TOP.store(kernel_stack_top, Ordering::Release);
+}
+
+#[cfg(feature = "kernel-test")]
+pub(super) fn kernel_stack_top() -> u64 {
+    KERNEL_STACK_TOP.load(Ordering::Acquire)
 }
 
 #[unsafe(naked)]
@@ -163,6 +170,7 @@ extern "C" fn dispatch(frame: *const EntryFrame) -> u64 {
 
     // SAFETY: entry passes a pointer to its complete, live frame on the kernel stack.
     let frame = unsafe { &*frame };
+
     let request = RawSyscall {
         number: frame.rax,
         arguments: [
@@ -188,6 +196,7 @@ extern "C" fn dispatch(frame: *const EntryFrame) -> u64 {
             fs_base: CurrentArchitectureBackend::user_thread_pointer(),
         },
     };
+
     // SAFETY: configure stores one permanent SyscallHandler function pointer.
     let handler: SyscallHandler = unsafe { transmute(address) };
     handler(request)
