@@ -29,7 +29,7 @@ impl Tty {
         }
 
         loop {
-            let count = self.read_available(output)?;
+            let count = self.read_inner(output)?;
 
             if count > 0 {
                 return Ok(count);
@@ -44,12 +44,12 @@ impl Tty {
         self.output.write(input).map_err(map_output_error)
     }
 
-    fn read_available(&self, output: &mut [u8]) -> Result<usize, FileError> {
+    fn read_inner(&self, output: &mut [u8]) -> Result<usize, FileError> {
         let _read_guard = self.read_lock.lock();
         let mut count = 0;
 
         while count < output.len() {
-            let Some(result) = self.next_result() else {
+            let Some(result) = self.next_input_result() else {
                 break;
             };
 
@@ -85,7 +85,7 @@ impl Tty {
         Ok(1)
     }
 
-    fn next_result(&self) -> Option<ProcessResult> {
+    fn next_input_result(&self) -> Option<ProcessResult> {
         if let Some(result) = *self.pending_result.lock() {
             return Some(result);
         }

@@ -21,6 +21,7 @@ struct Tty {
     input: Arc<dyn InputDevice>,
     output: Arc<dyn TerminalOutput>,
     line_discipline: Lock<LineDiscipline>,
+    // Holds encoded event bytes that did not fit in the previous read buffer.
     pending: Lock<Option<encoder::EncodedInputEvent>>,
     pending_offset: Lock<usize>,
     pending_result: Lock<Option<roxy_line_discipline::ProcessResult>>,
