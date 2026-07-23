@@ -98,7 +98,7 @@ impl ProcessTable {
     }
 
     /// Wakes the process waiting for `process_id` to exit.
-    pub(super) fn wake_waiter(&mut self, process_id: ProcessId) {
+    pub(super) fn wake_exit_waiter(&mut self, process_id: ProcessId) {
         let Some(thread_id) = self.take_waiter_thread(process_id) else {
             return;
         };

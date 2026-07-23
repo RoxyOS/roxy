@@ -50,7 +50,7 @@ impl ProcessTable {
 
         process.addrspace = None;
         process.state = ProcessState::Exited(status);
-        self.wake_waiter(process_id);
+        self.wake_exit_waiter(process_id);
     }
 }
 
