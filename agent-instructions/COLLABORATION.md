@@ -26,9 +26,11 @@ overlapping writes, and preserve changes made by other agents.
 ## Subsystem Scope
 
 A subsystem is the smallest directory that owns the planned change. A crate, package, recipe,
-architecture backend, or directory with its own `DESIGN.md` is normally a subsystem. If a change
-spans several nested areas, lock their nearest common owning directory. Files at the repository
-root require a repository-root lock.
+architecture backend, or directory with its own `DESIGN.md` is normally a subsystem. Never
+create an `.agent-lock` in the project root: every lock must be scoped to exactly one subsystem.
+If a change spans multiple subsystems, acquire a separate lock for each affected subsystem rather
+than broadening a lock to their common parent. Coordinate repository-root files with the affected
+subsystem owners; do not use a repository-root lock.
 
 A lock covers the directory containing it and that directory's entire tree. Lock scopes overlap
 when they are identical or when either directory is an ancestor of the other. Overlapping locks
@@ -65,9 +67,9 @@ Acquire a lock as follows:
    making any other write.
 4. Keep the lock through implementation, formatting, generation, and validation.
 
-When a task needs several independent subsystem locks, determine all required scopes first,
-acquire them in lexicographic path order, and begin editing only after all acquisitions succeed.
-If any acquisition fails, release the locks acquired for that task and coordinate the conflict.
+When a task needs locks for several subsystems, determine all required scopes first, acquire them
+in lexicographic path order, and begin editing only after all acquisitions succeed. If any
+acquisition fails, release the locks acquired for that task and coordinate the conflict.
 
 ## Conflicts And Stale Locks
 
