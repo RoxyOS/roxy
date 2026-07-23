@@ -1,4 +1,4 @@
-use core::{ptr, slice};
+use core::ptr;
 
 use roxy_boot::FramebufferInfo;
 
@@ -17,7 +17,7 @@ struct PixelFormat {
 }
 
 pub(crate) struct Framebuffer {
-    address: *mut u8,
+    address: *mut u32,
     width: usize,
     height: usize,
     pitch: usize,
@@ -112,12 +112,9 @@ impl Framebuffer {
             for pixel_x in left..right {
                 let offset = pixel_y * self.pitch + pixel_x * BYTES_PER_PIXEL;
 
-                // SAFETY: construction validates the full pitch * height mapping, and the
+                // SAFETY: construction validates the mapping and pixel alignment, while the
                 // rectangle assertions keep this four-byte pixel inside its visible row.
-                unsafe {
-                    let pixel = ptr::read_unaligned(self.address.add(offset).cast::<u32>());
-                    ptr::write_unaligned(self.address.add(offset).cast::<u32>(), pixel ^ mask);
-                }
+                unsafe { self.write_pixel_at(offset, self.read_pixel_at(offset) ^ mask) };
             }
         }
     }
@@ -129,37 +126,50 @@ impl Framebuffer {
         clear_color: u32,
     ) {
         assert!(pixel_rows <= region_height && region_height <= self.height);
-        let source_offset = self.pitch * pixel_rows;
-        let copy_length = self.pitch * (region_height - pixel_rows);
-        let clear_offset = copy_length;
-        let clear_length = self.pitch * pixel_rows;
+        for destination_y in 0..region_height - pixel_rows {
+            let source_y = destination_y + pixel_rows;
 
-        // SAFETY: construction validates pitch * height, the assertions bound both regions, and
-        // ptr::copy permits their overlap while moving rows toward the start of the mapping. The
-        // vacated rows form the following in-bounds byte range.
-        unsafe {
-            ptr::copy(self.address.add(source_offset), self.address, copy_length);
-            slice::from_raw_parts_mut(self.address.add(clear_offset), clear_length).fill(0);
+            for pixel_x in 0..self.width {
+                let color = self.read_pixel(pixel_x, source_y);
+                self.write_pixel(pixel_x, destination_y, color);
+            }
         }
 
-        if clear_color != 0 {
-            self.fill_rect(
-                0,
-                region_height - pixel_rows,
-                self.width,
-                pixel_rows,
-                clear_color,
-            );
-        }
+        self.fill_rect(
+            0,
+            region_height - pixel_rows,
+            self.width,
+            pixel_rows,
+            clear_color,
+        );
     }
 
     pub(crate) fn write_pixel(&mut self, pixel_x: usize, pixel_y: usize, color: u32) {
         assert!(pixel_x < self.width && pixel_y < self.height);
         let offset = pixel_y * self.pitch + pixel_x * BYTES_PER_PIXEL;
 
-        // SAFETY: construction validates the full pitch * height mapping, and the assertions keep
-        // the four-byte pixel inside its visible row.
-        unsafe { ptr::write_unaligned(self.address.add(offset).cast::<u32>(), color) };
+        // SAFETY: construction validates the mapping and pixel alignment, while the assertions
+        // keep this four-byte pixel inside its visible row.
+        unsafe { self.write_pixel_at(offset, color) };
+    }
+
+    fn read_pixel(&self, pixel_x: usize, pixel_y: usize) -> u32 {
+        assert!(pixel_x < self.width && pixel_y < self.height);
+        let offset = pixel_y * self.pitch + pixel_x * BYTES_PER_PIXEL;
+
+        // SAFETY: construction validates the mapping and pixel alignment, while the assertions
+        // keep this four-byte pixel inside its visible row.
+        unsafe { self.read_pixel_at(offset) }
+    }
+
+    unsafe fn read_pixel_at(&self, offset: usize) -> u32 {
+        // SAFETY: callers prove this is an aligned pixel inside the framebuffer mapping.
+        unsafe { ptr::read_volatile(self.address.add(offset / BYTES_PER_PIXEL)) }
+    }
+
+    unsafe fn write_pixel_at(&mut self, offset: usize, color: u32) {
+        // SAFETY: callers prove this is an aligned pixel inside the framebuffer mapping.
+        unsafe { ptr::write_volatile(self.address.add(offset / BYTES_PER_PIXEL), color) };
     }
 }
 
@@ -195,6 +205,8 @@ fn supported(
         && info.bits_per_pixel == 32
         && pitch >= row_bytes
         && address != 0
+        && address.is_multiple_of(BYTES_PER_PIXEL)
+        && pitch.is_multiple_of(BYTES_PER_PIXEL)
         && valid_channel(info.red_mask_size, info.red_mask_shift)
         && valid_channel(info.green_mask_size, info.green_mask_shift)
         && valid_channel(info.blue_mask_size, info.blue_mask_shift)

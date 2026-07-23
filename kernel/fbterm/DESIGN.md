@@ -42,7 +42,8 @@ Console → TextRenderer → Framebuffer → framebuffer mapping
 `Framebuffer` is the pixel-addressed hardware boundary. It validates and owns the boot-provided
 mapping, physical pixel dimensions, pitch, and RGB channel layout. It converts RGB components into
 native pixels and provides bounded pixel, rectangle, and pixel-row operations. It has no concept of
-characters, cells, cursors, or terminal control bytes.
+characters, cells, cursors, or terminal control bytes. Every pixel access is a volatile 32-bit
+operation so scrolling does not turn the device mapping into an ordinary-memory copy.
 
 `TextRenderer` interprets the framebuffer as a grid of fixed 8x16 cells. It derives and owns the
 grid's total `columns` and `rows` from the framebuffer dimensions; a partial cell at the right or

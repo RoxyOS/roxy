@@ -172,6 +172,19 @@ mod tests {
         assert_eq!(console.row, 1);
     });
 
+    kernel_test!("roxy-fbterm::scroll-overflow", scrolls_after_last_row, {
+        let mut storage = vec![0u8; 32 * 64];
+        let mut console = console(&mut storage, 16, 32);
+
+        console.write(b"A\nB");
+        let bottom_cell = cell_bytes(&storage, 64, 0, 1);
+        console.write(b"\n");
+
+        assert_eq!(cell_bytes(&storage, 64, 0, 0), bottom_cell);
+        assert_eq!(console.column, 0);
+        assert_eq!(console.row, 1);
+    });
+
     kernel_test!("roxy-fbterm::ignored-byte", ignores_non_ascii, {
         let mut storage = vec![0u8; 32 * 64];
         let mut console = console(&mut storage, 16, 32);
