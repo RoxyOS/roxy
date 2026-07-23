@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/block", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/elf", "kernel/ext4", "kernel/fbterm", "kernel/fd", "kernel/futex", "kernel/input", "kernel/interrupt", "kernel/memory", "kernel/process", "kernel/ps2", "kernel/serial", "kernel/syscall", "kernel/terminal", "kernel/test", "kernel/thread", "kernel/time", "kernel/ttyfd", "kernel/utils", "kernel/vfs", "kernel/vm"]
+members = ["xtask", "kernel/arch", "kernel/block", "kernel/boot", "kernel/core", "kernel/cpu", "kernel/elf", "kernel/ext4", "kernel/fbterm", "kernel/fd", "kernel/futex", "kernel/input", "kernel/interrupt", "kernel/line-discipline", "kernel/memory", "kernel/process", "kernel/ps2", "kernel/serial", "kernel/syscall", "kernel/terminal", "kernel/test", "kernel/thread", "kernel/time", "kernel/ttyfd", "kernel/utils", "kernel/vfs", "kernel/vm"]
 
 [workspace.package]
 edition = "2024"
@@ -40,6 +40,7 @@ roxy-fd.path = "kernel/fd"
 roxy-futex.path = "kernel/futex"
 roxy-input.path = "kernel/input"
 roxy-interrupt.path = "kernel/interrupt"
+roxy-line-discipline.path = "kernel/line-discipline"
 roxy-memory.path = "kernel/memory"
 roxy-process.path = "kernel/process"
 roxy-ps2.path = "kernel/ps2"

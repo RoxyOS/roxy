@@ -6,9 +6,10 @@
 the composition root. It does not choose a hardware backend, own hardware drivers, adapt endpoints
 to file descriptors, assign process descriptor numbers, or implement syscall ABI policy.
 
-Input devices, TTY file descriptors, echo, terminal attributes, pseudo-terminals, job control, and
-signal generation are outside this subsystem. Future line discipline must sit above raw input and
-output endpoints rather than introduce terminal-specific paths in process or syscall code.
+Input devices, TTY file descriptors, line discipline, echo, terminal attributes, pseudo-terminals,
+job control, and signal generation are outside this subsystem. `roxy-line-discipline` and
+`roxy-ttyfd` sit above raw input and output endpoints rather than introducing terminal-specific
+paths in process or syscall code.
 
 ## Ownership and file adaptation
 

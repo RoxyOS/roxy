@@ -1,28 +1,11 @@
 use alloc::{boxed::Box, sync::Arc};
 
-use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_fd::{File, FileError, FileMetadata, FileType, OpenFile, SeekError, SeekFrom};
-use roxy_input::InputDevice;
-use roxy_terminal::{OutputError, TerminalOutput};
 
-use crate::encoder::{EncodedInputEvent, encode_input_event};
+use crate::Tty;
 
 pub(super) struct TtyFile {
-    input: Arc<dyn InputDevice>,
-    output: Arc<dyn TerminalOutput>,
-    // Holds encoded event bytes that did not fit in the previous read buffer.
-    pending: Option<EncodedInputEvent>,
-    pending_offset: usize,
-}
-
-#[must_use]
-pub fn open_file(input: Arc<dyn InputDevice>, output: Arc<dyn TerminalOutput>) -> Arc<OpenFile> {
-    OpenFile::new(Box::new(TtyFile {
-        input,
-        output,
-        pending: None,
-        pending_offset: 0,
-    }))
+    tty: Arc<Tty>,
 }
 
 impl File for TtyFile {
@@ -41,24 +24,11 @@ impl File for TtyFile {
     }
 
     fn read(&mut self, _position: &mut u64, output: &mut [u8]) -> Result<usize, FileError> {
-        if output.is_empty() {
-            return Ok(0);
-        }
-
-        loop {
-            let count = self.read_available(output);
-
-            if count > 0 {
-                return Ok(count);
-            }
-
-            assert!(!CurrentArchitectureBackend::interrupts_enabled());
-            CurrentArchitectureBackend::wait_for_interrupt();
-        }
+        self.tty.read(output)
     }
 
     fn write(&mut self, _position: &mut u64, input: &[u8]) -> Result<usize, FileError> {
-        self.output.write(input).map_err(map_output_error)
+        self.tty.write(input)
     }
 
     fn seek(&mut self, _current: u64, _position: SeekFrom) -> Result<u64, SeekError> {
@@ -67,57 +37,25 @@ impl File for TtyFile {
 }
 
 impl TtyFile {
-    fn read_available(&mut self, output: &mut [u8]) -> usize {
-        let mut count = self.drain_pending(output);
-
-        while count < output.len() {
-            let Some(event) = self.input.read_event() else {
-                break;
-            };
-
-            self.pending = encode_input_event(event);
-            count += self.drain_pending(&mut output[count..]);
-        }
-
-        count
-    }
-
-    fn drain_pending(&mut self, output: &mut [u8]) -> usize {
-        let Some(pending) = self.pending else {
-            return 0;
-        };
-        let remaining = &pending.as_bytes()[self.pending_offset..];
-        let count = output.len().min(remaining.len());
-        output[..count].copy_from_slice(&remaining[..count]);
-        self.pending_offset += count;
-
-        if self.pending_offset == pending.as_bytes().len() {
-            self.pending = None;
-            self.pending_offset = 0;
-        }
-
-        count
-    }
-}
-
-fn map_output_error(error: OutputError) -> FileError {
-    match error {
-        OutputError::Io => FileError::Io,
+    #[must_use]
+    pub(super) fn open(tty: Arc<Tty>) -> Arc<OpenFile> {
+        OpenFile::new(Box::new(Self { tty }))
     }
 }
 
 #[cfg(feature = "kernel-test")]
 mod tests {
     use alloc::{sync::Arc, vec::Vec};
-    use core::sync::atomic::{AtomicUsize, Ordering};
+    use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-    use roxy_fd::{FileType, SeekError, SeekFrom};
+    use roxy_fd::{FileError, FileType, SeekError, SeekFrom};
     use roxy_input::{InputDevice, InputEvent, KeyCode, KeyState};
     use roxy_terminal::{OutputError, TerminalOutput};
     use roxy_test::kernel_test;
     use spin::Mutex;
 
-    use super::open_file;
+    use super::TtyFile;
+    use crate::Tty;
 
     struct MockInput;
 
@@ -142,10 +80,29 @@ mod tests {
     struct MockOutput {
         written: AtomicUsize,
         bytes: Mutex<Vec<u8>>,
+        fail_next: AtomicBool,
+        zero_next: AtomicBool,
+    }
+
+    impl MockOutput {
+        fn new() -> Self {
+            Self {
+                written: AtomicUsize::new(0),
+                bytes: Mutex::new(Vec::new()),
+                fail_next: AtomicBool::new(false),
+                zero_next: AtomicBool::new(false),
+            }
+        }
     }
 
     impl TerminalOutput for MockOutput {
         fn write(&self, input: &[u8]) -> Result<usize, OutputError> {
+            if self.fail_next.swap(false, Ordering::Relaxed) {
+                return Err(OutputError::Io);
+            }
+            if self.zero_next.swap(false, Ordering::Relaxed) {
+                return Ok(0);
+            }
             self.written.fetch_add(input.len(), Ordering::Relaxed);
             self.bytes.lock().extend_from_slice(input);
 
@@ -153,14 +110,19 @@ mod tests {
         }
     }
 
+    fn open_file(
+        input: Arc<dyn InputDevice>,
+        output: Arc<dyn TerminalOutput>,
+    ) -> Arc<roxy_fd::OpenFile> {
+        TtyFile::open(Arc::new(Tty::new(input, output)))
+    }
+
     kernel_test!("roxy-ttyfd::file-adapter", delegates_tty_io, {
         let input = Arc::new(MockInput);
-        let output = Arc::new(MockOutput {
-            written: AtomicUsize::new(0),
-            bytes: Mutex::new(Vec::new()),
-        });
-        let first = open_file(input.clone(), output.clone());
-        let second = open_file(input, output.clone());
+        let output = Arc::new(MockOutput::new());
+        let tty = Arc::new(Tty::new(input, output.clone()));
+        let first = TtyFile::open(tty.clone());
+        let second = TtyFile::open(tty);
         let mut buffer = [0; 4];
 
         assert!(first.is_terminal());
@@ -174,13 +136,13 @@ mod tests {
         assert_eq!(&buffer, b"xxxx");
         assert_eq!(first.write(b"one"), Ok(3));
         assert_eq!(second.write(b"two"), Ok(3));
-        assert_eq!(output.written.load(Ordering::Relaxed), 6);
-        assert_eq!(&*output.bytes.lock(), b"onetwo");
+        assert_eq!(output.written.load(Ordering::Relaxed), 10);
+        assert_eq!(&*output.bytes.lock(), b"xxxxonetwo");
         assert_eq!(first.seek(SeekFrom::Start(0)), Err(SeekError::NotSeekable));
         assert!(!Arc::ptr_eq(&first, &second));
     });
 
-    kernel_test!("roxy-ttyfd::event-encoding", encodes_input_events, {
+    kernel_test!("roxy-ttyfd::event-encoding", encodes_and_echoes_events, {
         let input = Arc::new(EventInput {
             events: Mutex::new(alloc::vec![
                 InputEvent::Character('é'),
@@ -194,11 +156,8 @@ mod tests {
                 },
             ]),
         });
-        let output = Arc::new(MockOutput {
-            written: AtomicUsize::new(0),
-            bytes: Mutex::new(Vec::new()),
-        });
-        let file = open_file(input, output);
+        let output = Arc::new(MockOutput::new());
+        let file = open_file(input, output.clone());
         let mut first = [0; 3];
         let mut second = [0; 2];
 
@@ -206,5 +165,65 @@ mod tests {
         assert_eq!(&first, &[0xc3, 0xa9, 0x1b]);
         assert_eq!(file.read(&mut second), Ok(2));
         assert_eq!(&second, b"[D");
+        assert_eq!(&*output.bytes.lock(), &[0xc3, 0xa9, 0x1b, b'[', b'D']);
+    });
+
+    kernel_test!("roxy-ttyfd::shared-input-state", shares_tty_input_state, {
+        let input = Arc::new(EventInput {
+            events: Mutex::new(alloc::vec![InputEvent::Character('é')]),
+        });
+        let output = Arc::new(MockOutput::new());
+        let tty = Arc::new(Tty::new(input, output.clone()));
+        let first = TtyFile::open(tty.clone());
+        let second = TtyFile::open(tty.clone());
+        let mut first_byte = [0; 1];
+        let mut second_byte = [0; 1];
+
+        assert_eq!(Arc::strong_count(&tty), 3);
+        assert!(!Arc::ptr_eq(&first, &second));
+        assert_eq!(first.read(&mut first_byte), Ok(1));
+        assert_eq!(second.read(&mut second_byte), Ok(1));
+        assert_eq!(first_byte, [0xc3]);
+        assert_eq!(second_byte, [0xa9]);
+        assert_eq!(&*output.bytes.lock(), &[0xc3, 0xa9]);
+    });
+
+    kernel_test!("roxy-ttyfd::disabled-echo", skips_disabled_echo, {
+        let input = Arc::new(EventInput {
+            events: Mutex::new(alloc::vec![InputEvent::Character('x')]),
+        });
+        let output = Arc::new(MockOutput::new());
+        let tty = Arc::new(Tty::new(input, output.clone()));
+        tty.line_discipline.lock().termios.echo = false;
+        let file = TtyFile::open(tty);
+        let mut buffer = [0; 1];
+
+        assert_eq!(file.read(&mut buffer), Ok(1));
+        assert_eq!(&buffer, b"x");
+        assert!(output.bytes.lock().is_empty());
+    });
+
+    kernel_test!("roxy-ttyfd::echo-retry", retries_failed_echo, {
+        let input = Arc::new(EventInput {
+            events: Mutex::new(alloc::vec![
+                InputEvent::Character('x'),
+                InputEvent::Character('y'),
+            ]),
+        });
+        let output = Arc::new(MockOutput::new());
+        let file = open_file(input, output.clone());
+        let mut buffer = [0; 1];
+
+        output.fail_next.store(true, Ordering::Relaxed);
+        assert_eq!(file.read(&mut buffer), Err(FileError::Io));
+        assert_eq!(file.read(&mut buffer), Ok(1));
+        assert_eq!(&buffer, b"x");
+        assert_eq!(&*output.bytes.lock(), b"x");
+
+        output.zero_next.store(true, Ordering::Relaxed);
+        assert_eq!(file.read(&mut buffer), Err(FileError::Io));
+        assert_eq!(file.read(&mut buffer), Ok(1));
+        assert_eq!(&buffer, b"y");
+        assert_eq!(&*output.bytes.lock(), b"xy");
     });
 }

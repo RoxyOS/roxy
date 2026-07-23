@@ -1,0 +1,17 @@
+[package]
+name = "roxy-line-discipline"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+kernel-test = ["dep:linkme", "dep:roxy-test"]
+
+[dependencies]
+linkme = { workspace = true, optional = true }
+
+roxy-test = { workspace = true, optional = true }
+
+[lints]
+workspace = true

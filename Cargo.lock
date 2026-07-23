@@ -605,6 +605,7 @@ dependencies = [
  "roxy-futex",
  "roxy-input",
  "roxy-interrupt",
+ "roxy-line-discipline",
  "roxy-memory",
  "roxy-process",
  "roxy-ps2",
@@ -618,6 +619,14 @@ dependencies = [
  "roxy-vfs",
  "roxy-vm",
  "spin 0.12.2",
+]
+
+[[package]]
+name = "roxy-line-discipline"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-test",
 ]
 
 [[package]]
@@ -751,8 +760,10 @@ dependencies = [
  "roxy-arch",
  "roxy-fd",
  "roxy-input",
+ "roxy-line-discipline",
  "roxy-terminal",
  "roxy-test",
+ "roxy-utils",
  "spin 0.12.2",
 ]
 

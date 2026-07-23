@@ -20,6 +20,7 @@ kernel-test = [
     "roxy-ext4/kernel-test",
     "roxy-fbterm/kernel-test",
     "roxy-futex/kernel-test",
+    "roxy-line-discipline/kernel-test",
     "roxy-ttyfd/kernel-test",
     "roxy-interrupt/kernel-test",
     "roxy-memory/kernel-test",
@@ -56,6 +57,7 @@ roxy-fd.workspace = true
 roxy-futex.workspace = true
 roxy-input.workspace = true
 roxy-interrupt.workspace = true
+roxy-line-discipline.workspace = true
 roxy-memory.workspace = true
 roxy-process.workspace = true
 roxy-ps2.workspace = true

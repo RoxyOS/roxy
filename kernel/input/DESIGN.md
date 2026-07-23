@@ -13,5 +13,6 @@ documented policy.
 `Character` carries Unicode text and control characters; `Key` carries non-character keys with
 pressed/released state. Drivers own only input production and queue synchronization; TTY adapters
 own byte encoding, buffer filling, and waiting policy.
-The current interface deliberately has no echo, canonical processing, terminal attributes, signals,
-blocking API, or device enumeration. Those are future TTY or line-discipline responsibilities.
+The current interface deliberately has no echo, canonical processing, terminal attributes,
+signals, blocking API, or device enumeration. TTY adapters and line disciplines own those policies
+above this raw-input boundary.

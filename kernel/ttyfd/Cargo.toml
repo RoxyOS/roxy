@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-kernel-test = ["dep:linkme", "dep:roxy-test"]
+kernel-test = ["dep:linkme", "dep:roxy-test", "roxy-line-discipline/kernel-test"]
 
 [dependencies]
 linkme = { workspace = true, optional = true }
@@ -15,8 +15,10 @@ spin.workspace = true
 roxy-fd.workspace = true
 roxy-arch.workspace = true
 roxy-input.workspace = true
+roxy-line-discipline.workspace = true
 roxy-terminal.workspace = true
 roxy-test = { workspace = true, optional = true }
+roxy-utils.workspace = true
 
 [lints]
 workspace = true
