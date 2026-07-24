@@ -70,6 +70,10 @@
 
 - Keep unsafe code local. Every unsafe block or unsafe implementation must have a nearby `SAFETY`
   explanation covering the relevant caller obligations and invariants.
+- Represent C and userspace ABI records with typed `#[repr(C)]` structs whenever practical. Model
+  padding explicitly and initialize every field; do not encode or decode structured ABI data by
+  manually indexing raw byte buffers. Convert a typed value to bytes only at the I/O boundary, keep
+  that conversion local, and document its layout and lifetime invariants in the `SAFETY` comment.
 - **IMPORTANT**: **Never** reject, terminate, block indefinitely, silently degrade, or return any
   error for a userspace request because kernel functionality is missing or incomplete without
   first emitting an unconditional serial `UNSUPPORTED` diagnostic naming the syscall or operation,
