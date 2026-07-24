@@ -40,7 +40,10 @@ commit and push them.
 5. Only after the user supplies a commit already pushed to the RoxyOS fork and explicitly requests
    integration, update `distro/recipes/mlibc/recipe` with that commit and its `version`/`revision`,
    then perform one clean package and rootfs build. Treat the result as reproducible only after
-   that clean build succeeds.
+   that clean build succeeds. Use `0.0.0.YYYYMMDD` for the first mlibc recipe update on a date.
+   For additional updates on the same date, append and increment a version suffix such as `.1`,
+   `.2`, and so on. Keep `revision=1` for these updates; do not use `revision` to distinguish
+   same-date mlibc commits. On the next date, return to the unsuffixed date version.
 
 ## Patching a distro package
 
