@@ -193,6 +193,18 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::Sigaction)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::OpenDir)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::ReadEntries)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {

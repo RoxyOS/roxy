@@ -10,6 +10,7 @@ use crate::{
 
 pub(crate) struct MockFileSystem {
     file_id: u64,
+    file_type: FileType,
     last_path: Lock<Vec<u8>>,
     syncs: AtomicUsize,
 }
@@ -18,8 +19,16 @@ impl MockFileSystem {
     pub(crate) fn new(file_id: u64) -> Self {
         Self {
             file_id,
+            file_type: FileType::Regular,
             last_path: Lock::new(Vec::new()),
             syncs: AtomicUsize::new(0),
+        }
+    }
+
+    pub(crate) fn directory(file_id: u64) -> Self {
+        Self {
+            file_type: FileType::Directory,
+            ..Self::new(file_id)
         }
     }
 
@@ -34,7 +43,7 @@ impl MockFileSystem {
     fn metadata_value(&self) -> Metadata {
         Metadata {
             file_id: self.file_id,
-            file_type: FileType::Regular,
+            file_type: self.file_type,
             permissions: crate::FilePermissions::DEFAULT_FILE,
             size: 0,
             hard_links: 1,

@@ -15,5 +15,7 @@ spin.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-utils.workspace = true
 
+roxy-fd.workspace = true
+
 [lints]
 workspace = true

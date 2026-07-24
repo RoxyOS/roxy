@@ -1,9 +1,9 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 use roxy_utils::Lock;
 
 use crate::file::File;
-use crate::{FileError, FileMetadata, SeekError, SeekFrom};
+use crate::{DirectoryEntry, FileError, FileMetadata, SeekError, SeekFrom};
 
 struct OpenFileState {
     object: Box<dyn File>,
@@ -80,6 +80,19 @@ impl OpenFile {
         state.position = new_position;
 
         Ok(new_position)
+    }
+
+    /// Reads directory entries through the serialized open-file state if `self` is a directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns `BadOperation` when the open object is not a directory.
+    pub fn read_directory_entries(&self, limit: usize) -> Result<Vec<DirectoryEntry>, FileError> {
+        let mut state = self.state.lock();
+        let OpenFileState { object, position } = &mut *state;
+        let directory = object.as_directory().ok_or(FileError::BadOperation)?;
+
+        directory.read_entries(position, limit)
     }
 }
 

@@ -585,7 +585,6 @@ dependencies = [
  "linkme",
  "roxy-test",
  "roxy-utils",
- "roxy-vfs",
 ]
 
 [[package]]
@@ -779,6 +778,7 @@ name = "roxy-vfs"
 version = "0.1.0"
 dependencies = [
  "linkme",
+ "roxy-fd",
  "roxy-test",
  "roxy-utils",
  "spin 0.12.2",

@@ -59,6 +59,7 @@ roxy_test::kernel_test!(
         drop(hard);
 
         let entries = read_dir(b"/b").unwrap();
+        assert!(entries.iter().all(|entry| entry.file_id != 0));
 
         assert!(entries.iter().any(|entry| entry.name == b"file"));
 

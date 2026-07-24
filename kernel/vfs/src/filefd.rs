@@ -1,29 +1,21 @@
-use alloc::{boxed::Box, sync::Arc};
+use roxy_fd::{
+    File as FdFile, FileError as FdFileError, FileMetadata as FdFileMetadata,
+    FileType as FdFileType, SeekError as FdSeekError, SeekFrom as FdSeekFrom,
+};
 
-use roxy_vfs::{SeekFrom as VfsSeekFrom, VfsError, VfsFile};
+use crate::{SeekFrom as VfsSeekFrom, VfsError, VfsFile};
 
-use crate::{File, FileError, FileMetadata, FileType, OpenFile, SeekError, SeekFrom};
-
-struct VfsFileObject {
-    file: VfsFile,
-}
-
-impl OpenFile {
-    #[must_use]
-    pub fn from_vfs(file: VfsFile) -> Arc<Self> {
-        Self::new(Box::new(VfsFileObject { file }))
-    }
-}
-
-impl File for VfsFileObject {
+// Calls to `self.{seek, read, write}` are calling `VfsFile::{seek, read, write}`,
+// not to be confused with `FdFile::{seek, read, write}`
+impl FdFile for VfsFile {
     fn is_terminal(&self) -> bool {
         false
     }
 
-    fn metadata(&self) -> Result<FileMetadata, FileError> {
-        let metadata = self.file.metadata().map_err(map_file_error)?;
+    fn metadata(&self) -> Result<FdFileMetadata, FdFileError> {
+        let metadata = self.metadata().map_err(map_file_error)?;
 
-        Ok(FileMetadata {
+        Ok(FdFileMetadata {
             file_id: metadata.file_id,
             file_type: map_file_type(metadata.file_type),
             permissions: metadata.permissions.bits(),
@@ -32,82 +24,72 @@ impl File for VfsFileObject {
         })
     }
 
-    fn read(&mut self, position: &mut u64, output: &mut [u8]) -> Result<usize, FileError> {
-        self.file
-            .seek(VfsSeekFrom::Start(*position))
+    fn read(&mut self, position: &mut u64, output: &mut [u8]) -> Result<usize, FdFileError> {
+        self.seek(VfsSeekFrom::Start(*position))
             .map_err(map_file_error)?;
 
-        let read = self.file.read(output).map_err(map_file_error)?;
+        let read = self.read(output).map_err(map_file_error)?;
 
-        *position = self
-            .file
-            .seek(VfsSeekFrom::Current(0))
-            .map_err(map_file_error)?;
+        *position = self.seek(VfsSeekFrom::Current(0)).map_err(map_file_error)?;
 
         Ok(read)
     }
 
-    fn write(&mut self, position: &mut u64, input: &[u8]) -> Result<usize, FileError> {
-        self.file
-            .seek(VfsSeekFrom::Start(*position))
+    fn write(&mut self, position: &mut u64, input: &[u8]) -> Result<usize, FdFileError> {
+        self.seek(VfsSeekFrom::Start(*position))
             .map_err(map_file_error)?;
 
-        let written = self.file.write(input).map_err(map_file_error)?;
+        let written = self.write(input).map_err(map_file_error)?;
 
-        *position = self
-            .file
-            .seek(VfsSeekFrom::Current(0))
-            .map_err(map_file_error)?;
+        *position = self.seek(VfsSeekFrom::Current(0)).map_err(map_file_error)?;
 
         Ok(written)
     }
 
-    fn seek(&mut self, current: u64, position: SeekFrom) -> Result<u64, SeekError> {
-        self.file
-            .seek(VfsSeekFrom::Start(current))
+    fn seek(&mut self, current: u64, position: FdSeekFrom) -> Result<u64, FdSeekError> {
+        self.seek(VfsSeekFrom::Start(current))
             .map_err(map_seek_error)?;
 
-        self.file
-            .seek(match position {
-                SeekFrom::Start(position) => VfsSeekFrom::Start(position),
-                SeekFrom::Current(offset) => VfsSeekFrom::Current(offset),
-                SeekFrom::End(offset) => VfsSeekFrom::End(offset),
-            })
-            .map_err(map_seek_error)
+        self.seek(match position {
+            FdSeekFrom::Start(position) => VfsSeekFrom::Start(position),
+            FdSeekFrom::Current(offset) => VfsSeekFrom::Current(offset),
+            FdSeekFrom::End(offset) => VfsSeekFrom::End(offset),
+        })
+        .map_err(map_seek_error)
     }
 }
 
-fn map_file_error(error: VfsError) -> FileError {
+fn map_file_error(error: VfsError) -> FdFileError {
     match error {
         VfsError::InvalidInput
         | VfsError::IsDirectory
         | VfsError::NotDirectory
         | VfsError::PermissionDenied
-        | VfsError::Unsupported => FileError::BadOperation,
-        _ => FileError::Io,
+        | VfsError::Unsupported => FdFileError::BadOperation,
+        _ => FdFileError::Io,
     }
 }
 
-fn map_seek_error(error: VfsError) -> SeekError {
+fn map_seek_error(error: VfsError) -> FdSeekError {
     match error {
-        VfsError::InvalidInput => SeekError::InvalidOffset,
+        VfsError::InvalidInput => FdSeekError::InvalidOffset,
         VfsError::IsDirectory | VfsError::NotDirectory | VfsError::Unsupported => {
-            SeekError::NotSeekable
+            FdSeekError::NotSeekable
         }
-        _ => SeekError::Io,
+        _ => FdSeekError::Io,
     }
 }
 
-fn map_file_type(file_type: roxy_vfs::FileType) -> FileType {
+fn map_file_type(file_type: crate::FileType) -> FdFileType {
     match file_type {
-        roxy_vfs::FileType::Regular => FileType::Regular,
-        roxy_vfs::FileType::Directory => FileType::Directory,
-        roxy_vfs::FileType::Symlink => FileType::Symlink,
-        roxy_vfs::FileType::BlockDevice => FileType::BlockDevice,
-        roxy_vfs::FileType::CharacterDevice => FileType::CharacterDevice,
-        roxy_vfs::FileType::Fifo => FileType::Fifo,
-        roxy_vfs::FileType::Socket => FileType::Socket,
-        roxy_vfs::FileType::Unknown => FileType::Unknown,
+        crate::FileType::Regular => FdFileType::Regular,
+        crate::FileType::Directory => FdFileType::Directory,
+        crate::FileType::Symlink => FdFileType::Symlink,
+        crate::FileType::BlockDevice => FdFileType::BlockDevice,
+        crate::FileType::CharacterDevice => FdFileType::CharacterDevice,
+        crate::FileType::Fifo => FdFileType::Fifo,
+        crate::FileType::Socket => FdFileType::Socket,
+        crate::FileType::Unknown => FdFileType::Unknown,
     }
 }
 
@@ -115,13 +97,12 @@ fn map_file_type(file_type: roxy_vfs::FileType) -> FileType {
 mod tests {
     use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
-    use roxy_vfs::{
+    use crate::{
         DirEntry, FileHandle, FileSystem, FileType, Metadata, OpenAccess, OpenOptions,
         ResolvedPath, SeekFrom as VfsSeekFrom, Vfs, VfsError,
     };
 
-    use super::OpenFile;
-    use crate::SeekFrom;
+    use roxy_fd::{OpenFile as FdOpenFile, SeekFrom as FdSeekFrom};
 
     struct MockFileSystem;
 
@@ -252,7 +233,7 @@ mod tests {
         Metadata {
             file_id: 1,
             file_type: FileType::Regular,
-            permissions: roxy_vfs::FilePermissions::DEFAULT_FILE,
+            permissions: crate::FilePermissions::DEFAULT_FILE,
             size: 5,
             hard_links: 1,
         }
@@ -265,7 +246,7 @@ mod tests {
             .ok_or(VfsError::InvalidInput)
     }
 
-    roxy_test::kernel_test!("roxy-fd::vfs-open-file", synchronizes_vfs_position, {
+    roxy_test::kernel_test!("roxy-vfs::fd-file-adapter", synchronizes_vfs_position, {
         let vfs = Vfs::new();
 
         vfs.mount(ResolvedPath::root(), Arc::new(MockFileSystem))
@@ -280,13 +261,13 @@ mod tests {
                 },
             )
             .unwrap();
-        let file = OpenFile::from_vfs(file);
+        let file = FdOpenFile::new(Box::new(file));
         let mut output = [0; 5];
 
         assert_eq!(file.read(&mut output[..2]), Ok(2));
-        assert_eq!(file.seek(SeekFrom::Current(1)), Ok(3));
+        assert_eq!(file.seek(FdSeekFrom::Current(1)), Ok(3));
         assert_eq!(file.write(b"X"), Ok(1));
-        assert_eq!(file.seek(SeekFrom::Start(0)), Ok(0));
+        assert_eq!(file.seek(FdSeekFrom::Start(0)), Ok(0));
         assert_eq!(file.read(&mut output), Ok(5));
         assert_eq!(&output, b"helXo");
         assert_eq!(file.metadata().unwrap().size, 5);

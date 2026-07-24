@@ -2,9 +2,9 @@
 
 ## Purpose and scope
 
-`roxy-vfs` provides normalized byte paths, filesystem and file-handle traits, mount routing, active
-handle tracking, and global filesystem operations. It does not implement an on-disk filesystem or
-own block devices.
+`roxy-vfs` provides normalized byte paths, filesystem, file and directory handles, mount routing,
+active-handle tracking, and global filesystem operations. It does not implement an on-disk
+filesystem or own block devices.
 
 ## Paths and mount routing
 
@@ -22,15 +22,18 @@ execution and path normalization complete before any filesystem or mount-table o
 
 Mount resolution selects the longest matching component boundary. The resolved filesystem receives
 a path local to its mount. A mount owns an `Arc<dyn FileSystem>` and active-handle counter; unmount
-is rejected while any file from that mount remains active.
+is rejected while any file or directory from that mount remains active.
 
 ## Global interface and ownership
 
 One `Vfs` is registered globally before process file operations begin. Free functions accept raw
 path bytes, resolve them exactly once, and delegate to the global instance. `Vfs` methods, mount
 routing, and `FileSystem` callbacks accept only `ResolvedPath`; they never repeat raw validation or
-cwd lookup. Filesystems own persistent filesystem state, while `VfsFile` owns an active handle and
-boxed `FileHandle` until close/drop.
+cwd lookup. Filesystems own persistent filesystem state. `VfsFile` owns a boxed `FileHandle`, while
+`VfsDirectory` owns an opening-time directory-entry snapshot. Both retain an active inode handle
+until close/drop so namespace mutations and unmount cannot invalidate an open object.
+These VFS-owned types implement the descriptor-layer `File` and `Directory` capabilities directly;
+the descriptor crate remains independent of VFS and contains no concrete file implementations.
 
 Symbolic-link targets remain raw validated bytes because a relative target is stored data whose
 meaning depends on the directory containing the link. The link location itself is a

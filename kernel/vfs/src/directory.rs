@@ -1,14 +1,51 @@
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 
-use crate::{FileSystem, FileType, ResolvedPath, Vfs, VfsError};
+use crate::{FileSystem, FileType, Metadata, ResolvedPath, Vfs, VfsError, file::ActiveHandles};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DirEntry {
+    pub file_id: u64,
     pub name: Vec<u8>,
     pub file_type: FileType,
 }
 
+pub struct VfsDirectory {
+    metadata: Metadata,
+    entries: Vec<DirEntry>,
+    active: Arc<ActiveHandles>,
+}
+
+impl VfsDirectory {
+    #[must_use]
+    pub const fn metadata(&self) -> Metadata {
+        self.metadata
+    }
+
+    #[must_use]
+    pub fn entries(&self) -> &[DirEntry] {
+        &self.entries
+    }
+}
+
 impl Vfs {
+    pub fn open_dir(&self, path: &ResolvedPath) -> Result<VfsDirectory, VfsError> {
+        let resolved = self.resolve(path)?;
+        let metadata = resolved.filesystem.metadata(&resolved.local_path, true)?;
+
+        if metadata.file_type != FileType::Directory {
+            return Err(VfsError::NotDirectory);
+        }
+
+        let entries = resolved.filesystem.read_dir(&resolved.local_path)?;
+        resolved.active.add(metadata.file_id);
+
+        Ok(VfsDirectory {
+            metadata,
+            entries,
+            active: resolved.active,
+        })
+    }
+
     pub fn read_dir(&self, path: &ResolvedPath) -> Result<Vec<DirEntry>, VfsError> {
         let resolved = self.resolve(path)?;
 
@@ -117,11 +154,40 @@ impl Vfs {
     }
 }
 
+impl Drop for VfsDirectory {
+    fn drop(&mut self) {
+        self.active.remove(self.metadata.file_id);
+    }
+}
+
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use alloc::sync::Arc;
+    use alloc::{boxed::Box, sync::Arc};
+
+    use roxy_fd::OpenFile;
 
     use crate::{OpenOptions, ResolvedPath, Vfs, VfsError, test_utils::MockFileSystem};
+
+    roxy_test::kernel_test!(
+        "roxy-vfs::active-directory-handle",
+        active_directory_handle_blocks_mutation,
+        {
+            let vfs = Vfs::new();
+
+            vfs.mount(ResolvedPath::root(), Arc::new(MockFileSystem::directory(7)))
+                .unwrap();
+
+            let directory = vfs.open_dir(&path(b"/")).unwrap();
+            assert_eq!(directory.metadata().file_type, crate::FileType::Directory);
+            let file = OpenFile::new(Box::new(directory));
+
+            assert!(file.read_directory_entries(1).unwrap().is_empty());
+            assert_eq!(vfs.rmdir(&path(b"/")), Err(VfsError::Busy));
+
+            drop(file);
+            vfs.rmdir(&path(b"/")).unwrap();
+        }
+    );
 
     roxy_test::kernel_test!(
         "roxy-vfs::rejects-cross-mount-operations",

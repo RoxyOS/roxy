@@ -38,6 +38,11 @@ delivery are not implemented. Their handlers do not dereference signal-structure
 emits the centralized `UNSUPPORTED` diagnostic with the requested mask operation or signal number
 and returns `ENOSYS`.
 
+`open_dir` creates a descriptor backed by an opening-time VFS directory snapshot. `read_entries`
+serializes that descriptor into fixed-size Roxy x86_64 `dirent` records and advances the shared
+open-file position by entry count. A writable userspace range is validated before the position is
+advanced; EOF returns zero bytes, and `seek` to entry zero implements `rewinddir`.
+
 The current process model has no stored credentials and treats every process as the root identity.
 `getuid`, `geteuid`, `getgid`, and `getegid` therefore return real and effective user and group IDs
 of `0` without consulting process state. Credential storage, mutation, and permission enforcement

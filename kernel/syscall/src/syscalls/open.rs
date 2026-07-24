@@ -1,4 +1,7 @@
+use alloc::boxed::Box;
+
 use bitflags::bitflags;
+use roxy_fd::OpenFile;
 use roxy_memory::UserAddress;
 use roxy_vfs::{CreationMode, FilePermissions, OpenAccess, OpenOptions, ResolvedPath, VfsError};
 
@@ -104,7 +107,7 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
     let options = request.options()?;
 
     let file = roxy_vfs::open(path, options).map_err(map_vfs_error)?;
-    let fd = roxy_process::insert_open_file(roxy_fd::OpenFile::from_vfs(file));
+    let fd = roxy_process::insert_open_file(OpenFile::new(Box::new(file)));
 
     Ok(u64::from(fd.as_u32()))
 }

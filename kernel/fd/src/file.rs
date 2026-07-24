@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 pub trait File: Send {
     /// Reports whether this object is a terminal.
     fn is_terminal(&self) -> bool;
@@ -35,6 +37,33 @@ pub trait File: Send {
     ///
     /// Returns an error when the object is not seekable or the target position is invalid.
     fn seek(&mut self, current: u64, position: SeekFrom) -> Result<u64, SeekError>;
+
+    /// Returns this object's directory capability when it supports directory iteration.
+    fn as_directory(&mut self) -> Option<&mut dyn Directory> {
+        None
+    }
+}
+
+pub trait Directory {
+    /// Returns up to `limit` directory entries and advances `position` by their count.
+    /// `position` is the index of the next directory entry to return.
+    ///
+    /// # Errors
+    ///
+    /// Returns an object-specific I/O error.
+    fn read_entries(
+        &mut self,
+        position: &mut u64,
+        limit: usize,
+    ) -> Result<Vec<DirectoryEntry>, FileError>;
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DirectoryEntry {
+    pub file_id: u64,
+    pub offset: u64,
+    pub file_type: FileType,
+    pub name: Vec<u8>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

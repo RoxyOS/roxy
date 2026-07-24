@@ -60,6 +60,7 @@ impl FileSystem for Ext4FileSystem {
                 let entry = entry.map_err(map_ext4)?;
 
                 Ok(DirEntry {
+                    file_id: u64::from(entry.inode.get()),
                     name: entry.file_name().as_ref().into(),
                     file_type: metadata::map_file_type(entry.file_type().map_err(map_ext4)?),
                 })

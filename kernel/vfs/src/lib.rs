@@ -6,8 +6,10 @@ extern crate alloc;
 use spin::Once;
 
 mod directory;
+mod directoryfd;
 mod error;
 mod file;
+mod filefd;
 mod interface;
 mod io;
 mod metadata;
@@ -34,12 +36,12 @@ pub(crate) fn global_vfs() -> Result<&'static Vfs, VfsError> {
     GLOBAL_VFS.get().ok_or(VfsError::NotInitialized)
 }
 
-pub use directory::DirEntry;
+pub use directory::{DirEntry, VfsDirectory};
 pub use error::VfsError;
 pub use file::{CreationMode, OpenAccess, OpenOptions, SeekFrom, VfsFile};
 pub use interface::{
-    create, hard_link, metadata, mkdir, open, read, read_dir, read_link, rename, rmdir, symlink,
-    sync, unlink, write,
+    create, hard_link, metadata, mkdir, open, open_dir, read, read_dir, read_link, rename, rmdir,
+    symlink, sync, unlink, write,
 };
 pub use metadata::{FileType, Metadata};
 pub use mount::Vfs;

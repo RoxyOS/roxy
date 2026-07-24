@@ -1,6 +1,8 @@
 use alloc::vec::Vec;
 
-use crate::{DirEntry, Metadata, OpenOptions, ResolvedPath, VfsError, VfsFile, global_vfs};
+use crate::{
+    DirEntry, Metadata, OpenOptions, ResolvedPath, VfsDirectory, VfsError, VfsFile, global_vfs,
+};
 
 pub fn open(path: impl AsRef<[u8]>, options: OpenOptions) -> Result<VfsFile, VfsError> {
     let vfs = global_vfs()?;
@@ -42,6 +44,13 @@ pub fn read_dir(path: impl AsRef<[u8]>) -> Result<Vec<DirEntry>, VfsError> {
     let path = ResolvedPath::resolve(path)?;
 
     vfs.read_dir(&path)
+}
+
+pub fn open_dir(path: impl AsRef<[u8]>) -> Result<VfsDirectory, VfsError> {
+    let vfs = global_vfs()?;
+    let path = ResolvedPath::resolve(path)?;
+
+    vfs.open_dir(&path)
 }
 
 pub fn mkdir(path: impl AsRef<[u8]>) -> Result<(), VfsError> {

@@ -11,17 +11,18 @@ the filesystem mount registry.
 `FdTable` owns descriptor-to-`Arc<OpenFile>` entries and allocates the lowest unused descriptor.
 Cloning a table clones references to open files, which is the behavior required by fork. An
 `OpenFile` owns a boxed `File` object and its current offset; its lock serializes operations that
-must update the object and offset together.
+must update the object and offset together. Directory objects hold an opening-time VFS snapshot and
+interpret the shared offset as an entry index, so forked descriptors share directory iteration.
 
-The underlying `File` trait owns object-specific behavior. The VFS adapter translates a
-`VfsFile`/`FileHandle` pair into that trait without exposing VFS implementation details to process
-code. Other subsystems, including the terminal subsystem, adapt their objects through the same
-trait; the FD layer does not identify terminals by descriptor number or concrete backend type.
+The `File` and `Directory` traits define object capabilities without implementing any concrete file
+kind in this crate. Owning subsystems such as VFS and terminal implement those traits for their
+objects. `File::as_directory` exposes optional directory iteration without concrete-type
+downcasting; the FD layer does not identify objects by descriptor number or concrete backend type.
 
 ## Invariants
 
 - Descriptor numbers are valid only in the table that returned them.
-- Reads, writes, and seeks serialize access to one open file's offset.
+- Reads, writes, directory iteration, and seeks serialize access to one open file's offset.
 - Removing a descriptor drops one reference; the underlying object remains alive while other
   references or active VFS handles exist.
 - Errors distinguish bad descriptors, unsupported operations, seekability, and underlying I/O
