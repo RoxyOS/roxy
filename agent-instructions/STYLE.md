@@ -15,8 +15,8 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
 
 ## Hard Limits
 
-- Keep a source file at or below 150 non-blank lines whenever practical. A source file must not
-  exceed 250 non-blank lines.
+- Keep a source file at or below 150 total lines whenever practical. A source file must not exceed
+  250 total lines. Both limits count every physical line, including blank lines.
 - Keep a function at or below 30 lines. Extract named operations when it begins to mix validation,
   state construction, side effects, and policy decisions.
 - A tuple must contain no more than three elements. Use a dedicated struct with named fields when
