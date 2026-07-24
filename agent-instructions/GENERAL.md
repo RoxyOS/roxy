@@ -8,6 +8,18 @@
   instead of duplicating style rules in other instruction files.
 - Repository policy is written in English. Always speak to the user in Chinese.
 
+## User Handoff
+
+- After completing any change, explain to the user what changed, why it changed, and the resulting
+  behavior. Do not limit the final response to a file list, validation commands, or a statement
+  that the task is complete.
+- When a change affects design, explain the resulting architecture, responsibility and ownership
+  boundaries, and important control or data flow. When architecture is unchanged, state the local
+  behavior or implementation contract that changed instead.
+- Report compatibility effects, intentional limitations, validation performed, and any remaining
+  failures or follow-up work. Calibrate detail to the size of the change, but provide enough context
+  for the user to understand and evaluate the result without reading the diff first.
+
 ## Git Operations
 
 - Read-only Git commands, including `status`, `log`, `diff`, `show`, and `reflog`, do not require
