@@ -16,10 +16,10 @@ Handlers follow three stages: parse raw values into typed data, validate all use
 state, then call the owning subsystem. The implementation stage should remain a small delegation,
 not a second copy of subsystem policy.
 
-`read` uses a bounded kernel transfer buffer when copying into userspace. Regular files may require
-several underlying reads to satisfy a larger request, while a terminal request performs exactly
-one underlying read so canonical line boundaries and partial-line behavior remain visible at the
-userspace ABI.
+`read` uses a bounded kernel transfer buffer and performs exactly one underlying file read per
+syscall. It therefore returns at most 4096 bytes even when userspace requests more; callers that
+require additional data must issue another read. This uniform short-read policy keeps file-type
+semantics, including terminal line boundaries, inside the owning file implementation.
 
 Path-based `stat` and `open` copy the userspace byte string before passing it to the global VFS
 interface. The VFS leaves absolute paths independent of cwd and obtains the process-owned cwd

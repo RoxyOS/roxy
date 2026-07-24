@@ -19,33 +19,21 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
         return Ok(0);
     }
 
+    let length = count.min(BUFFER_SIZE);
     let file = roxy_process::current_open_file(fd).map_err(map_process_error)?;
     let addrspace = roxy_process::current_addrspace().map_err(map_process_error)?;
-    let last_offset = u64::try_from(count - 1).map_err(|_| Errno::Fault)?;
+    let last_offset = u64::try_from(length - 1).map_err(|_| Errno::Fault)?;
+
     address.checked_add(last_offset).ok_or(Errno::Fault)?;
 
     let mut buffer = [0u8; BUFFER_SIZE];
-    let mut transferred = 0;
+    let read = file.read(&mut buffer[..length]).map_err(map_file_error)?;
 
-    while transferred < count {
-        let length = (count - transferred).min(buffer.len());
-        let read = file.read(&mut buffer[..length]).map_err(map_file_error)?;
-        let target = address
-            .checked_add(u64::try_from(transferred).unwrap())
-            .ok_or(Errno::Fault)?;
+    addrspace
+        .write_bytes(address, &buffer[..read])
+        .map_err(|_| Errno::Fault)?;
 
-        addrspace
-            .write_bytes(target, &buffer[..read])
-            .map_err(|_| Errno::Fault)?;
-
-        transferred += read;
-
-        if read < length {
-            break;
-        }
-    }
-
-    Ok(u64::try_from(transferred).unwrap())
+    Ok(u64::try_from(read).unwrap())
 }
 
 fn map_process_error(_: DescriptorError) -> Errno {
