@@ -10,26 +10,29 @@ byte-processing policy, or syscall ABI parsing.
 ## Ownership and behavior
 
 Initialization publishes one TTY before processes can receive their initial descriptors. The TTY
-owns the input and output endpoints together with event-encoding progress, the line discipline,
-pending results, and a TTY-level read lock. This makes input policy and partially processed bytes
+owns the input and output endpoints together with the line discipline, one readable byte buffer,
+and a TTY-level read lock. This makes input policy, committed lines, and partially consumed data
 terminal-wide rather than properties of whichever descriptor read first. Each `open` creates a
 distinct `OpenFile` whose stateless `TtyFile` wrapper retains one `Arc` to the common TTY.
 
-`Tty::read` encodes input events as UTF-8 characters or conventional terminal escape sequences and
-passes each encoded byte to `LineDiscipline::process`. It applies the returned optional echo and
-reader-delivery actions while holding the TTY read lock, so concurrent open files consume one
-ordered stream. Echo completes before delivery. A failed or zero-length echo returns an I/O error
-and retains the already processed result for the next read, so retry does not process the byte
-twice. The lock is released before waiting with the architecture's atomic interrupt wait when no
-event or readable result is available. `Tty::write` delegates directly to output; `TtyFile` only
-adapts these operations, fixed metadata, and rejected seeks to the `File` interface.
+`Tty::read` first copies from its readable buffer. When that buffer is empty, it encodes one input
+event as a UTF-8 character or conventional terminal escape sequence and passes the complete event
+to `LineDiscipline::process`. Any result buffer is appended to the TTY buffer, while accepted echo
+is written to the output endpoint. Canonical reads continue processing events until newline moves
+a complete line from the discipline into the TTY buffer; noncanonical events move there
+immediately. Concurrent open files consume one ordered stream under the TTY read lock.
+
+Failed or partial echo returns an I/O error without discarding bytes already moved into the TTY
+buffer; echo itself is not retried. The read lock is released before waiting with the architecture's
+atomic interrupt wait. `Tty::write` delegates directly to output; `TtyFile` only adapts these
+operations, fixed metadata, and rejected seeks to the `File` interface.
 
 The adapter defines the character-device metadata so hardware backends do not need to know
 user-facing file identity or permissions.
 
 ## Limits
 
-The current line discipline always delivers every encoded byte unchanged and echoes it when the
-TTY's enabled-by-default termios echo setting requests that action. Canonical mode, userspace
-termios configuration, other terminal attributes, ioctl handling, PTYs, job control, and signals
-remain unsupported.
+The current line discipline supports fixed Backspace and newline canonical processing plus raw
+event delivery when canonical mode is disabled. Userspace termios configuration, other control
+characters and terminal attributes, ioctl handling, PTYs, job control, and signals remain
+unsupported.

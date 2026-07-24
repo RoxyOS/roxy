@@ -62,9 +62,10 @@ not a recoverable memory allocation path.
 ## Design limits
 
 The current image assumes one statically selected init program and the existing Limine/x86_64 boot
-path. Normal builds selecting `fbterm` encode PS/2 input events, process every byte through the
-shared line discipline, and echo the resulting stream through the selected terminal; kernel-test
-builds select serial for all three streams while still initializing required PS/2 hardware and
-running its pure decoder and queue tests. Changes to initialization order, kernel terminal
-selection, or initial descriptor policy must update this document and the affected subsystem
-designs together.
+path. Normal builds selecting `fbterm` encode PS/2 input events, process each complete encoded event
+through the shared line discipline, and echo accepted input through the selected terminal. The
+default discipline buffers input canonically until newline and consumes Backspace as an editing
+operation. Kernel-test builds select serial for all three streams while still initializing required
+PS/2 hardware and running its pure decoder and queue tests. Changes to initialization order, kernel
+terminal selection, or initial descriptor policy must update this document and the affected
+subsystem designs together.
