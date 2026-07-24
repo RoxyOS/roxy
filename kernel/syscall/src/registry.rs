@@ -181,6 +181,18 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::Waitpid)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Sigprocmask)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Sigaction)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {

@@ -17,6 +17,8 @@ mod isatty;
 mod open;
 mod read;
 mod seek;
+mod sigaction;
+mod sigprocmask;
 mod stat;
 mod tcb_set;
 mod vm;
@@ -25,7 +27,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 26] = [
+pub(super) const SYSCALLS: [Syscall; 28] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -52,4 +54,6 @@ pub(super) const SYSCALLS: [Syscall; 26] = [
     getgid::SYSCALL,
     getegid::SYSCALL,
     waitpid::SYSCALL,
+    sigprocmask::SYSCALL,
+    sigaction::SYSCALL,
 ];

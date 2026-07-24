@@ -33,6 +33,11 @@ PID, a pending nonblocking wait returns zero, and absence of a matching child re
 Process-group selectors, stopped or continued states, and resource usage remain unsupported and
 must use the centralized diagnostic path.
 
+`sigprocmask` and `sigaction` have stable syscall numbers for the mlibc ABI, but signal state and
+delivery are not implemented. Their handlers do not dereference signal-structure pointers; each
+emits the centralized `UNSUPPORTED` diagnostic with the requested mask operation or signal number
+and returns `ENOSYS`.
+
 The current process model has no stored credentials and treats every process as the root identity.
 `getuid`, `geteuid`, `getgid`, and `getegid` therefore return real and effective user and group IDs
 of `0` without consulting process state. Credential storage, mutation, and permission enforcement
