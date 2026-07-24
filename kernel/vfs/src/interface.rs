@@ -39,6 +39,13 @@ pub fn metadata(path: impl AsRef<[u8]>) -> Result<Metadata, VfsError> {
     vfs.metadata(&path)
 }
 
+pub fn symlink_metadata(path: impl AsRef<[u8]>) -> Result<Metadata, VfsError> {
+    let vfs = global_vfs()?;
+    let path = ResolvedPath::resolve(path)?;
+
+    vfs.symlink_metadata(&path)
+}
+
 pub fn read_dir(path: impl AsRef<[u8]>) -> Result<Vec<DirEntry>, VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;

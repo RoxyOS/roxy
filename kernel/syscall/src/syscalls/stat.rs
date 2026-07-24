@@ -3,6 +3,7 @@ use core::{
     slice,
 };
 
+use bitflags::bitflags;
 use roxy_fd::{Fd, FileError, FileMetadata, FileType as FdFileType};
 use roxy_memory::UserAddress;
 use roxy_vfs::{FileType as VfsFileType, Metadata as VfsMetadata, ResolvedPath, VfsError};
@@ -19,6 +20,25 @@ const MODE_BLOCK: u32 = 0x6000;
 const MODE_CHARACTER: u32 = 0x2000;
 const MODE_FIFO: u32 = 0x1000;
 const MODE_SOCKET: u32 = 0xc000;
+
+bitflags! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    struct StatFlags: u64 {
+        const SYMLINK_NOFOLLOW = 0x100;
+    }
+}
+
+impl StatFlags {
+    fn parse(value: u64) -> Result<Self, Errno> {
+        let unknown = value & !Self::all().bits();
+
+        if unknown != 0 {
+            return Err(unsupported("stat.flags", unknown));
+        }
+
+        Ok(Self::from_bits_retain(value))
+    }
+}
 
 /// Fixed-layout stat payload copied across the userspace syscall ABI.
 /// Not to be confused with `StatData`
@@ -70,14 +90,11 @@ struct StatData {
 
 fn handle(arguments: [u64; 6]) -> SyscallResult {
     let target = StatTarget::parse(arguments[0])?;
+    let flags = StatFlags::parse(arguments[3])?;
     let output = UserAddress::new(arguments[4]).ok_or(Errno::Fault)?;
 
-    if arguments[3] != 0 {
-        return Err(unsupported("stat.flags", arguments[3]));
-    }
-
     let metadata = match target {
-        StatTarget::Path => path_metadata(arguments[2])?,
+        StatTarget::Path => path_metadata(arguments[2], flags)?,
         StatTarget::Fd => fd_metadata(arguments[1])?,
     };
     let result = encode(metadata);
@@ -87,7 +104,7 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
     Ok(0)
 }
 
-fn path_metadata(path: u64) -> Result<StatData, Errno> {
+fn path_metadata(path: u64, flags: StatFlags) -> Result<StatData, Errno> {
     let address = UserAddress::new(path).ok_or(Errno::Fault)?;
     let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
     let path = crate::user::read_c_string(&addrspace, address, ResolvedPath::MAX_LEN)?;
@@ -96,9 +113,13 @@ fn path_metadata(path: u64) -> Result<StatData, Errno> {
         return Err(Errno::NotFound);
     }
 
-    roxy_vfs::metadata(path)
-        .map(StatData::from)
-        .map_err(map_vfs_error)
+    let metadata = if flags.contains(StatFlags::SYMLINK_NOFOLLOW) {
+        roxy_vfs::symlink_metadata(path)
+    } else {
+        roxy_vfs::metadata(path)
+    };
+
+    metadata.map(StatData::from).map_err(map_vfs_error)
 }
 
 fn fd_metadata(raw: u64) -> Result<StatData, Errno> {
@@ -209,7 +230,7 @@ fn unsupported(operation: &str, argument: u64) -> Errno {
 mod tests {
     use roxy_test::kernel_test;
 
-    use super::{MODE_REGULAR, StatData, encode};
+    use super::{MODE_REGULAR, StatData, StatFlags, encode};
 
     kernel_test!("roxy-syscall::stat-encoding", stat_encoding, {
         let result = encode(StatData {
@@ -224,5 +245,10 @@ mod tests {
         assert_eq!(result.blocks, 2);
         assert_eq!(result.mode, MODE_REGULAR | 0o640);
         assert_eq!(result.hard_links, 2);
+    });
+
+    kernel_test!("roxy-syscall::stat-flags", stat_flags, {
+        assert_eq!(StatFlags::parse(0), Ok(StatFlags::empty()));
+        assert_eq!(StatFlags::parse(0x100), Ok(StatFlags::SYMLINK_NOFOLLOW));
     });
 }

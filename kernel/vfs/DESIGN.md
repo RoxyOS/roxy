@@ -37,7 +37,8 @@ the descriptor crate remains independent of VFS and contains no concrete file im
 
 Symbolic-link targets remain raw validated bytes because a relative target is stored data whose
 meaning depends on the directory containing the link. The link location itself is a
-`ResolvedPath`, and `read_link` returns the stored target without resolving it.
+`ResolvedPath`, and `read_link` returns the stored target without resolving it. Normal metadata
+queries follow the final symbolic link, while `symlink_metadata` reports the link inode itself.
 
 Filesystem traits are synchronous and return `VfsError`. Filesystem-specific types and errors must
 be translated inside adapters such as `roxy-ext4`.

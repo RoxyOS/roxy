@@ -23,8 +23,22 @@ pub struct Metadata {
 
 impl Vfs {
     pub fn metadata(&self, path: &ResolvedPath) -> Result<Metadata, VfsError> {
+        self.metadata_inner(path, true)
+    }
+
+    pub fn symlink_metadata(&self, path: &ResolvedPath) -> Result<Metadata, VfsError> {
+        self.metadata_inner(path, false)
+    }
+
+    fn metadata_inner(
+        &self,
+        path: &ResolvedPath,
+        follow_symlink: bool,
+    ) -> Result<Metadata, VfsError> {
         let resolved = self.resolve(path)?;
 
-        resolved.filesystem.metadata(&resolved.local_path, true)
+        resolved
+            .filesystem
+            .metadata(&resolved.local_path, follow_symlink)
     }
 }
