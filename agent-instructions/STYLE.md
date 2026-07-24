@@ -27,6 +27,10 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
 ## Code Organization
 
 - Prefer small modules with narrow responsibilities over large files divided by comments.
+- Never create a source file that contains only tests, such as `tests.rs`. Keep tests in an inline
+  test module beside the production code they cover. If that would exceed the file-size limit,
+  split the production code into additional responsibility-based modules and colocate each module's
+  tests with its implementation; do not extract tests alone.
 - Name general-purpose utility modules `utils.rs`, not `helper.rs` or `helpers.rs`.
 - Organize files by behavior or lifecycle phase rather than placing every operation for one type
   in the same file. Spread its `impl` blocks across focused modules when appropriate.
