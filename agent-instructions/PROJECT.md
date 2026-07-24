@@ -8,7 +8,7 @@ their local contracts and implementation decisions.
 
 Roxy OS is an x86_64 operating system with a Rust `no_std` kernel and a small Unix-like userspace.
 The kernel is split into focused workspace crates and composed into one executable by
-`kernel/core`. It boots through Limine under UEFI, mounts an ext4 root filesystem supplied as a
+`kernel/main`. It boots through Limine under UEFI, mounts an ext4 root filesystem supplied as a
 boot module, and starts `/bin/sh` as its initial userspace process.
 
 Userspace is cross-built with Jinx from pinned recipes under `distro`. Its core is Roxy's mlibc
@@ -22,7 +22,7 @@ targets `x86_64-unknown-roxy`.
 
 ## Repository Map
 
-- `kernel/core`: the kernel executable and composition root. Its entry point defines global
+- `kernel/main`: the kernel executable and composition root. Its entry point defines global
   initialization order and selects normal boot or the in-kernel test harness.
 - `kernel/<subsystem>`: small `roxy-*` crates for architecture, boot metadata, memory, scheduling,
   processes, syscalls, filesystems, terminals, and related services. Read the owning `DESIGN.md`
@@ -40,7 +40,7 @@ targets `x86_64-unknown-roxy`.
   these are artifacts rather than source.
 
 The root `Cargo.toml` lists every Rust workspace member and makes the dependency graph easy to
-trace. Crate names use the `roxy-*` prefix except for the composition binary, `roxy-kernel`, and the
+trace. Crate names use the `roxy-*` prefix except for the composition binary, `kernel-main`, and the
 host-side `xtask` tool.
 
 ## Runtime Shape
@@ -53,7 +53,7 @@ Limine/UEFI → serial and boot metadata → architecture and memory
 → interrupts → /bin/sh → scheduler
 ```
 
-`kernel/core/DESIGN.md` owns the exact initialization contract. The root filesystem image is
+`kernel/main/DESIGN.md` owns the exact initialization contract. The root filesystem image is
 embedded in the boot ISO as a Limine module, adapted to a RAM-backed block device, and mounted by
 the VFS/ext4 stack. Normal builds prefer the framebuffer terminal and retain serial diagnostics;
 kernel-test builds use serial and terminate QEMU through its debug-exit device.

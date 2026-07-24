@@ -16,7 +16,7 @@ mod tests {
 
     use super::inject;
 
-    roxy_test::kernel_test!("roxy-kernel::initial-standard-fds", initial_standard_fds, {
+    roxy_test::kernel_test!("kernel-main::initial-standard-fds", initial_standard_fds, {
         let mut table = FdTable::new();
 
         inject(&mut table);

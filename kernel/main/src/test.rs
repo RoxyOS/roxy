@@ -29,7 +29,7 @@ mod tests {
     use roxy_arch::CpuId;
 
     roxy_test::kernel_test!(
-        "roxy-kernel::subsystems-are-initialized",
+        "kernel-main::subsystems-are-initialized",
         subsystems_are_initialized,
         {
             let cpu = roxy_cpu::current_cpu();
@@ -53,7 +53,7 @@ mod tests {
     );
 
     roxy_test::kernel_test!(
-        "roxy-kernel::hardcoded-root-device-is-mounted",
+        "kernel-main::hardcoded-root-device-is-mounted",
         limine_rootfs_is_mounted,
         {
             let root = roxy_vfs::metadata(b"/").unwrap();

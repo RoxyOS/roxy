@@ -28,7 +28,7 @@ pub(super) fn build(
 }
 
 fn stage_kernel(staging: &Path, kernel: &Path, rootfs: &Path) -> Result<()> {
-    copy(kernel, &staging.join("boot/roxy-kernel"))?;
+    copy(kernel, &staging.join("boot/kernel-main"))?;
     copy(rootfs, &staging.join("boot/rootfs.img"))?;
     copy(
         &workspace_root().join("kernel/limine.conf"),

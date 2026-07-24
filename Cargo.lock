@@ -328,6 +328,39 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 
 [[package]]
+name = "kernel-main"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "qemu-exit",
+ "roxy-arch",
+ "roxy-block",
+ "roxy-boot",
+ "roxy-cpu",
+ "roxy-elf",
+ "roxy-ext4",
+ "roxy-fbterm",
+ "roxy-fd",
+ "roxy-futex",
+ "roxy-input",
+ "roxy-interrupt",
+ "roxy-line-discipline",
+ "roxy-memory",
+ "roxy-process",
+ "roxy-ps2",
+ "roxy-serial",
+ "roxy-syscall",
+ "roxy-terminal",
+ "roxy-test",
+ "roxy-thread",
+ "roxy-time",
+ "roxy-ttyfd",
+ "roxy-vfs",
+ "roxy-vm",
+ "spin 0.12.2",
+]
+
+[[package]]
 name = "limine"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -585,39 +618,6 @@ dependencies = [
  "spin 0.12.2",
  "x2apic",
  "x86_64",
-]
-
-[[package]]
-name = "roxy-kernel"
-version = "0.1.0"
-dependencies = [
- "linkme",
- "qemu-exit",
- "roxy-arch",
- "roxy-block",
- "roxy-boot",
- "roxy-cpu",
- "roxy-elf",
- "roxy-ext4",
- "roxy-fbterm",
- "roxy-fd",
- "roxy-futex",
- "roxy-input",
- "roxy-interrupt",
- "roxy-line-discipline",
- "roxy-memory",
- "roxy-process",
- "roxy-ps2",
- "roxy-serial",
- "roxy-syscall",
- "roxy-terminal",
- "roxy-test",
- "roxy-thread",
- "roxy-time",
- "roxy-ttyfd",
- "roxy-vfs",
- "roxy-vm",
- "spin 0.12.2",
 ]
 
 [[package]]
