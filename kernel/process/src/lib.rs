@@ -15,6 +15,7 @@ mod table;
 mod wait;
 
 pub use creation::spawn;
+pub use cwd::set_current_working_directory;
 pub use execve::execve_current;
 pub use fork::{ForkError, fork_current};
 pub use initial_fds::InitialFdInjector;

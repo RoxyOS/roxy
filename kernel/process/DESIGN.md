@@ -95,5 +95,5 @@ The current model supports one thread per process and has no `FD_CLOEXEC` state,
 survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
 multi-threaded exec cleanup, credentials, signals, process groups, and PID 1 reparenting are not.
 Orphan zombies are retained because no init reaper adopts them. Process-identity callers encode an
-absent parent as PID 0. The working directory cannot yet be changed because `chdir` and `fchdir`
-are not implemented.
+absent parent as PID 0. `chdir` can replace cwd after VFS validation; descriptor-based `fchdir`
+remains unsupported.

@@ -124,6 +124,8 @@ mod tests {
 
             table.insert(process);
 
+            table.set_working_directory(process_id, ResolvedPath::resolve(b"/usr").unwrap());
+
             let replaced = table.replace_addrspace(thread_id, new.clone());
 
             assert_eq!(replaced.id(), old.id());
@@ -139,7 +141,7 @@ mod tests {
             assert_eq!(table.processes[&process_id].id, process_id);
             assert_eq!(
                 table.processes[&process_id].working_directory.as_bytes(),
-                b"/"
+                b"/usr"
             );
         }
     );

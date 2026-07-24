@@ -19,7 +19,8 @@ not a second copy of subsystem policy.
 Path-based `stat` and `open` copy the userspace byte string before passing it to the global VFS
 interface. The VFS leaves absolute paths independent of cwd and obtains the process-owned cwd
 through its registered provider only for relative paths. Syscall handlers do not duplicate path
-normalization or process-state lookup.
+normalization or process-state lookup. Path-based `stat` accepts `AT_SYMLINK_NOFOLLOW` and uses the
+VFS link-metadata operation to report the final symbolic link instead of its target.
 
 Process-identity queries delegate to the process subsystem. `getpid` returns the stable process ID
 owned by the current thread's process and does not expose scheduler thread IDs through the ABI.
@@ -42,6 +43,10 @@ and returns `ENOSYS`.
 serializes that descriptor into fixed-size Roxy x86_64 `dirent` records and advances the shared
 open-file position by entry count. A writable userspace range is validated before the position is
 advanced; EOF returns zero bytes, and `seek` to entry zero implements `rewinddir`.
+
+`chdir` resolves its path against the old cwd, verifies through VFS metadata that the result is a
+directory, and only then replaces the process-owned normalized absolute cwd. Failed validation
+leaves the existing cwd unchanged.
 
 The current process model has no stored credentials and treats every process as the root identity.
 `getuid`, `geteuid`, `getgid`, and `getegid` therefore return real and effective user and group IDs

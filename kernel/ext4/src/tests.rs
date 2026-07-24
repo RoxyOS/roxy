@@ -1,6 +1,7 @@
 use roxy_vfs::{
     CreationMode, FilePermissions, FileType, OpenAccess, OpenOptions, SeekFrom, VfsError,
-    hard_link, metadata, mkdir, open, read_dir, read_link, rename, rmdir, symlink, sync, unlink,
+    hard_link, metadata, mkdir, open, read_dir, read_link, rename, rmdir, symlink,
+    symlink_metadata, sync, unlink,
 };
 
 roxy_test::kernel_test!(
@@ -35,6 +36,11 @@ roxy_test::kernel_test!(
         rename(b"/a/file", b"/b/file").unwrap();
         hard_link(b"/b/file", b"/hard").unwrap();
         symlink(b"/hard", b"/sym").unwrap();
+        assert_eq!(metadata(b"/sym").unwrap().file_type, FileType::Regular);
+        assert_eq!(
+            symlink_metadata(b"/sym").unwrap().file_type,
+            FileType::Symlink
+        );
         assert_eq!(read_link(b"/sym").unwrap(), b"/hard");
         rename(b"/sym", b"/a/sym").unwrap();
         assert_eq!(read_link(b"/a/sym").unwrap(), b"/hard");

@@ -205,6 +205,12 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::ReadEntries)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Chdir)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {

@@ -1,5 +1,6 @@
 mod anon_allocate;
 mod anon_free;
+mod chdir;
 mod clock_get;
 mod close;
 mod execve;
@@ -29,7 +30,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 30] = [
+pub(super) const SYSCALLS: [Syscall; 31] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -60,4 +61,5 @@ pub(super) const SYSCALLS: [Syscall; 30] = [
     sigaction::SYSCALL,
     open_dir::SYSCALL,
     read_entries::SYSCALL,
+    chdir::SYSCALL,
 ];
