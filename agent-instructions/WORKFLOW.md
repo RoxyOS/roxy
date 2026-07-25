@@ -9,10 +9,13 @@ common development tasks. Read the applicable subsystem `DESIGN.md` before chang
 Use the persistent `distro/sources/mlibc-workdir` tree for local mlibc iteration. The mlibc recipe
 sets `clean_workdirs=no`, so this worktree is intentionally retained between builds.
 
-By default, limit mlibc work to local files in that worktree. Do not fetch, pull, rebase, switch,
-or otherwise synchronize with upstream mlibc or RoxyOS fork remotes. Do not create mlibc commits
-or push mlibc changes on the user's behalf; hand off the tested local changes so the user can
-commit and push them.
+Roxy maintains mlibc as a thin fork. Keep Roxy-specific work as a reviewable commit stack on top of
+the selected upstream base, and upstream generally useful changes when practical. Local iteration,
+publication to the canonical RoxyOS fork, and recipe integration are separate phases. Every Git
+mutation in these phases still requires the explicit user confirmation mandated by
+`agent-instructions/GENERAL.md`.
+
+### Iterate locally
 
 1. Edit and test mlibc in `distro/sources/mlibc-workdir`. Do not update the recipe commit or fetch
    remote changes during local iteration.
@@ -35,15 +38,49 @@ commit and push them.
    ```
 
    Kernel-only changes should reuse the existing rootfs and must not trigger an mlibc rebuild.
-4. Once behavior is stable, report the local diff and validation performed, then leave commit and
-   push to the user. Do not update the recipe to an unpublished local commit.
-5. Only after the user supplies a commit already pushed to the RoxyOS fork and explicitly requests
-   integration, update `distro/recipes/mlibc/recipe` with that commit and its `version`/`revision`,
-   then perform one clean package and rootfs build. Treat the result as reproducible only after
-   that clean build succeeds. Use `0.0.0.YYYYMMDD` for the first mlibc recipe update on a date.
-   For additional updates on the same date, append and increment a version suffix such as `.1`,
-   `.2`, and so on. Keep `revision=1` for these updates; do not use `revision` to distinguish
-   same-date mlibc commits. On the next date, return to the unsuffixed date version.
+4. Before publication, inspect the mlibc worktree diff and status. Exclude `.agent-lock` files,
+   build output, downloaded subprojects, editor files, and unrelated upstream or Roxy changes.
+
+### Commit and publish
+
+1. Put one cohesive mlibc behavior or ABI consumer change in each commit. Keep its implementation,
+   tests, build declarations, and mlibc-local documentation together. Do not combine independent
+   sysdeps, upstream synchronization, generated files, or main Roxy OS repository changes in the
+   same mlibc commit.
+2. Use the subject form `roxy: <imperative summary>` for Roxy-specific commits. Preserve upstream
+   commit authorship and subject when applying an upstream commit unchanged. Explain ABI choices,
+   compatibility constraints, and validation in the commit body when the subject is insufficient.
+3. Confirm that the intended mlibc diff builds from `mlibc-workdir`, that relevant tests pass, and
+   that `git diff --check` passes. `git status --short` may contain only the intended files and the
+   active collaboration lock, which must remain untracked and excluded from the commit. Record any
+   unavailable or unrelated failing validation before requesting commit approval.
+4. After explicit user approval, commit in `distro/sources/mlibc-workdir`. Do not amend, squash,
+   rebase, merge, or otherwise rewrite unrelated fork history as part of a feature commit.
+5. After separate explicit user approval, push the commit to the canonical RoxyOS mlibc fork. If a
+   change is suitable for the mlibc project, also prepare or submit it upstream, but never make the
+   Roxy recipe depend on an unmerged pull-request ref. Verify that the exact commit SHA is reachable
+   from the canonical fork before changing the recipe.
+6. Never force-push the canonical fork as part of this workflow. If the push is rejected or the
+   remote branch moved, stop and request approval for a separate fetch and synchronization step.
+
+### Update the recipe
+
+1. Update `distro/recipes/mlibc/recipe` only after the exact mlibc commit is published and remotely
+   reachable. Pin the immutable commit SHA; do not pin a branch, local object, or unpublished
+   rewritten commit.
+2. Use `0.0.0.YYYYMMDD` for the first mlibc recipe update on a date. For additional updates on the
+   same date, append and increment a version suffix such as `.1`, `.2`, and so on. Keep
+   `revision=1`; do not use `revision` to distinguish same-date mlibc commits. On the next date,
+   return to the unsuffixed date version.
+3. Perform one clean mlibc package build after updating the pin, then inspect the base dependency
+   graph and rebuild affected userspace packages. Refresh the rootfs and run Roxy when installed
+   userspace behavior or the kernel ABI changed. Treat the recipe update as reproducible only after
+   the clean build fetches the published commit and all required integration validation succeeds.
+4. Commit the recipe update in the main Roxy OS repository only after the clean build succeeds and
+   after obtaining the explicit Git confirmation required by `agent-instructions/GENERAL.md`.
+   Keep the compatible kernel ABI change and recipe pin in the same integration series. If
+   integration exposes a defect, publish a follow-up mlibc commit instead of rewriting a commit
+   already referenced by a recipe.
 
 ## Patching a distro package
 
