@@ -23,11 +23,15 @@ bitflags! {
     }
 }
 
+// Request for the kernel to poll a fd
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 struct PollFdAbi {
+    // Which fd do you wanna poll
     fd: i32,
+    // What event do you wanna poll
     events: i16,
+    // What event happened (Filled by kernel)
     revents: i16,
 }
 
