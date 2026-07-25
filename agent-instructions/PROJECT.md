@@ -20,13 +20,20 @@ kernel and scheduler are BSP-oriented, the QEMU configuration uses one virtual C
 tooling assumes an x86_64 Linux host. Kernel Rust targets `x86_64-unknown-none`; userspace Clang
 targets `x86_64-unknown-roxy`.
 
+The current userspace exposes only the Roxy ABI, but the kernel architecture must remain capable
+of hosting multiple Unix-like ABI personalities, including Linux-, BSD-, and Solaris-compatible
+interfaces. The syscall subsystem is the sole userspace layout boundary. Kernel subsystems below
+it exchange ABI-neutral types and must not depend on one personality's record layout, padding,
+request numbers, or calling conventions.
+
 ## Repository Map
 
 - `kernel/main`: the kernel executable and composition root. Its entry point defines global
   initialization order and selects normal boot or the in-kernel test harness.
 - `kernel/<subsystem>`: small `roxy-*` crates for architecture, boot metadata, memory, scheduling,
-  processes, syscalls, filesystems, terminals, and related services. Read the owning `DESIGN.md`
-  before changing one.
+  processes, syscalls, filesystems, terminals, and related services. `kernel/syscall` contains the
+  userspace ABI personalities and translates them into shared kernel types. Read the owning
+  `DESIGN.md` before changing one.
 - `kernel/test`: the distributed in-kernel test registry. Subsystem tests are linked into a special
   kernel image and run inside QEMU.
 - `distro`: the Jinx package graph, Roxy toolchain configuration, source pins, and package patches.

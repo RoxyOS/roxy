@@ -89,10 +89,20 @@
 
 - Keep unsafe code local. Every unsafe block or unsafe implementation must have a nearby `SAFETY`
   explanation covering the relevant caller obligations and invariants.
-- Represent C and userspace ABI records with typed `#[repr(C)]` structs whenever practical. Model
-  padding explicitly and initialize every field; do not encode or decode structured ABI data by
-  manually indexing raw byte buffers. Convert a typed value to bytes only at the I/O boundary, keep
-  that conversion local, and document its layout and lifetime invariants in the `SAFETY` comment.
+- Userspace ABI layouts belong exclusively to the syscall subsystem. Define userspace-facing
+  `#[repr(C)]` records, explicit ABI padding, size/offset assertions, request numbers, and raw
+  pointer interpretation only under `kernel/syscall`; never expose those records through a shared
+  kernel API or reproduce them in process, FD, TTY, filesystem, or other domain subsystems.
+- Represent each userspace ABI record in the syscall subsystem with a typed `#[repr(C)]` struct.
+  Model padding explicitly and initialize every field; do not encode or decode structured ABI data
+  by manually indexing raw byte buffers. Decode immediately into ABI-neutral kernel types before
+  dispatch and encode subsystem results only when returning through the selected ABI personality.
+  Keep byte conversion local and document its layout and lifetime invariants in the `SAFETY`
+  comment.
+- A `#[repr(C)]` type outside `kernel/syscall` is permitted only for a non-userspace contract such
+  as an architecture context, hardware-defined record, or internal foreign-function boundary. Its
+  owning design and nearby source must identify that contract so it cannot be mistaken for a
+  userspace ABI layout.
 - **IMPORTANT**: **Never** reject, terminate, block indefinitely, silently degrade, or return any
   error for a userspace request because kernel functionality is missing or incomplete without
   first emitting an unconditional serial `UNSUPPORTED` diagnostic naming the syscall or operation,
