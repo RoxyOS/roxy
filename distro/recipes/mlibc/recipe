@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-version=0.0.0.20260725.1
+version=0.0.0.20260725.2
 revision=1
 
 git_url="https://github.com/RoxyOS/mlibc"
-commit="744fc31120c599cac2a1f2fd259942c7caad96d9"
+commit="e7a369d6502b7985191dc8a02c19f131de8dc456"
 shallow=no
 
 source_hostdeps="meson"
