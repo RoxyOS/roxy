@@ -25,7 +25,7 @@ Apache-2.0 license, and provides a fixed bitmap whose dimensions match the cell 
 font parsing, allocation, or scaling. LF advances a row, CR returns to column zero, backspace
 clears the preceding cell, and tab advances to the next eight-column stop. Reaching the bottom
 scrolls the framebuffer by one glyph row. Input is supplied by `roxy-input` implementations through
-`roxy-ttyfd`; the framebuffer console itself only owns output rendering.
+`roxy-tty`; the framebuffer console itself only owns output rendering.
 
 Only Limine RGB 32-bit modes are accepted. Color masks determine packed foreground/background
 pixels. Full ANSI parsing, Unicode, input devices, PTYs, and diagnostic mirroring are outside the

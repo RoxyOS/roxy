@@ -77,6 +77,7 @@ mod tests {
     use core::fmt::Write;
 
     use roxy_test::kernel_test;
+    use roxy_tty_types::WindowSize;
     use spin::Mutex;
 
     use super::TerminalWriter;
@@ -92,6 +93,10 @@ mod tests {
             self.output.lock().extend_from_slice(&input[..written]);
 
             Ok(written)
+        }
+
+        fn window_size(&self) -> WindowSize {
+            WindowSize::UNKNOWN
         }
     }
 

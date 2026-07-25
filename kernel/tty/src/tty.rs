@@ -12,10 +12,13 @@ use crate::encoder::{EncodedInputEvent, encode_input_event};
 
 impl Tty {
     pub(super) fn new(input: Arc<dyn InputDevice>, output: Arc<dyn TerminalOutput>) -> Self {
+        let window_size = output.window_size();
+
         Self {
             input,
             output,
             line_discipline: Lock::new(LineDiscipline::new()),
+            window_size: Lock::new(window_size),
             buffered: Lock::new(alloc::vec::Vec::new()),
             read_lock: Lock::new(()),
         }
@@ -117,7 +120,7 @@ mod tests {
 
     use crate::test_support::{character, open};
 
-    kernel_test!("roxy-ttyfd::noncanonical", preserves_event_stream, {
+    kernel_test!("roxy-tty::noncanonical", preserves_event_stream, {
         let events = alloc::vec![
             character('é'),
             InputEvent::Key {
@@ -130,7 +133,7 @@ mod tests {
             },
         ];
         let (tty, output, file) = open(events);
-        tty.line_discipline.lock().termios.canonical = false;
+        tty.line_discipline.lock().settings.canonical = false;
         let mut first = [0; 2];
         let mut second = [0; 3];
 
@@ -141,13 +144,13 @@ mod tests {
         assert_eq!(output.bytes(), &[0xc3, 0xa9, 0x1b, b'[', b'D']);
     });
 
-    kernel_test!("roxy-ttyfd::partial-echo", preserves_buffered_input, {
+    kernel_test!("roxy-tty::partial-echo", preserves_buffered_input, {
         let events = alloc::vec![InputEvent::Key {
             code: KeyCode::ArrowLeft,
             state: KeyState::Pressed,
         }];
         let (tty, output, file) = open(events);
-        tty.line_discipline.lock().termios.canonical = false;
+        tty.line_discipline.lock().settings.canonical = false;
         output.limit_writes(1);
         let mut buffer = [0; 3];
 
@@ -157,7 +160,7 @@ mod tests {
         assert_eq!(&buffer, b"\x1b[D");
     });
 
-    kernel_test!("roxy-ttyfd::echo-error", preserves_committed_line, {
+    kernel_test!("roxy-tty::echo-error", preserves_committed_line, {
         let (_tty, output, file) = open(alloc::vec![character('x'), character('\n')]);
         output.fail_on_call(2);
         let mut buffer = [0; 2];

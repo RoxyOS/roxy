@@ -3,9 +3,9 @@
 ## Purpose and scope
 
 `roxy-fd` models process-local descriptor numbers, shared open-file state, file operations, and
-the VFS file adapter. It also owns typed ioctl requests and the decoding of each request's number
-and request-specific argument. It does not own a process table, general syscall argument parsing,
-path lookup, or the filesystem mount registry.
+the VFS file adapter. It also owns the typed ioctl requests dispatched to file objects. It does not
+own a process table, syscall ABI request-number decoding, general syscall argument parsing, path
+lookup, or the filesystem mount registry.
 
 ## Ownership model
 
@@ -20,18 +20,30 @@ kind in this crate. Owning subsystems such as VFS and terminal implement those t
 objects. `File::as_directory` exposes optional directory iteration without concrete-type
 downcasting; the FD layer does not identify objects by descriptor number or concrete backend type.
 
-`IoctlRequest` couples an operation with its decoded argument so file implementations never receive
-an untyped request number and a separate raw argument. `OpenFile::ioctl` holds the open-file lock
-while dispatching that complete request to the object. Unsupported raw request pairs fail during
-`IoctlRequest::parse` before object dispatch. The `File` trait's default implementation returns
-`IoctlError::NotTty`; file kinds override it only when they need to support a concrete request.
+The syscall boundary decodes personality-specific request numbers and layouts, copies pointer-based
+ABI payloads, and constructs an `IoctlRequest` containing only layout-neutral kernel values or a
+borrowed typed output. A getter fills that output directly during object dispatch, so the interface
+cannot produce a response type that mismatches its request. `OpenFile::ioctl` holds the open-file
+lock across this dispatch. The `File` trait's default implementation returns
+`IoctlError::NotTty`; file kinds override it only for supported requests.
+
+Terminal-specific ioctl payload types belong to `roxy-tty-types`, which both this crate and
+`roxy-tty` depend on. `File::ioctl` embeds those layout-neutral domain values in one typed
+dispatch surface without making the descriptor layer depend on a concrete TTY implementation.
+Userspace ABI layouts, request numbers, errno policy, and raw userspace pointers remain exclusive
+to `roxy-syscall`.
 
 ## Invariants
 
 - Descriptor numbers are valid only in the table that returned them.
 - Reads, writes, directory iteration, and seeks serialize access to one open file's offset.
 - Ioctl operations serialize against other operations on the same open file.
-- A `File` receives only ioctl requests whose request-specific argument has already been decoded.
+- A `File` receives only ioctl requests whose request-specific argument has already been decoded
+  and copied out of userspace.
+- FD types contain no userspace `#[repr(C)]` layout, padding, offset, request number, or raw user
+  pointer; adding another ABI personality does not change the `File` interface.
+- Terminal ioctl payload types are owned by `roxy-tty-types` and may not grow personality-specific
+  semantics.
 - Removing a descriptor drops one reference; the underlying object remains alive while other
   references or active VFS handles exist.
 - Errors distinguish bad descriptors, unsupported operations, seekability, and underlying I/O
@@ -44,5 +56,5 @@ The process subsystem owns each `FdTable` and preserves it across `execve`; ther
 The model is synchronous and does not yet include descriptor polling, duplication syscalls, or
 per-descriptor flags.
 
-No ioctl request is currently implemented, so parsing every raw request and argument pair returns
-`None`.
+The typed request set covers terminal attribute get/set operations with their application timing
+and terminal window-size get/set operations. Other ioctl families have no typed request variant.

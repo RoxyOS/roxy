@@ -4,6 +4,7 @@ extern crate alloc;
 
 mod encoder;
 mod file;
+mod ioctl;
 mod tty;
 
 use alloc::{sync::Arc, vec::Vec};
@@ -12,6 +13,7 @@ use roxy_fd::OpenFile;
 use roxy_input::InputDevice;
 use roxy_line_discipline::LineDiscipline;
 use roxy_terminal::TerminalOutput;
+use roxy_tty_types::WindowSize;
 use roxy_utils::Lock;
 use spin::Once;
 
@@ -21,6 +23,7 @@ struct Tty {
     input: Arc<dyn InputDevice>,
     output: Arc<dyn TerminalOutput>,
     line_discipline: Lock<LineDiscipline>,
+    window_size: Lock<WindowSize>,
     buffered: Lock<Vec<u8>>,
     read_lock: Lock<()>,
 }
@@ -57,6 +60,7 @@ mod test_support {
     use roxy_fd::OpenFile;
     use roxy_input::{InputDevice, InputEvent};
     use roxy_terminal::{OutputError, TerminalOutput};
+    use roxy_tty_types::WindowSize;
     use spin::Mutex;
 
     use crate::Tty;
@@ -76,6 +80,7 @@ mod test_support {
 
     pub(super) struct MockOutput {
         bytes: Mutex<Vec<u8>>,
+        window_size: WindowSize,
         calls: AtomicUsize,
         fail_call: AtomicUsize,
         max_write: AtomicUsize,
@@ -85,6 +90,12 @@ mod test_support {
         fn new() -> Self {
             Self {
                 bytes: Mutex::new(Vec::new()),
+                window_size: WindowSize {
+                    rows: 30,
+                    columns: 100,
+                    pixel_width: 800,
+                    pixel_height: 480,
+                },
                 calls: AtomicUsize::new(0),
                 fail_call: AtomicUsize::new(0),
                 max_write: AtomicUsize::new(usize::MAX),
@@ -117,6 +128,10 @@ mod test_support {
 
             Ok(count)
         }
+
+        fn window_size(&self) -> WindowSize {
+            self.window_size
+        }
     }
 
     pub(super) fn character(character: char) -> InputEvent {
@@ -139,11 +154,12 @@ mod test_support {
 mod tests {
     use roxy_input::{InputEvent, KeyCode, KeyState};
     use roxy_test::kernel_test;
+    use roxy_tty_types::WindowSize;
 
     use super::file::TtyFile;
     use super::test_support::{character, open};
 
-    kernel_test!("roxy-ttyfd::canonical-edit", edits_before_delivery, {
+    kernel_test!("roxy-tty::canonical-edit", edits_before_delivery, {
         let events = alloc::vec![
             character('a'),
             character('b'),
@@ -160,7 +176,7 @@ mod tests {
         assert_eq!(output.bytes(), b"ab\xc3\xa9\x08c\n");
     });
 
-    kernel_test!("roxy-ttyfd::canonical-escape", commits_escape_sequence, {
+    kernel_test!("roxy-tty::canonical-escape", commits_escape_sequence, {
         let events = alloc::vec![
             InputEvent::Key {
                 code: KeyCode::ArrowLeft,
@@ -176,7 +192,7 @@ mod tests {
         assert_eq!(output.bytes(), b"\x1b[D\n");
     });
 
-    kernel_test!("roxy-ttyfd::shared-line", shares_partial_canonical_line, {
+    kernel_test!("roxy-tty::shared-line", shares_partial_canonical_line, {
         let (tty, output, first) = open(alloc::vec![
             character('a'),
             character('b'),
@@ -194,13 +210,27 @@ mod tests {
         assert_eq!(output.bytes(), b"abc\n");
     });
 
-    kernel_test!("roxy-ttyfd::disabled-echo", skips_disabled_echo, {
+    kernel_test!("roxy-tty::disabled-echo", skips_disabled_echo, {
         let (tty, output, file) = open(alloc::vec![character('x'), character('\n')]);
-        tty.line_discipline.lock().termios.echo = false;
+        tty.line_discipline.lock().settings.echo = false;
         let mut buffer = [0; 2];
 
         assert_eq!(file.read(&mut buffer), Ok(2));
         assert_eq!(&buffer, b"x\n");
         assert!(output.bytes().is_empty());
+    });
+
+    kernel_test!("roxy-tty::initial-window-size", inherits_output_size, {
+        let (tty, _output, _file) = open(alloc::vec![]);
+
+        assert_eq!(
+            *tty.window_size.lock(),
+            WindowSize {
+                rows: 30,
+                columns: 100,
+                pixel_width: 800,
+                pixel_height: 480,
+            }
+        );
     });
 }

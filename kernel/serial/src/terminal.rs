@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 
 use roxy_terminal::{OutputError, TerminalOutput};
+use roxy_tty_types::WindowSize;
 use spin::Once;
 
 use crate::device;
@@ -27,5 +28,9 @@ impl TerminalOutput for SerialTerminal {
         device::current().send(chunks);
 
         Ok(input.len())
+    }
+
+    fn window_size(&self) -> WindowSize {
+        WindowSize::UNKNOWN
     }
 }

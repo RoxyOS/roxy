@@ -13,6 +13,7 @@ linkme = { workspace = true, optional = true }
 spin.workspace = true
 
 roxy-test = { workspace = true, optional = true }
+roxy-tty-types.workspace = true
 roxy-utils.workspace = true
 
 [lints]

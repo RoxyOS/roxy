@@ -54,6 +54,8 @@ generated build directories and installed staging trees remain build artifacts o
 ## ABI and failure contracts
 
 Userspace packages must target the syscall and ABI exposed by the kernel and Roxy mlibc sysdeps.
+Roxy's terminal sysdeps route `tcgetattr`, `tcsetattr`, `tcgetwinsize`, and `tcsetwinsize` through
+the shared ioctl syscall using the Linux-compatible request numbers mirrored by the kernel.
 An ABI change is incomplete until the relevant mlibc source pin/recipe and rootfs package graph can
 build together. Failed source verification, configure, build, or install steps must abort rather
 than falling back to stale artifacts.

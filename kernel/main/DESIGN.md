@@ -30,7 +30,7 @@ configures the architecture entry before interrupts are enabled.
 PS/2 initialization follows scheduler registration and precedes both periodic timer startup and
 global interrupt enable. The PS/2 subsystem completes its controller and keyboard handshake,
 registers IRQ1, and unmasks the route in that window. The composition root then combines the
-resulting input device with the selected terminal output through `roxy-ttyfd`, which creates the
+resulting input device with the selected terminal output through `roxy-tty`, which creates the
 shared line discipline, before process initialization registers the initial-FD injector. This
 hardware is required on the supported platform; a missing controller or handshake timeout is
 boot-fatal rather than a reason to expose an output-only framebuffer terminal.
@@ -45,7 +45,7 @@ policy.
 Process initialization also receives the composition root's initial-FD injector. The current
 injector creates three independent TTY open files at descriptors 0, 1, and 2 for every directly
 spawned process. All three share the PS/2 input device, selected kernel output endpoint, and
-TTY-level line discipline through `roxy-ttyfd`. Process and syscall code remain unaware of the
+TTY-level line discipline through `roxy-tty`. Process and syscall code remain unaware of the
 selected backend. Descriptor assignment remains in `kernel-main` rather than the TTY or hardware
 subsystems so a future composition may replace this initial stream policy.
 

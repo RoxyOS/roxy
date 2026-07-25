@@ -45,7 +45,7 @@ pub trait File: Send {
     /// # Errors
     ///
     /// Returns an operation-specific ioctl error.
-    fn ioctl(&mut self, _request: IoctlRequest) -> Result<u64, IoctlError> {
+    fn ioctl(&mut self, _request: IoctlRequest<'_>) -> Result<(), IoctlError> {
         Err(IoctlError::NotTty)
     }
 

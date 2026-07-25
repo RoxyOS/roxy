@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/block", "kernel/boot", "kernel/cpu", "kernel/elf", "kernel/ext4", "kernel/fbterm", "kernel/fd", "kernel/futex", "kernel/input", "kernel/interrupt", "kernel/line-discipline", "kernel/main", "kernel/memory", "kernel/process", "kernel/ps2", "kernel/serial", "kernel/syscall", "kernel/terminal", "kernel/test", "kernel/thread", "kernel/time", "kernel/ttyfd", "kernel/utils", "kernel/vfs", "kernel/vm"]
+members = ["xtask", "kernel/arch", "kernel/block", "kernel/boot", "kernel/cpu", "kernel/elf", "kernel/ext4", "kernel/fbterm", "kernel/fd", "kernel/futex", "kernel/input", "kernel/interrupt", "kernel/line-discipline", "kernel/main", "kernel/memory", "kernel/process", "kernel/ps2", "kernel/serial", "kernel/syscall", "kernel/terminal", "kernel/test", "kernel/thread", "kernel/time", "kernel/tty", "kernel/tty-types", "kernel/utils", "kernel/vfs", "kernel/vm"]
 
 [workspace.package]
 edition = "2024"
@@ -50,7 +50,8 @@ roxy-terminal.path = "kernel/terminal"
 roxy-test.path = "kernel/test"
 roxy-thread.path = "kernel/thread"
 roxy-time.path = "kernel/time"
-roxy-ttyfd.path = "kernel/ttyfd"
+roxy-tty.path = "kernel/tty"
+roxy-tty-types.path = "kernel/tty-types"
 roxy-utils.path = "kernel/utils"
 roxy-vfs.path = "kernel/vfs"
 roxy-vm.path = "kernel/vm"

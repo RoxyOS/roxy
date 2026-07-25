@@ -1,6 +1,9 @@
 use alloc::{boxed::Box, sync::Arc};
 
-use roxy_fd::{File, FileError, FileMetadata, FileType, OpenFile, SeekError, SeekFrom};
+use roxy_fd::{
+    File, FileError, FileMetadata, FileType, IoctlError, IoctlRequest, OpenFile, SeekError,
+    SeekFrom,
+};
 
 use crate::Tty;
 
@@ -34,6 +37,10 @@ impl File for TtyFile {
     fn seek(&mut self, _current: u64, _position: SeekFrom) -> Result<u64, SeekError> {
         Err(SeekError::NotSeekable)
     }
+
+    fn ioctl(&mut self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
+        self.tty.ioctl(request)
+    }
 }
 
 impl TtyFile {
@@ -50,7 +57,7 @@ mod tests {
 
     use crate::test_support::{character, open};
 
-    kernel_test!("roxy-ttyfd::file-adapter", delegates_tty_io, {
+    kernel_test!("roxy-tty::file-adapter", delegates_tty_io, {
         let (_tty, output, file) = open(alloc::vec![character('x'), character('\n')]);
         let mut buffer = [0; 4];
 

@@ -12,6 +12,6 @@ pub use fd::Fd;
 pub use file::{
     Directory, DirectoryEntry, File, FileError, FileMetadata, FileType, SeekError, SeekFrom,
 };
-pub use ioctl::{IoctlError, IoctlRequest};
+pub use ioctl::{ApplyWhen, IoctlError, IoctlRequest, LocalFlags, Termios, WindowSize};
 pub use open::OpenFile;
 pub use table::FdTable;

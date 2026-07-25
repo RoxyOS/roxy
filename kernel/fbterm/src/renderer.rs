@@ -53,6 +53,14 @@ impl TextRenderer {
         self.rows
     }
 
+    pub(crate) fn pixel_width(&self) -> usize {
+        self.framebuffer.width()
+    }
+
+    pub(crate) fn pixel_height(&self) -> usize {
+        self.framebuffer.height()
+    }
+
     pub(crate) fn draw_ascii(&mut self, column: usize, row: usize, byte: u8) {
         assert!((0x20..=0x7e).contains(&byte));
         self.clear_cell(column, row);

@@ -354,7 +354,7 @@ dependencies = [
  "roxy-test",
  "roxy-thread",
  "roxy-time",
- "roxy-ttyfd",
+ "roxy-tty",
  "roxy-vfs",
  "roxy-vm",
  "spin 0.12.2",
@@ -575,6 +575,7 @@ dependencies = [
  "roxy-boot",
  "roxy-terminal",
  "roxy-test",
+ "roxy-tty-types",
  "spin 0.12.2",
 ]
 
@@ -584,6 +585,7 @@ version = "0.1.0"
 dependencies = [
  "linkme",
  "roxy-test",
+ "roxy-tty-types",
  "roxy-utils",
 ]
 
@@ -680,6 +682,7 @@ name = "roxy-serial"
 version = "0.1.0"
 dependencies = [
  "roxy-terminal",
+ "roxy-tty-types",
  "roxy-utils",
  "spin 0.12.2",
  "uart_16550",
@@ -699,6 +702,7 @@ dependencies = [
  "roxy-test",
  "roxy-thread",
  "roxy-time",
+ "roxy-tty-types",
  "roxy-utils",
  "roxy-vfs",
  "roxy-vm",
@@ -710,6 +714,7 @@ version = "0.1.0"
 dependencies = [
  "linkme",
  "roxy-test",
+ "roxy-tty-types",
  "roxy-utils",
  "spin 0.12.2",
 ]
@@ -751,7 +756,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "roxy-ttyfd"
+name = "roxy-tty"
 version = "0.1.0"
 dependencies = [
  "linkme",
@@ -761,8 +766,16 @@ dependencies = [
  "roxy-line-discipline",
  "roxy-terminal",
  "roxy-test",
+ "roxy-tty-types",
  "roxy-utils",
  "spin 0.12.2",
+]
+
+[[package]]
+name = "roxy-tty-types"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.13.1",
 ]
 
 [[package]]

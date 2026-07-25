@@ -2,6 +2,7 @@ use spin::Mutex;
 
 use roxy_boot::FramebufferInfo;
 use roxy_terminal::{OutputError, TerminalOutput};
+use roxy_tty_types::WindowSize;
 
 use crate::{InitError, console::Console, framebuffer::Framebuffer, renderer::TextRenderer};
 
@@ -26,6 +27,10 @@ impl TerminalOutput for FbTerminal {
         self.console.lock().write(input);
 
         Ok(input.len())
+    }
+
+    fn window_size(&self) -> WindowSize {
+        self.console.lock().window_size()
     }
 }
 

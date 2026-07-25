@@ -2,9 +2,23 @@
 
 ## Purpose and scope
 
-`roxy-syscall` is the userspace ABI boundary. It owns syscall numbering, registration, dispatch,
-raw-argument parsing, errno conversion, and mandatory unsupported-operation reporting. Actual
-process, memory, file, futex, and time operations remain in their owning subsystems.
+`roxy-syscall` is the sole userspace ABI boundary. It owns ABI personality selection, syscall
+numbering, registration, dispatch, raw-argument parsing, record layout, errno conversion, and
+mandatory unsupported-operation reporting. Actual process, memory, file, futex, and time
+operations remain in their owning subsystems.
+
+## ABI isolation
+
+The long-term architecture permits multiple Unix-like ABI personalities, including Linux-, BSD-,
+and Solaris-compatible interfaces, while the current implementation exposes only the Roxy ABI.
+Every personality-specific record layout, `#[repr(C)]` type, padding field, size or offset
+assertion, request number, and raw userspace pointer interpretation is private to this subsystem.
+
+Handlers decode those representations into ABI-neutral kernel types before calling another
+subsystem and encode returned domain values only at the userspace copy boundary. Process, FD, TTY,
+filesystem, scheduler, and other domain APIs must never accept or return a personality-specific
+record. Adding an ABI personality therefore adds adapters here rather than conditional layouts or
+compatibility branches throughout the kernel.
 
 ## Registry and dispatch
 
@@ -59,12 +73,14 @@ including the terminator. A buffer shorter than the complete result returns `ERA
 non-writable userspace range returns `EFAULT`. No process-table lock spans result encoding or the
 userspace write.
 
-`ioctl` validates and resolves the descriptor before asking `roxy-fd` to decode the raw request
-number together with its raw argument. The FD layer owns request-specific decoding and locked
-object dispatch; the syscall layer only maps an unrecognized request and operation errors to errno.
-Unknown requests return `ENOTTY` without a diagnostic. Consequently an invalid descriptor returns
-`EBADF` even when the request is unknown. A file object's `IoctlError::NotTty` also maps to
-`ENOTTY`.
+`ioctl` validates and resolves the descriptor before decoding the raw request number and any mode
+encoded in it. For terminal requests, the syscall layer copies the Roxy mlibc
+`termios` or `winsize` record between userspace and an initialized typed kernel value. Setters own
+their copied value; getters borrow a typed local that the file object fills before it is copied
+back. The FD layer owns locked object dispatch, while the syscall layer maps operation errors to
+errno. Unknown requests return `ENOTTY` without a diagnostic. Consequently an invalid descriptor
+returns `EBADF` even when the request is unknown. A file object's `IoctlError::NotTty` also maps to
+`ENOTTY`; rejected unsupported terminal fields use the centralized diagnostic and `ENOTSUP` path.
 
 The current process model has no stored credentials and treats every process as the root identity.
 `getuid`, `geteuid`, `getgid`, and `getegid` therefore return real and effective user and group IDs
@@ -91,6 +107,8 @@ parser is the sole exception: unknown requests currently return `ENOTTY` without
 
 ## Limits
 
-The ABI is currently Roxy-specific and manually mirrored by the Roxy mlibc sysdeps. Every ABI
-change must keep syscall numbers, Rust/C declarations, registry tests, and userspace symbols in
-sync. The generic mlibc `ioctl()` bridge is present, but no concrete ioctl request is supported.
+The only active personality is currently Roxy-specific and manually mirrored by the Roxy mlibc
+sysdeps. Every ABI change must keep syscall numbers, private layout adapters, registry tests, and
+userspace symbols in sync. Terminal ioctls intentionally use Linux-compatible request numbers and
+mlibc's Linux `termios` layout inside the Roxy personality adapter; other ioctl families remain
+unsupported.

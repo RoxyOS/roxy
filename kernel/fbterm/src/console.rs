@@ -1,3 +1,5 @@
+use roxy_tty_types::WindowSize;
+
 use crate::renderer::TextRenderer;
 
 pub(crate) struct Console {
@@ -36,6 +38,15 @@ impl Console {
         }
 
         self.toggle_cursor();
+    }
+
+    pub(crate) fn window_size(&self) -> WindowSize {
+        WindowSize {
+            rows: saturating_u16(self.renderer.rows()),
+            columns: saturating_u16(self.renderer.columns()),
+            pixel_width: saturating_u16(self.renderer.pixel_width()),
+            pixel_height: saturating_u16(self.renderer.pixel_height()),
+        }
     }
 
     fn toggle_cursor(&mut self) {
@@ -77,12 +88,17 @@ impl Console {
     }
 }
 
+fn saturating_u16(value: usize) -> u16 {
+    u16::try_from(value).unwrap_or(u16::MAX)
+}
+
 #[cfg(feature = "kernel-test")]
 mod tests {
     use alloc::{vec, vec::Vec};
 
     use roxy_boot::FramebufferInfo;
     use roxy_test::kernel_test;
+    use roxy_tty_types::WindowSize;
 
     use super::Console;
     use crate::{
@@ -203,5 +219,20 @@ mod tests {
 
         assert_eq!(console.column, 8);
         assert_eq!(console.row, 0);
+    });
+
+    kernel_test!("roxy-fbterm::window-size", reports_text_grid, {
+        let mut storage = vec![0u8; 128 * 32 * 4];
+        let console = console(&mut storage, 128, 32);
+
+        assert_eq!(
+            console.window_size(),
+            WindowSize {
+                rows: 2,
+                columns: 16,
+                pixel_width: 128,
+                pixel_height: 32,
+            }
+        );
     });
 }

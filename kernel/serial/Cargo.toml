@@ -10,6 +10,7 @@ spin.workspace = true
 uart_16550.workspace = true
 
 roxy-terminal.workspace = true
+roxy-tty-types.workspace = true
 roxy-utils.workspace = true
 
 [lints]

@@ -2,15 +2,19 @@
 
 extern crate alloc;
 
+mod settings;
+
 use alloc::vec::Vec;
 use core::mem;
+
+pub use settings::LineDisciplineSettings;
 
 const INPUT_CAPACITY: usize = 4096;
 const CANONICAL_PAYLOAD_CAPACITY: usize = INPUT_CAPACITY - 1;
 
 /// Processes the byte stream between a TTY input device and its readers.
 pub struct LineDiscipline {
-    pub termios: Termios,
+    pub settings: LineDisciplineSettings,
     buffered: Vec<u8>,
 }
 
@@ -18,37 +22,37 @@ impl LineDiscipline {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            termios: Termios::new(),
+            settings: LineDisciplineSettings::new(),
             buffered: Vec::new(),
         }
     }
 
     #[must_use]
-    pub const fn with_termios(termios: Termios) -> Self {
+    pub const fn with_settings(settings: LineDisciplineSettings) -> Self {
         Self {
-            termios,
+            settings,
             buffered: Vec::new(),
         }
     }
 
     /// Applies the current input policy to one encoded input event.
-    #[must_use]
     pub fn process(&mut self, input: &[u8]) -> ProcessResult {
         if input.is_empty() {
             return ProcessResult::ignored();
         }
 
-        assert!(
-            self.termios.canonical,
-            "non-canonical is not supported for now"
-        );
+        if !self.settings.canonical {
+            return ProcessResult {
+                echo: self.settings.echo,
+                buffer: Some(input.to_vec()),
+            };
+        }
 
-        // Backspace
-        if input == b"\x08" {
+        if input == [self.settings.erase_character] {
             let erased = self.erase_character();
 
             return ProcessResult {
-                echo: erased && self.termios.echo,
+                echo: erased && self.settings.echo,
                 buffer: None,
             };
         }
@@ -58,7 +62,7 @@ impl LineDiscipline {
             self.buffered.push(b'\n');
 
             return ProcessResult {
-                echo: self.termios.echo,
+                echo: self.settings.echo,
                 buffer: Some(mem::take(&mut self.buffered)),
             };
         }
@@ -70,9 +74,31 @@ impl LineDiscipline {
         self.buffered.extend_from_slice(input);
 
         ProcessResult {
-            echo: self.termios.echo,
+            echo: self.settings.echo,
             buffer: None,
         }
+    }
+
+    /// Replaces terminal input settings.
+    ///
+    /// Returns unfinished canonical input when disabling canonical mode so the TTY can make it
+    /// readable.
+    pub fn update_settings(&mut self, settings: LineDisciplineSettings) -> Option<Vec<u8>> {
+        let released =
+            if self.settings.canonical && !settings.canonical && !self.buffered.is_empty() {
+                Some(mem::take(&mut self.buffered))
+            } else {
+                None
+            };
+
+        self.settings = settings;
+
+        released
+    }
+
+    /// Discards the line currently being edited.
+    pub fn clear_input(&mut self) {
+        self.buffered.clear();
     }
 
     /// Erase the last buffered character. Returns weather it actually
@@ -89,29 +115,6 @@ impl LineDiscipline {
 }
 
 impl Default for LineDiscipline {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Terminal input settings owned by a line discipline.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Termios {
-    pub echo: bool,
-    pub canonical: bool,
-}
-
-impl Termios {
-    #[must_use]
-    pub const fn new() -> Self {
-        Self {
-            echo: true,
-            canonical: true,
-        }
-    }
-}
-
-impl Default for Termios {
     fn default() -> Self {
         Self::new()
     }
@@ -140,14 +143,15 @@ mod tests {
     use roxy_test::kernel_test;
 
     use super::{
-        CANONICAL_PAYLOAD_CAPACITY, INPUT_CAPACITY, LineDiscipline, ProcessResult, Termios,
+        CANONICAL_PAYLOAD_CAPACITY, INPUT_CAPACITY, LineDiscipline, LineDisciplineSettings,
+        ProcessResult,
     };
 
     kernel_test!("roxy-line-discipline::canonical", buffers_canonical_line, {
         let mut discipline = LineDiscipline::new();
 
-        assert!(discipline.termios.echo);
-        assert!(discipline.termios.canonical);
+        assert!(discipline.settings.echo);
+        assert!(discipline.settings.canonical);
         assert_eq!(
             discipline.process(b"ab"),
             ProcessResult {
@@ -174,17 +178,43 @@ mod tests {
     });
 
     kernel_test!("roxy-line-discipline::settings", obeys_settings, {
-        let mut discipline = LineDiscipline::with_termios(Termios {
+        let mut discipline = LineDiscipline::with_settings(LineDisciplineSettings {
             echo: false,
             canonical: false,
+            ..LineDisciplineSettings::new()
         });
 
         assert_eq!(discipline.process(b"\x08").buffer.unwrap(), b"\x08");
 
-        discipline.termios.echo = true;
+        discipline.settings.echo = true;
         let result = discipline.process(b"x");
         assert!(result.echo);
         assert_eq!(result.buffer.unwrap(), b"x");
+    });
+
+    kernel_test!(
+        "roxy-line-discipline::mode-transition",
+        releases_partial_line,
+        {
+            let mut discipline = LineDiscipline::new();
+
+            assert!(discipline.process(b"partial").buffer.is_none());
+            let released = discipline.update_settings(LineDisciplineSettings {
+                canonical: false,
+                ..LineDisciplineSettings::new()
+            });
+
+            assert_eq!(released.unwrap(), b"partial");
+        }
+    );
+
+    kernel_test!("roxy-line-discipline::flush", discards_partial_line, {
+        let mut discipline = LineDiscipline::new();
+
+        let _ = discipline.process(b"discarded");
+        discipline.clear_input();
+
+        assert_eq!(discipline.process(b"\n").buffer.unwrap(), b"\n");
     });
 
     kernel_test!("roxy-line-discipline::capacity", bounds_canonical_input, {
