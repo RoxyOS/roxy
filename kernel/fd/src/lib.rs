@@ -10,7 +10,8 @@ mod table;
 
 pub use fd::Fd;
 pub use file::{
-    Directory, DirectoryEntry, File, FileError, FileMetadata, FileType, SeekError, SeekFrom,
+    Directory, DirectoryEntry, File, FileError, FileMetadata, FileType, PollEvents, SeekError,
+    SeekFrom,
 };
 pub use ioctl::{ApplyWhen, IoctlError, IoctlRequest, LocalFlags, Termios, WindowSize};
 pub use open::OpenFile;

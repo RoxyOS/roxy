@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
-use roxy_fd::FileError;
+use roxy_fd::{FileError, PollEvents};
 use roxy_input::InputDevice;
 use roxy_line_discipline::{LineDiscipline, ProcessResult};
 use roxy_terminal::{OutputError, TerminalOutput};
@@ -41,27 +41,46 @@ impl Tty {
         }
     }
 
+    pub(super) fn poll(&self) -> Result<PollEvents, FileError> {
+        let _read_guard = self.read_lock.lock();
+
+        if self.buffered.lock().is_empty() {
+            self.fill_buffered()?;
+        }
+
+        Ok(PollEvents {
+            readable: !self.buffered.lock().is_empty(),
+            writable: true,
+            ..PollEvents::default()
+        })
+    }
+
     pub(super) fn write(&self, input: &[u8]) -> Result<usize, FileError> {
         self.output.write(input).map_err(map_output_error)
     }
 
     fn read_inner(&self, output: &mut [u8]) -> Result<usize, FileError> {
         let _read_guard = self.read_lock.lock();
-
-        loop {
-            let count = self.drain_buffered(output);
-
-            if count == 0 {
-                let Some(event) = self.next_input_event() else {
-                    return Ok(0);
-                };
-
-                let result = self.line_discipline.lock().process(event.as_bytes());
-                self.apply_result(event.as_bytes(), result)?;
-            } else {
-                return Ok(count);
-            }
+        let count = self.drain_buffered(output);
+        if count > 0 {
+            return Ok(count);
         }
+
+        self.fill_buffered()?;
+        Ok(self.drain_buffered(output))
+    }
+
+    fn fill_buffered(&self) -> Result<(), FileError> {
+        while self.buffered.lock().is_empty() {
+            let Some(event) = self.next_input_event() else {
+                return Ok(());
+            };
+
+            let result = self.line_discipline.lock().process(event.as_bytes());
+            self.apply_result(event.as_bytes(), result)?;
+        }
+
+        Ok(())
     }
 
     fn apply_result(&self, input: &[u8], result: ProcessResult) -> Result<(), FileError> {

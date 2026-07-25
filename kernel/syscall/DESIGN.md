@@ -73,6 +73,11 @@ including the terminator. A buffer shorter than the complete result returns `ERA
 non-writable userspace range returns `EFAULT`. No process-table lock spans result encoding or the
 userspace write.
 
+`poll` decodes the userspace `pollfd` array inside this subsystem and queries each descriptor's
+ABI-neutral readiness through `roxy-fd`. The initial interface is non-blocking (`timeout == 0`):
+it reports TTY and regular-file readiness, returns `POLLNVAL` for invalid descriptors, and does
+not yet provide wait queues, timer deadlines, or signal-mask replacement.
+
 `ioctl` validates and resolves the descriptor before decoding the raw request number and any mode
 encoded in it. For terminal requests, the syscall layer copies the Roxy mlibc
 `termios` or `winsize` record between userspace and an initialized typed kernel value. Setters own

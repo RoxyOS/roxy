@@ -3,7 +3,7 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use roxy_utils::Lock;
 
 use crate::file::File;
-use crate::{DirectoryEntry, FileError, FileMetadata, SeekError, SeekFrom};
+use crate::{DirectoryEntry, FileError, FileMetadata, PollEvents, SeekError, SeekFrom};
 
 pub(crate) struct OpenFileState {
     pub(crate) object: Box<dyn File>,
@@ -63,6 +63,15 @@ impl OpenFile {
         object.write(position, input)
     }
 
+    /// Reports readiness through the serialized open-file object.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying object's readiness error.
+    pub fn poll(&self) -> Result<PollEvents, FileError> {
+        self.state.lock().object.poll()
+    }
+
     /// Changes and returns the serialized open-file position.
     ///
     /// # Errors
@@ -103,7 +112,7 @@ mod tests {
     use roxy_test::kernel_test;
 
     use super::OpenFile;
-    use crate::{File, FileError, SeekError, SeekFrom};
+    use crate::{File, FileError, PollEvents, SeekError, SeekFrom};
 
     struct Unsupported {
         terminal: bool,
@@ -114,6 +123,10 @@ mod tests {
     }
 
     impl File for Unsupported {
+        fn poll(&mut self) -> Result<PollEvents, FileError> {
+            Ok(PollEvents::default())
+        }
+
         fn is_terminal(&self) -> bool {
             self.terminal
         }
@@ -136,6 +149,14 @@ mod tests {
     }
 
     impl File for Cursor {
+        fn poll(&mut self) -> Result<PollEvents, FileError> {
+            Ok(PollEvents {
+                readable: true,
+                writable: true,
+                ..PollEvents::default()
+            })
+        }
+
         fn is_terminal(&self) -> bool {
             false
         }
@@ -202,6 +223,20 @@ mod tests {
 
         assert!(terminal.is_terminal());
         assert!(!non_terminal.is_terminal());
+    });
+
+    kernel_test!("roxy-fd::default-poll", reports_default_readiness, {
+        let file = OpenFile::new(Box::new(Cursor { length: 0 }));
+        let ready = file.poll().unwrap();
+
+        assert_eq!(
+            ready,
+            PollEvents {
+                readable: true,
+                writable: true,
+                ..PollEvents::default()
+            }
+        );
     });
 
     kernel_test!("roxy-fd::shared-seek-position", shared_seek_position, {

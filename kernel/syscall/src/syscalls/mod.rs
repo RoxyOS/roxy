@@ -19,6 +19,7 @@ mod ioctl;
 mod isatty;
 mod open;
 mod open_dir;
+mod poll;
 mod read;
 mod read_entries;
 mod seek;
@@ -32,7 +33,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 33] = [
+pub(super) const SYSCALLS: [Syscall; 34] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -66,4 +67,5 @@ pub(super) const SYSCALLS: [Syscall; 33] = [
     chdir::SYSCALL,
     ioctl::SYSCALL,
     getcwd::SYSCALL,
+    poll::SYSCALL,
 ];

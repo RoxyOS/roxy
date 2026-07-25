@@ -1,8 +1,24 @@
+use crate::{IoctlError, IoctlRequest};
 use alloc::vec::Vec;
 
-use crate::{IoctlError, IoctlRequest};
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PollEvents {
+    pub readable: bool,
+    pub priority: bool,
+    pub writable: bool,
+    pub error: bool,
+    pub hangup: bool,
+}
 
 pub trait File: Send {
+    /// Reports the events that are currently ready for this object.
+    ///
+    /// # Errors
+    ///
+    /// Returns an object-specific I/O error when readiness cannot be queried.
+    fn poll(&mut self) -> Result<PollEvents, FileError>;
+
     /// Reports whether this object is a terminal.
     fn is_terminal(&self) -> bool;
 

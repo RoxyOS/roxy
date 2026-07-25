@@ -2,13 +2,21 @@ use alloc::vec::Vec;
 
 use roxy_fd::{
     Directory as FdDirectory, DirectoryEntry as FdDirectoryEntry, File as FdFile,
-    FileError as FdFileError, FileMetadata as FdFileMetadata, FileType as FdFileType,
+    FileError as FdFileError, FileMetadata as FdFileMetadata, FileType as FdFileType, PollEvents,
     SeekError as FdSeekError, SeekFrom as FdSeekFrom,
 };
 
 use crate::VfsDirectory;
 
 impl FdFile for VfsDirectory {
+    fn poll(&mut self) -> Result<PollEvents, FdFileError> {
+        Ok(PollEvents {
+            readable: true,
+            writable: true,
+            ..PollEvents::default()
+        })
+    }
+
     fn is_terminal(&self) -> bool {
         false
     }

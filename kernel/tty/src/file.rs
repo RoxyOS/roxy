@@ -1,8 +1,8 @@
 use alloc::{boxed::Box, sync::Arc};
 
 use roxy_fd::{
-    File, FileError, FileMetadata, FileType, IoctlError, IoctlRequest, OpenFile, SeekError,
-    SeekFrom,
+    File, FileError, FileMetadata, FileType, IoctlError, IoctlRequest, OpenFile, PollEvents,
+    SeekError, SeekFrom,
 };
 
 use crate::Tty;
@@ -28,6 +28,10 @@ impl File for TtyFile {
 
     fn read(&mut self, _position: &mut u64, output: &mut [u8]) -> Result<usize, FileError> {
         self.tty.read(output)
+    }
+
+    fn poll(&mut self) -> Result<PollEvents, FileError> {
+        self.tty.poll()
     }
 
     fn write(&mut self, _position: &mut u64, input: &[u8]) -> Result<usize, FileError> {

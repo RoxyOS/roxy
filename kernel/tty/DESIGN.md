@@ -23,6 +23,11 @@ is written to the output endpoint. Canonical reads continue processing events un
 a complete line from the discipline into the TTY buffer; noncanonical events move there
 immediately. Concurrent open files consume one ordered stream under the TTY read lock.
 
+`Tty::poll` uses the same lock and non-blocking input processing path to publish current
+readability without entering the interrupt wait. A canonical TTY becomes readable only after a
+complete line is committed; output is currently always writable because terminal output has no
+backpressure model.
+
 Failed or partial echo returns an I/O error without discarding bytes already moved into the TTY
 buffer; echo itself is not retried. The read lock is released before waiting with the architecture's
 atomic interrupt wait. `Tty::write` delegates directly to output; `TtyFile` only adapts these

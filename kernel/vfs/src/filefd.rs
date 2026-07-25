@@ -1,6 +1,6 @@
 use roxy_fd::{
     File as FdFile, FileError as FdFileError, FileMetadata as FdFileMetadata,
-    FileType as FdFileType, SeekError as FdSeekError, SeekFrom as FdSeekFrom,
+    FileType as FdFileType, PollEvents, SeekError as FdSeekError, SeekFrom as FdSeekFrom,
 };
 
 use crate::{SeekFrom as VfsSeekFrom, VfsError, VfsFile};
@@ -8,6 +8,14 @@ use crate::{SeekFrom as VfsSeekFrom, VfsError, VfsFile};
 // Calls to `self.{seek, read, write}` are calling `VfsFile::{seek, read, write}`,
 // not to be confused with `FdFile::{seek, read, write}`
 impl FdFile for VfsFile {
+    fn poll(&mut self) -> Result<PollEvents, FdFileError> {
+        Ok(PollEvents {
+            readable: true,
+            writable: true,
+            ..PollEvents::default()
+        })
+    }
+
     fn is_terminal(&self) -> bool {
         false
     }

@@ -55,12 +55,16 @@ mod tests {
     use alloc::{boxed::Box, sync::Arc};
 
     use super::FdTable;
-    use crate::{Fd, File, FileError, OpenFile, SeekError, SeekFrom};
+    use crate::{Fd, File, FileError, OpenFile, PollEvents, SeekError, SeekFrom};
     use roxy_test::kernel_test;
 
     struct Unsupported;
 
     impl File for Unsupported {
+        fn poll(&mut self) -> Result<PollEvents, FileError> {
+            Ok(PollEvents::default())
+        }
+
         fn is_terminal(&self) -> bool {
             false
         }
