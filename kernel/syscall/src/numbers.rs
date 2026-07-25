@@ -33,6 +33,7 @@ pub(crate) enum SyscallNumber {
     ReadEntries = 29,
     Chdir = 30,
     Ioctl = 31,
+    Getcwd = 32,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -72,6 +73,7 @@ impl TryFrom<u64> for SyscallNumber {
             29 => Ok(Self::ReadEntries),
             30 => Ok(Self::Chdir),
             31 => Ok(Self::Ioctl),
+            32 => Ok(Self::Getcwd),
             _ => Err(()),
         }
     }
@@ -115,6 +117,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(29), Ok(SyscallNumber::ReadEntries));
         assert_eq!(SyscallNumber::try_from(30), Ok(SyscallNumber::Chdir));
         assert_eq!(SyscallNumber::try_from(31), Ok(SyscallNumber::Ioctl));
-        assert!(SyscallNumber::try_from(32).is_err());
+        assert_eq!(SyscallNumber::try_from(32), Ok(SyscallNumber::Getcwd));
+        assert!(SyscallNumber::try_from(33).is_err());
     });
 }

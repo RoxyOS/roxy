@@ -53,6 +53,12 @@ advanced; EOF returns zero bytes, and `seek` to entry zero implements `rewinddir
 directory, and only then replaces the process-owned normalized absolute cwd. Failed validation
 leaves the existing cwd unchanged.
 
+`getcwd` snapshots the process-owned normalized absolute cwd, appends a null terminator, and copies
+the complete result to a caller-provided writable buffer. Success returns the copied byte count,
+including the terminator. A buffer shorter than the complete result returns `ERANGE`; an invalid or
+non-writable userspace range returns `EFAULT`. No process-table lock spans result encoding or the
+userspace write.
+
 `ioctl` validates and resolves the descriptor before asking `roxy-fd` to decode the raw request
 number together with its raw argument. The FD layer owns request-specific decoding and locked
 object dispatch; the syscall layer only maps an unrecognized request and operation errors to errno.

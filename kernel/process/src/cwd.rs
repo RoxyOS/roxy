@@ -7,7 +7,7 @@ use crate::table::{PROCESS_TABLE, ProcessTable};
 /// # Panics
 ///
 /// Panics when the current scheduled thread is not owned by a running process.
-pub(super) fn current_working_directory() -> ResolvedPath {
+pub fn current_working_directory() -> ResolvedPath {
     let table = PROCESS_TABLE.lock();
     let process_id = table.current_process_id();
 

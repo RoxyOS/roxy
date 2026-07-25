@@ -21,6 +21,7 @@ pub(crate) enum Errno {
     NoSpace = 28,
     Pipe = 29,
     ReadOnly = 30,
+    Range = 34,
     NameTooLong = 36,
     NoSys = 38,
     Overflow = 75,

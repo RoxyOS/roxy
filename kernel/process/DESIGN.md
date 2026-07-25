@@ -17,7 +17,8 @@ the VFS root, fork children clone the parent's directory, and `execve` preserves
 process metadata. Process initialization registers a VFS working-directory provider that clones the
 current directory under the process-table lock. The VFS invokes it only for relative global
 operations and receives an owned snapshot, so no process-table lock spans path normalization or
-filesystem access.
+filesystem access. The syscall subsystem uses the same owned-snapshot API for `getcwd`, keeping
+userspace memory access outside the process-table lock.
 
 Each process also records an optional parent process ID. Directly spawned processes have no parent;
 fork children record the caller's process ID. Only that recorded parent may wait for and remove the

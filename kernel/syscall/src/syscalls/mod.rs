@@ -8,6 +8,7 @@ mod exit;
 mod fork;
 mod futex_wait;
 mod futex_wake;
+mod getcwd;
 mod getegid;
 mod geteuid;
 mod getgid;
@@ -31,7 +32,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 32] = [
+pub(super) const SYSCALLS: [Syscall; 33] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -64,4 +65,5 @@ pub(super) const SYSCALLS: [Syscall; 32] = [
     read_entries::SYSCALL,
     chdir::SYSCALL,
     ioctl::SYSCALL,
+    getcwd::SYSCALL,
 ];
