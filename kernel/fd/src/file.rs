@@ -1,5 +1,7 @@
 use alloc::vec::Vec;
 
+use crate::{IoctlError, IoctlRequest};
+
 pub trait File: Send {
     /// Reports whether this object is a terminal.
     fn is_terminal(&self) -> bool;
@@ -37,6 +39,15 @@ pub trait File: Send {
     ///
     /// Returns an error when the object is not seekable or the target position is invalid.
     fn seek(&mut self, current: u64, position: SeekFrom) -> Result<u64, SeekError>;
+
+    /// Performs a typed ioctl operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an operation-specific ioctl error.
+    fn ioctl(&mut self, _request: IoctlRequest) -> Result<u64, IoctlError> {
+        Err(IoctlError::NotTty)
+    }
 
     /// Returns this object's directory capability when it supports directory iteration.
     fn as_directory(&mut self) -> Option<&mut dyn Directory> {

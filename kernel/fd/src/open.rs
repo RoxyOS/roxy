@@ -5,13 +5,13 @@ use roxy_utils::Lock;
 use crate::file::File;
 use crate::{DirectoryEntry, FileError, FileMetadata, SeekError, SeekFrom};
 
-struct OpenFileState {
-    object: Box<dyn File>,
+pub(crate) struct OpenFileState {
+    pub(crate) object: Box<dyn File>,
     position: u64,
 }
 
 pub struct OpenFile {
-    state: Lock<OpenFileState>,
+    pub(crate) state: Lock<OpenFileState>,
 }
 
 impl OpenFile {

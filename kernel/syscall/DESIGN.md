@@ -53,6 +53,13 @@ advanced; EOF returns zero bytes, and `seek` to entry zero implements `rewinddir
 directory, and only then replaces the process-owned normalized absolute cwd. Failed validation
 leaves the existing cwd unchanged.
 
+`ioctl` validates and resolves the descriptor before asking `roxy-fd` to decode the raw request
+number together with its raw argument. The FD layer owns request-specific decoding and locked
+object dispatch; the syscall layer only maps an unrecognized request and operation errors to errno.
+Unknown requests return `ENOTTY` without a diagnostic. Consequently an invalid descriptor returns
+`EBADF` even when the request is unknown. A file object's `IoctlError::NotTty` also maps to
+`ENOTTY`.
+
 The current process model has no stored credentials and treats every process as the root identity.
 `getuid`, `geteuid`, `getgid`, and `getegid` therefore return real and effective user and group IDs
 of `0` without consulting process state. Credential storage, mutation, and permission enforcement
@@ -73,10 +80,11 @@ success it invokes the architecture's fresh-user resume path and never returns t
 Subsystem errors are translated to stable ABI errno values at this boundary. Invalid userspace
 addresses return `EFAULT`; size limits and format failures use their defined errno values. Missing
 kernel functionality must emit the centralized unconditional `UNSUPPORTED` diagnostic before an
-error is returned, including operation, argument, PID/TID, and errno.
+error is returned, including operation, argument, PID/TID, and errno. The provisional `ioctl`
+parser is the sole exception: unknown requests currently return `ENOTTY` without a diagnostic.
 
 ## Limits
 
 The ABI is currently Roxy-specific and manually mirrored by the Roxy mlibc sysdeps. Every ABI
 change must keep syscall numbers, Rust/C declarations, registry tests, and userspace symbols in
-sync.
+sync. The generic mlibc `ioctl()` bridge is present, but no concrete ioctl request is supported.
