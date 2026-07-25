@@ -47,7 +47,7 @@ fn command(image: &Path) -> Result<Command> {
     ));
     command.arg("-cdrom").arg(image).args([
         "-m",
-        "256M",
+        "4G",
         "-smp",
         "1",
         "-serial",
