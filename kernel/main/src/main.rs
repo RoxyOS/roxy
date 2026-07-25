@@ -19,7 +19,7 @@ use roxy_interrupt::InterruptPlatformInfo;
 use roxy_serial::e_println;
 
 #[cfg(not(feature = "kernel-test"))]
-const INIT: &[u8] = b"/bin/sh";
+const INIT: &[u8] = b"/usr/bin/bash";
 
 #[unsafe(no_mangle)]
 #[allow(clippy::missing_panics_doc)]
