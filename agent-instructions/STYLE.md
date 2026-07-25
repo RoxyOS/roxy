@@ -95,9 +95,6 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
 
 - Use the newest appropriate Rust and standard-library features supported by the pinned nightly
   toolchain. Do not retain compatibility patterns for older compilers.
-- Prefer chained transformations, iterators, and combinators when ownership, failure behavior, and
-  control flow remain obvious. Break chains at semantic boundaries or where error context becomes
-  unclear.
 - Use `tap` to configure a value that is immediately returned or passed onward. Do not introduce a
   `let mut value; ...; value` pattern solely for configuration.
 - Avoid turbofish syntax when a local type annotation communicates the same information more
