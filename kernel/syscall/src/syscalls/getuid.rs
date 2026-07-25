@@ -1,9 +1,9 @@
-use crate::{Syscall, SyscallResult, numbers::SyscallNumber};
+use crate::{SyscallResult, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Getuid, handle);
+syscall!(SyscallNumber::Getuid, handle());
 
 #[allow(clippy::unnecessary_wraps)]
-fn handle(_arguments: [u64; 6]) -> SyscallResult {
+fn handle() -> SyscallResult {
     Ok(0)
 }
 
@@ -14,6 +14,6 @@ mod tests {
     use super::handle;
 
     kernel_test!("roxy-syscall::getuid", getuid, {
-        assert_eq!(handle([0; 6]), Ok(0));
+        assert_eq!(handle(), Ok(0));
     });
 }

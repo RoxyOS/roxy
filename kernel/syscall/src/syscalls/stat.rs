@@ -1,16 +1,18 @@
-use core::{
-    mem::{align_of, offset_of, size_of},
-    slice,
-};
+use core::mem::{align_of, offset_of, size_of};
 
 use bitflags::bitflags;
 use roxy_fd::{Fd, FileError, FileMetadata, FileType as FdFileType};
-use roxy_memory::UserAddress;
-use roxy_vfs::{FileType as VfsFileType, Metadata as VfsMetadata, ResolvedPath, VfsError};
+use roxy_vfs::{FileType as VfsFileType, Metadata as VfsMetadata, VfsError};
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{
+    SyscallResult,
+    args::{CString, Out, SyscallArg},
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
+};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Stat, handle);
+syscall!(SyscallNumber::Stat, handle(target: StatTarget => Invalid, fd: u64, path: u64, flags: StatFlags => Invalid, output: Out<StatAbi> => Fault));
 
 const BLOCK_SIZE: u32 = 4096;
 const MODE_REGULAR: u32 = 0x8000;
@@ -28,20 +30,19 @@ bitflags! {
     }
 }
 
-impl StatFlags {
-    fn parse(value: u64) -> Result<Self, Errno> {
-        let unknown = value & !Self::all().bits();
+impl SyscallArg for StatFlags {
+    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
+        let unknown = raw & !Self::all().bits();
 
         if unknown != 0 {
             return Err(unsupported("stat.flags", unknown));
         }
 
-        Ok(Self::from_bits_retain(value))
+        Ok(Self::from_bits_retain(raw))
     }
 }
 
 /// Fixed-layout stat payload copied across the userspace syscall ABI.
-/// Not to be confused with `StatData`
 #[repr(C)]
 struct StatAbi {
     file_id: u64,
@@ -61,127 +62,101 @@ const _: () = assert!(offset_of!(StatAbi, hard_links) == 24);
 const _: () = assert!(offset_of!(StatAbi, mode) == 32);
 const _: () = assert!(offset_of!(StatAbi, block_size) == 36);
 
+impl StatAbi {
+    fn new(file_id: u64, size: u64, hard_links: u32, mode: u32) -> Self {
+        Self {
+            file_id,
+            size,
+            blocks: size.div_ceil(512),
+            hard_links: u64::from(hard_links),
+            mode,
+            block_size: BLOCK_SIZE,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum StatTarget {
     Path,
     Fd,
 }
 
-impl StatTarget {
-    fn parse(value: u64) -> Result<Self, Errno> {
-        match value {
+impl SyscallArg for StatTarget {
+    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
+        match raw {
             1 => Ok(Self::Path),
             2 => Ok(Self::Fd),
-            _ => Err(unsupported("stat.target", value)),
+            _ => Err(unsupported("stat.target", raw)),
         }
     }
 }
 
-/// Normalized kernel metadata shared by path-based and descriptor-based stat requests. Not to be
-/// confused with `StatAbi`
-#[derive(Clone, Copy)]
-struct StatData {
-    file_id: u64,
-    file_type: u32,
-    permissions: u16,
-    size: u64,
-    hard_links: u32,
-}
-
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let target = StatTarget::parse(arguments[0])?;
-    let flags = StatFlags::parse(arguments[3])?;
-    let output = UserAddress::new(arguments[4]).ok_or(Errno::Fault)?;
-
-    let metadata = match target {
-        StatTarget::Path => path_metadata(arguments[2], flags)?,
-        StatTarget::Fd => fd_metadata(arguments[1])?,
+fn handle(
+    target: StatTarget,
+    fd: u64,
+    path: u64,
+    flags: StatFlags,
+    output: Out<StatAbi>,
+) -> SyscallResult {
+    let result = match target {
+        StatTarget::Path => path_metadata(path, flags)?,
+        StatTarget::Fd => fd_metadata(fd)?,
     };
-    let result = encode(metadata);
 
-    write_result(output, &result)?;
+    // SAFETY: StatAbi's checked repr(C) layout consists of initialized integer fields without
+    // implicit padding.
+    unsafe { output.write(&result) }?;
 
     Ok(0)
 }
 
-fn path_metadata(path: u64, flags: StatFlags) -> Result<StatData, Errno> {
-    let address = UserAddress::new(path).ok_or(Errno::Fault)?;
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
-    let path = crate::user::read_c_string(&addrspace, address, ResolvedPath::MAX_LEN)?;
+fn path_metadata(path: u64, flags: StatFlags) -> Result<StatAbi, Errno> {
+    let path = CString::parse(path, Errno::Fault)?;
 
     if path.is_empty() {
         return Err(Errno::NotFound);
     }
 
     let metadata = if flags.contains(StatFlags::SYMLINK_NOFOLLOW) {
-        roxy_vfs::symlink_metadata(path)
+        roxy_vfs::symlink_metadata(path.into_inner())
     } else {
-        roxy_vfs::metadata(path)
+        roxy_vfs::metadata(path.into_inner())
     };
 
-    metadata.map(StatData::from).map_err(map_vfs_error)
+    metadata.map(StatAbi::from).map_err(map_vfs_error)
 }
 
-fn fd_metadata(raw: u64) -> Result<StatData, Errno> {
-    let fd = u32::try_from(raw).map(Fd::new).map_err(|_| Errno::BadFd)?;
+fn fd_metadata(raw: u64) -> Result<StatAbi, Errno> {
+    let fd = Fd::parse(raw, Errno::BadFd)?;
     let file = roxy_process::current_open_file(fd).map_err(|_| Errno::BadFd)?;
 
     file.metadata()
-        .map(StatData::from)
+        .map(StatAbi::from)
         .map_err(|error| match error {
             FileError::BadOperation => unsupported("stat.fd-object", raw),
             FileError::Io => Errno::Io,
         })
 }
 
-fn encode(metadata: StatData) -> StatAbi {
-    StatAbi {
-        file_id: metadata.file_id,
-        size: metadata.size,
-        blocks: metadata.size.div_ceil(512),
-        hard_links: u64::from(metadata.hard_links),
-        mode: metadata.file_type | u32::from(metadata.permissions),
-        block_size: BLOCK_SIZE,
-    }
-}
-
-fn write_result(output: UserAddress, result: &StatAbi) -> Result<(), Errno> {
-    // SAFETY: StatAbi is repr(C), contains only initialized integer fields, and the slice does
-    // not outlive the borrowed value.
-    let bytes = unsafe {
-        slice::from_raw_parts(
-            (core::ptr::from_ref(result)).cast::<u8>(),
-            size_of::<StatAbi>(),
-        )
-    };
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
-
-    addrspace
-        .write_bytes(output, bytes)
-        .map_err(|_| Errno::Fault)
-}
-
-impl From<VfsMetadata> for StatData {
+impl From<VfsMetadata> for StatAbi {
     fn from(metadata: VfsMetadata) -> Self {
-        Self {
-            file_id: metadata.file_id,
-            file_type: vfs_file_type(metadata.file_type),
-            permissions: metadata.permissions.bits(),
-            size: metadata.size,
-            hard_links: metadata.hard_links,
-        }
+        Self::new(
+            metadata.file_id,
+            metadata.size,
+            metadata.hard_links,
+            vfs_file_type(metadata.file_type) | u32::from(metadata.permissions.bits()),
+        )
     }
 }
 
-impl From<FileMetadata> for StatData {
+impl From<FileMetadata> for StatAbi {
     fn from(metadata: FileMetadata) -> Self {
-        Self {
-            file_id: metadata.file_id,
-            file_type: fd_file_type(metadata.file_type),
-            permissions: metadata.permissions,
-            size: metadata.size,
-            hard_links: metadata.hard_links,
-        }
+        Self::new(
+            metadata.file_id,
+            metadata.size,
+            metadata.hard_links,
+            fd_file_type(metadata.file_type) | u32::from(metadata.permissions),
+        )
     }
 }
 
@@ -228,14 +203,16 @@ fn unsupported(operation: &str, argument: u64) -> Errno {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
+    use roxy_fd::{FileMetadata, FileType};
     use roxy_test::kernel_test;
 
-    use super::{MODE_REGULAR, StatData, StatFlags, encode};
+    use super::{MODE_REGULAR, StatAbi, StatFlags};
+    use crate::{args::SyscallArg, errno::Errno};
 
     kernel_test!("roxy-syscall::stat-encoding", stat_encoding, {
-        let result = encode(StatData {
+        let result = StatAbi::from(FileMetadata {
             file_id: 7,
-            file_type: MODE_REGULAR,
+            file_type: FileType::Regular,
             permissions: 0o640,
             size: 513,
             hard_links: 2,
@@ -248,7 +225,10 @@ mod tests {
     });
 
     kernel_test!("roxy-syscall::stat-flags", stat_flags, {
-        assert_eq!(StatFlags::parse(0), Ok(StatFlags::empty()));
-        assert_eq!(StatFlags::parse(0x100), Ok(StatFlags::SYMLINK_NOFOLLOW));
+        assert_eq!(StatFlags::parse(0, Errno::Invalid), Ok(StatFlags::empty()));
+        assert_eq!(
+            StatFlags::parse(0x100, Errno::Invalid),
+            Ok(StatFlags::SYMLINK_NOFOLLOW)
+        );
     });
 }

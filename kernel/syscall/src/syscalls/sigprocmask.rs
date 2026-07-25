@@ -1,11 +1,9 @@
 use crate::{
-    Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber, unsupported::unsupported_argument,
+    SyscallResult, errno::Errno, numbers::SyscallNumber, syscall, unsupported::unsupported_argument,
 };
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Sigprocmask, handle);
+syscall!(SyscallNumber::Sigprocmask, handle(how: u64));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let how = arguments[0];
-
+fn handle(how: u64) -> SyscallResult {
     Err(unsupported_argument("sigprocmask", how, Errno::NoSys))
 }

@@ -2,15 +2,11 @@ use roxy_memory::UserAddress;
 use roxy_process::MemoryError;
 
 use super::MemoryProtection;
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::VmProtect, handle);
+syscall!(SyscallNumber::VmProtect, handle(address: UserAddress => Invalid, size: usize => Invalid, protection: u64));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let address = UserAddress::new(arguments[0]).ok_or(Errno::Invalid)?;
-    let size = usize::try_from(arguments[1]).map_err(|_| Errno::Invalid)?;
-    let protection = arguments[2];
-
+fn handle(address: UserAddress, size: usize, protection: u64) -> SyscallResult {
     if size == 0 {
         return Err(Errno::Invalid);
     }

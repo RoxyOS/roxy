@@ -1,24 +1,18 @@
 use alloc::boxed::Box;
 
 use roxy_fd::OpenFile;
-use roxy_memory::UserAddress;
-use roxy_vfs::{ResolvedPath, VfsError};
+use roxy_vfs::VfsError;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, args::CString, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::OpenDir, handle);
+syscall!(SyscallNumber::OpenDir, handle(path: CString => Fault));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let path_address = UserAddress::new(arguments[0]).ok_or(Errno::Fault)?;
-
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
-    let path = crate::user::read_c_string(&addrspace, path_address, ResolvedPath::MAX_LEN)?;
-
+fn handle(path: CString) -> SyscallResult {
     if path.is_empty() {
         return Err(Errno::NotFound);
     }
 
-    let directory = roxy_vfs::open_dir(path).map_err(map_vfs_error)?;
+    let directory = roxy_vfs::open_dir(path.into_inner()).map_err(map_vfs_error)?;
     let file = OpenFile::new(Box::new(directory));
     let fd = roxy_process::insert_open_file(file);
 

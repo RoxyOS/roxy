@@ -1,10 +1,14 @@
-use core::{mem::size_of, slice, time::Duration};
+use core::{mem::size_of, time::Duration};
 
-use roxy_memory::UserAddress;
+use crate::{
+    SyscallResult,
+    args::{Out, SyscallArg},
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
+};
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
-
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::ClockGet, handle);
+syscall!(SyscallNumber::ClockGet, handle(clock: ClockId => Invalid, output: Out<ClockResult> => Fault));
 
 const NANOS_PER_SECOND: u32 = 1_000_000_000;
 
@@ -22,24 +26,21 @@ enum ClockId {
     Monotonic,
 }
 
-impl ClockId {
-    fn parse(clock: u64) -> Result<Self, Errno> {
-        match clock {
+impl SyscallArg for ClockId {
+    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
+        match raw {
             0 => Ok(Self::Realtime),
             1 => Ok(Self::Monotonic),
             _ => Err(crate::unsupported::unsupported_argument(
                 "clock_get",
-                clock,
+                raw,
                 Errno::Invalid,
             )),
         }
     }
 }
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let clock = ClockId::parse(arguments[0])?;
-    let output = UserAddress::new(arguments[1]).ok_or(Errno::Fault)?;
-
+fn handle(clock: ClockId, output: Out<ClockResult>) -> SyscallResult {
     let time = match clock {
         ClockId::Realtime => roxy_time::realtime_time(),
         ClockId::Monotonic => roxy_time::monotonic_time(),
@@ -47,17 +48,9 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
 
     let result = encode(time);
 
-    // SAFETY: ClockResult is repr(C), contains only initialized integer fields, and the slice
-    // lives only for the duration of the write.
-    let bytes = unsafe {
-        slice::from_raw_parts((&raw const result).cast::<u8>(), size_of::<ClockResult>())
-    };
-
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
-
-    addrspace
-        .write_bytes(output, bytes)
-        .map_err(|_| Errno::Fault)?;
+    // SAFETY: ClockResult's checked repr(C) layout contains two initialized integers without
+    // padding.
+    unsafe { output.write(&result) }?;
 
     Ok(0)
 }

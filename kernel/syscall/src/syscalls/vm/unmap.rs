@@ -1,9 +1,9 @@
 use roxy_memory::UserAddress;
 use roxy_process::MemoryError;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::VmUnmap, handle);
+syscall!(SyscallNumber::VmUnmap, handle(address: UserAddress => Invalid, size: usize => Invalid));
 
 struct VmUnmapRequest {
     address: UserAddress,
@@ -11,13 +11,6 @@ struct VmUnmapRequest {
 }
 
 impl VmUnmapRequest {
-    fn parse(arguments: [u64; 6]) -> Result<Self, Errno> {
-        Ok(Self {
-            address: UserAddress::new(arguments[0]).ok_or(Errno::Invalid)?,
-            size: usize::try_from(arguments[1]).map_err(|_| Errno::Invalid)?,
-        })
-    }
-
     fn execute(self) -> Result<(), Errno> {
         if self.size == 0 {
             return Err(Errno::Invalid);
@@ -29,8 +22,8 @@ impl VmUnmapRequest {
     }
 }
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let request = VmUnmapRequest::parse(arguments)?;
+fn handle(address: UserAddress, size: usize) -> SyscallResult {
+    let request = VmUnmapRequest { address, size };
 
     request.execute()?;
 

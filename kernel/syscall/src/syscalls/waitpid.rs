@@ -1,34 +1,42 @@
-use core::mem::size_of;
-
-use roxy_memory::UserAddress;
 use roxy_process::{ProcessId, WaitError, WaitResult, WaitTarget};
 
 use crate::{
-    Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber, unsupported::unsupported_argument,
+    SyscallResult,
+    args::{Out, SyscallArg},
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
+    unsupported::unsupported_argument,
 };
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Waitpid, handle);
+syscall!(SyscallNumber::Waitpid, handle(target: WaitTarget => Invalid, status: Option<Out<u32>> => Fault, options: WaitOptions => Invalid, rusage: u64));
 
 const WNOHANG: u64 = 1;
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let target = parse_target(arguments[0])?;
-    let status = parse_status(arguments[1])?;
-    let no_hang = parse_no_hang(arguments[2])?;
+#[derive(Clone, Copy)]
+enum WaitOptions {
+    Blocking,
+    NoHang,
+}
 
-    if arguments[3] != 0 {
+fn handle(
+    target: WaitTarget,
+    status: Option<Out<u32>>,
+    options: WaitOptions,
+    rusage: u64,
+) -> SyscallResult {
+    let no_hang = matches!(options, WaitOptions::NoHang);
+
+    if rusage != 0 {
         return Err(unsupported_argument(
             "waitpid.rusage",
-            arguments[3],
+            rusage,
             Errno::NotSupported,
         ));
     }
 
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
     if let Some(status) = status {
-        addrspace
-            .validate_writable(status, size_of::<u32>())
-            .map_err(|_| Errno::Fault)?;
+        status.validate()?;
     }
 
     let (process_id, exit_status) =
@@ -37,47 +45,45 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
             WaitResult::Pending => return Ok(0),
         };
 
-    if let Some(status) = status {
-        addrspace
-            .write_bytes(status, &encode_status(exit_status.code()).to_ne_bytes())
-            .map_err(|_| Errno::Fault)?;
+    if let Some(output) = status {
+        let encoded = encode_status(exit_status.code());
+
+        // SAFETY: u32 has no padding and encoded is initialized.
+        unsafe { output.write(&encoded) }?;
     }
 
     Ok(process_id.as_u64())
 }
 
-fn parse_target(raw: u64) -> Result<WaitTarget, Errno> {
-    let pid = i32::try_from(raw.cast_signed()).map_err(|_| Errno::Invalid)?;
+impl SyscallArg for WaitTarget {
+    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        let pid = i32::try_from(raw.cast_signed()).map_err(|_| error)?;
 
-    match pid {
-        -1 => Ok(WaitTarget::Any),
-        1.. => Ok(WaitTarget::Process(
-            ProcessId::new(pid.cast_unsigned().into()).unwrap(),
-        )),
-        _ => Err(unsupported_argument(
-            "waitpid.pid-selector",
-            pid,
-            Errno::NotSupported,
-        )),
+        match pid {
+            -1 => Ok(WaitTarget::Any),
+            1.. => Ok(WaitTarget::Process(
+                ProcessId::new(pid.cast_unsigned().into()).unwrap(),
+            )),
+            _ => Err(unsupported_argument(
+                "waitpid.pid-selector",
+                pid,
+                Errno::NotSupported,
+            )),
+        }
     }
 }
 
-fn parse_status(raw: u64) -> Result<Option<UserAddress>, Errno> {
-    match raw {
-        0 => Ok(None),
-        raw => UserAddress::new(raw).map(Some).ok_or(Errno::Fault),
-    }
-}
-
-fn parse_no_hang(raw: u64) -> Result<bool, Errno> {
-    match raw {
-        0 => Ok(false),
-        WNOHANG => Ok(true),
-        _ => Err(unsupported_argument(
-            "waitpid.options",
-            raw,
-            Errno::NotSupported,
-        )),
+impl SyscallArg for WaitOptions {
+    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
+        match raw {
+            0 => Ok(Self::Blocking),
+            WNOHANG => Ok(Self::NoHang),
+            _ => Err(unsupported_argument(
+                "waitpid.options",
+                raw,
+                Errno::NotSupported,
+            )),
+        }
     }
 }
 

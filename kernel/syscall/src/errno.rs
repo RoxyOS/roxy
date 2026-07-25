@@ -40,12 +40,13 @@ impl Errno {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "kernel-test")]
 mod tests {
+    use roxy_test::kernel_test;
+
     use super::Errno;
 
-    #[test]
-    fn errno_encodes_as_negative_return() {
+    kernel_test!("roxy-syscall::errno-encoding", encodes_negative_return, {
         assert_eq!(Errno::NoSys.encode().cast_signed(), -38);
-    }
+    });
 }

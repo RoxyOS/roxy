@@ -1,15 +1,11 @@
 use roxy_futex::FutexError;
 use roxy_memory::UserAddress;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::FutexWait, handle);
+syscall!(SyscallNumber::FutexWait, handle(address: UserAddress => Fault, expected: u32 => Invalid, timeout: u64));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let address = UserAddress::new(arguments[0]).ok_or(Errno::Fault)?;
-    let expected = u32::try_from(arguments[1]).map_err(|_| Errno::Invalid)?;
-    let timeout = arguments[2];
-
+fn handle(address: UserAddress, expected: u32, timeout: u64) -> SyscallResult {
     if !address.as_u64().is_multiple_of(4) {
         return Err(Errno::Invalid);
     }

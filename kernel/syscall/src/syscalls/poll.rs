@@ -1,15 +1,19 @@
-use alloc::vec;
-use core::{mem, slice};
+use core::mem;
 
 use bitflags::bitflags;
 use roxy_fd::{Fd, FileError, PollEvents};
 use roxy_memory::UserAddress;
 
 use crate::{
-    Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber, unsupported::unsupported_argument,
+    SyscallResult,
+    args::{Slice, SyscallArg},
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
+    unsupported::unsupported_argument,
 };
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Poll, handle);
+syscall!(SyscallNumber::Poll, handle(raw_address: u64, count: usize => Invalid, timeout: i64));
 
 bitflags! {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -37,10 +41,7 @@ struct PollFdAbi {
 
 const _: () = assert!(mem::size_of::<PollFdAbi>() == 8);
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let count = usize::try_from(arguments[1]).map_err(|_| Errno::Invalid)?;
-    let timeout = arguments[2].cast_signed();
-
+fn handle(raw_address: u64, count: usize, timeout: i64) -> SyscallResult {
     if timeout != 0 {
         return Err(unsupported_argument(
             "poll.timeout",
@@ -53,60 +54,26 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
         return Ok(0);
     }
 
-    let address = UserAddress::new(arguments[0]).ok_or(Errno::Fault)?;
+    let address = UserAddress::parse(raw_address, Errno::Fault)?;
 
-    let bytes = count
-        .checked_mul(mem::size_of::<PollFdAbi>())
-        .ok_or(Errno::Invalid)?;
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
-
-    addrspace
-        .validate_writable(address, bytes)
-        .map_err(|_| Errno::Fault)?;
-
-    let mut entries = vec![PollFdAbi::default(); count];
-    read_entries(&addrspace, address, &mut entries)?;
+    let entries = Slice::<PollFdAbi>::new(address, count);
+    entries.validate_writable()?;
+    // SAFETY: PollFdAbi's checked repr(C) size equals its fields' combined size, all fields are
+    // integers, and every bit pattern is valid.
+    let mut values = unsafe { entries.read() }?;
 
     let mut ready = 0;
 
-    for entry in &mut entries {
+    for entry in &mut values {
         entry.revents = poll_entry(*entry);
         if entry.revents != 0 {
             ready += 1;
         }
     }
 
-    write_entries(&addrspace, address, &entries)?;
+    // SAFETY: PollFdAbi has no padding and every field in entries is initialized.
+    unsafe { entries.write(&values) }?;
     Ok(ready)
-}
-
-fn read_entries(
-    addrspace: &roxy_vm::AddrSpaceHandle,
-    address: UserAddress,
-    entries: &mut [PollFdAbi],
-) -> Result<(), Errno> {
-    // SAFETY: PollFdAbi is repr(C), contains no padding, and entries is a valid writable slice.
-    let bytes = unsafe {
-        slice::from_raw_parts_mut(entries.as_mut_ptr().cast::<u8>(), mem::size_of_val(entries))
-    };
-
-    addrspace
-        .read_bytes(address, bytes)
-        .map_err(|_| Errno::Fault)
-}
-
-fn write_entries(
-    addrspace: &roxy_vm::AddrSpaceHandle,
-    address: UserAddress,
-    entries: &[PollFdAbi],
-) -> Result<(), Errno> {
-    // SAFETY: PollFdAbi is repr(C), contains no padding, and entries remains borrowed here.
-    let bytes =
-        unsafe { slice::from_raw_parts(entries.as_ptr().cast::<u8>(), mem::size_of_val(entries)) };
-
-    addrspace
-        .write_bytes(address, bytes)
-        .map_err(|_| Errno::Fault)
 }
 
 fn poll_entry(entry: PollFdAbi) -> i16 {

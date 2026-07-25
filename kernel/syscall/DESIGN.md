@@ -26,6 +26,15 @@ The static syscall table is validated for duplicate numbers before the architect
 configured. The architecture backend supplies a normalized `RawSyscall`. Most handlers receive six
 raw argument words; handlers such as fork may request the saved user context explicitly.
 
+Ordinary handlers declare their ordered arguments through the syscall registration macro. The
+generated adapter converts each raw word into the declared primitive or boundary type and then
+calls the typed handler. Every fallible conversion declares its ABI error at the registration site,
+such as `Fd => BadFd` or `UserAddress => Fault`; the parser applies that error without introducing
+policy-specific wrapper types. Validation whose ordering affects observable behavior remains
+explicit in the handler; for example, `poll` accepts an arbitrary pointer with a zero count, and
+`ioctl` resolves the descriptor before validating its pointer argument. Context-sensitive handlers
+such as `fork` continue to receive the complete saved syscall context.
+
 Handlers follow three stages: parse raw values into typed data, validate all userspace-controlled
 state, then call the owning subsystem. The implementation stage should remain a small delegation,
 not a second copy of subsystem policy.
@@ -98,6 +107,28 @@ Pointers are interpreted only through typed `UserAddress` values and the current
 `AddrSpaceHandle`. A handler must copy any path, array, or structure that must survive an address
 space change before invoking that change. Cross-page reads are valid when every covered page is
 mapped and accessible.
+
+Ordinary null-terminated byte strings parse into the syscall-owned `CString`, which owns a
+`Vec<u8>` and dereferences to that vector without imposing UTF-8 validity. Parsing reads from the
+current address space across page boundaries up to the VFS path-length limit. `execve` uses the
+same type for its path and lets the process subsystem enforce the final user-stack size.
+
+User arrays with an explicit address and element count use `Slice<T>`. The wrapper is constructed
+at the syscall's required validation stage rather than consuming raw arguments automatically; its
+unsafe `read`, `read_with_limit`, and `write` methods copy through the current address space and
+enforce allocation, capacity, address-range, and byte-size bounds. Offset slices support bounded
+chunked transfers without changing the original userspace range. Null-terminated pointer arrays
+such as `execve`'s `argv` and `envp` instead use `CStringArray`, because their ABI provides a
+terminator rather than an element count.
+
+Fixed-layout input records implement `SyscallArg` beside their owning syscall and copy themselves
+from userspace during argument parsing. Fixed-layout outputs use `Out<T>`, which validates and
+retains only the destination address so parsing never reads an output buffer. Request-dependent
+interfaces such as `ioctl` select the concrete input or output type only after decoding the request.
+Shared unsafe copy primitives form byte slices for single records and record arrays, but every call
+site retains the local proof that its checked layout has no implicit padding, initializes every
+output byte, and accepts arbitrary input bytes. The copy primitives do not define layouts, validate
+request-specific lengths, or select transfer direction.
 
 `execve` therefore parses path, argv, and envp completely before process image replacement. On
 success it invokes the architecture's fresh-user resume path and never returns to the old image.

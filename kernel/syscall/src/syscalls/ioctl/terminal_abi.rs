@@ -1,19 +1,15 @@
-use core::{
-    mem::{align_of, offset_of, size_of},
-    slice,
-};
+use core::mem::{align_of, offset_of, size_of};
 
 use roxy_memory::UserAddress;
 use roxy_tty_types::{LocalFlags, Termios, WindowSize};
-use roxy_vm::AddrSpaceHandle;
 
-use crate::errno::Errno;
-
-pub(super) const TERMIOS_SIZE: usize = size_of::<TermiosAbi>();
-pub(super) const WINDOW_SIZE: usize = size_of::<WindowSizeAbi>();
+use crate::{
+    args::{Out, SyscallArg, user_memory},
+    errno::Errno,
+};
 
 #[repr(C)]
-struct TermiosAbi {
+pub(super) struct TermiosAbi {
     input_flags: u32,
     output_flags: u32,
     control_flags: u32,
@@ -32,8 +28,21 @@ const _: () = assert!(offset_of!(TermiosAbi, control_characters) == 17);
 const _: () = assert!(offset_of!(TermiosAbi, input_speed) == 52);
 const _: () = assert!(offset_of!(TermiosAbi, output_speed) == 56);
 
+impl SyscallArg for TermiosAbi {
+    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        let address = UserAddress::parse(raw, error)?;
+        let mut abi = Self::zeroed();
+
+        // SAFETY: TermiosAbi's checked repr(C) layout explicitly represents all padding, contains
+        // only integers, and accepts every bit pattern.
+        unsafe { user_memory::read(address, &mut abi) }?;
+
+        Ok(abi)
+    }
+}
+
 #[repr(C)]
-struct WindowSizeAbi {
+pub(super) struct WindowSizeAbi {
     rows: u16,
     columns: u16,
     pixel_width: u16,
@@ -47,86 +56,48 @@ const _: () = assert!(offset_of!(WindowSizeAbi, columns) == 2);
 const _: () = assert!(offset_of!(WindowSizeAbi, pixel_width) == 4);
 const _: () = assert!(offset_of!(WindowSizeAbi, pixel_height) == 6);
 
-pub(super) fn read_termios(
-    addrspace: &AddrSpaceHandle,
-    address: UserAddress,
-) -> Result<Termios, Errno> {
-    let mut abi = TermiosAbi::zeroed();
-    // SAFETY: TermiosAbi is repr(C), explicitly represents its padding, contains only integer
-    // fields, and the slice does not outlive the uniquely borrowed value.
-    let bytes = unsafe {
-        slice::from_raw_parts_mut(
-            core::ptr::from_mut(&mut abi).cast::<u8>(),
-            size_of::<TermiosAbi>(),
-        )
-    };
+impl SyscallArg for WindowSizeAbi {
+    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        let address = UserAddress::parse(raw, error)?;
+        let mut abi = Self::zeroed();
 
-    addrspace
-        .read_bytes(address, bytes)
-        .map_err(|_| Errno::Fault)?;
+        // SAFETY: WindowSizeAbi's checked repr(C) layout contains only u16 fields without padding,
+        // and every bit pattern is valid.
+        unsafe { user_memory::read(address, &mut abi) }?;
+
+        Ok(abi)
+    }
+}
+
+pub(super) fn read_termios(address: UserAddress) -> Result<Termios, Errno> {
+    let abi = TermiosAbi::parse(address.as_u64(), Errno::Fault)?;
 
     Ok(abi.into())
 }
 
-pub(super) fn write_termios(
-    addrspace: &AddrSpaceHandle,
-    address: UserAddress,
-    termios: Termios,
-) -> Result<(), Errno> {
+pub(super) fn write_termios(output: Out<TermiosAbi>, termios: Termios) -> Result<(), Errno> {
     let abi = TermiosAbi::from(termios);
-    // SAFETY: TermiosAbi is repr(C), explicitly initializes its padding, contains only integer
-    // fields, and the slice does not outlive the borrowed value.
-    let bytes = unsafe {
-        slice::from_raw_parts(
-            core::ptr::from_ref(&abi).cast::<u8>(),
-            size_of::<TermiosAbi>(),
-        )
-    };
 
-    addrspace
-        .write_bytes(address, bytes)
-        .map_err(|_| Errno::Fault)
+    // SAFETY: TermiosAbi's checked repr(C) layout explicitly represents and initializes all
+    // padding and contains only integer fields.
+    unsafe { output.write(&abi) }
 }
 
-pub(super) fn read_window_size(
-    addrspace: &AddrSpaceHandle,
-    address: UserAddress,
-) -> Result<WindowSize, Errno> {
-    let mut abi = WindowSizeAbi::zeroed();
-    // SAFETY: WindowSizeAbi is repr(C), contains only integer fields, and the slice does not
-    // outlive the uniquely borrowed value.
-    let bytes = unsafe {
-        slice::from_raw_parts_mut(
-            core::ptr::from_mut(&mut abi).cast::<u8>(),
-            size_of::<WindowSizeAbi>(),
-        )
-    };
-
-    addrspace
-        .read_bytes(address, bytes)
-        .map_err(|_| Errno::Fault)?;
+pub(super) fn read_window_size(address: UserAddress) -> Result<WindowSize, Errno> {
+    let abi = WindowSizeAbi::parse(address.as_u64(), Errno::Fault)?;
 
     Ok(abi.into())
 }
 
 pub(super) fn write_window_size(
-    addrspace: &AddrSpaceHandle,
-    address: UserAddress,
+    output: Out<WindowSizeAbi>,
     window_size: WindowSize,
 ) -> Result<(), Errno> {
     let abi = WindowSizeAbi::from(window_size);
-    // SAFETY: WindowSizeAbi is repr(C), contains only initialized integer fields, and the slice
-    // does not outlive the borrowed value.
-    let bytes = unsafe {
-        slice::from_raw_parts(
-            core::ptr::from_ref(&abi).cast::<u8>(),
-            size_of::<WindowSizeAbi>(),
-        )
-    };
 
-    addrspace
-        .write_bytes(address, bytes)
-        .map_err(|_| Errno::Fault)
+    // SAFETY: WindowSizeAbi's checked repr(C) layout contains only initialized u16 fields without
+    // padding.
+    unsafe { output.write(&abi) }
 }
 
 impl TermiosAbi {

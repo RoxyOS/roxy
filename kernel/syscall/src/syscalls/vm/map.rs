@@ -3,9 +3,9 @@ use roxy_memory::UserAddress;
 use roxy_process::MemoryError;
 
 use super::MemoryProtection;
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, args::SyscallArg, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::VmMap, handle);
+syscall!(SyscallNumber::VmMap, handle(address: u64, size: usize => Invalid, protection: u64, flags: u64, file_descriptor: u64, offset: u64));
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum MapPlacement {
@@ -18,8 +18,16 @@ struct VmMapRequest {
     size: usize,
 }
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let arguments = VmMapArguments::parse(arguments)?;
+fn handle(
+    address: u64,
+    size: usize,
+    protection: u64,
+    flags: u64,
+    file_descriptor: u64,
+    offset: u64,
+) -> SyscallResult {
+    let arguments =
+        VmMapArguments::parse(address, size, protection, flags, file_descriptor, offset)?;
 
     let request = arguments.validate()?;
 
@@ -63,14 +71,21 @@ const REQUIRED_FLAGS: MapFlags = MapFlags::PRIVATE.union(MapFlags::ANONYMOUS);
 const SUPPORTED_FLAGS: MapFlags = REQUIRED_FLAGS.union(MapFlags::FIXED);
 
 impl VmMapArguments {
-    fn parse(arguments: [u64; 6]) -> Result<Self, Errno> {
+    fn parse(
+        address: u64,
+        size: usize,
+        protection: u64,
+        flags: u64,
+        file_descriptor: u64,
+        offset: u64,
+    ) -> Result<Self, Errno> {
         Ok(Self {
-            address: parse_address(arguments[0])?,
-            size: usize::try_from(arguments[1]).map_err(|_| Errno::Invalid)?,
-            protection: arguments[2],
-            flags: arguments[3],
-            file_descriptor: arguments[4],
-            offset: arguments[5],
+            address: Option::<UserAddress>::parse(address, Errno::Invalid)?,
+            size,
+            protection,
+            flags,
+            file_descriptor,
+            offset,
         })
     }
 
@@ -80,7 +95,7 @@ impl VmMapArguments {
         }
 
         MemoryProtection::validate_mapping(self.protection)?;
-        let flags = parse_flags(self.flags)?;
+        let flags = MapFlags::parse(self.flags, Errno::Invalid)?;
 
         validate_anonymous_source(self.file_descriptor, self.offset)?;
 
@@ -93,26 +108,21 @@ impl VmMapArguments {
     }
 }
 
-fn parse_address(address: u64) -> Result<Option<UserAddress>, Errno> {
-    match address {
-        0 => Ok(None),
-        value => UserAddress::new(value).map(Some).ok_or(Errno::Invalid),
+impl SyscallArg for MapFlags {
+    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
+        let flags = Self::from_bits_retain(raw);
+        let unknown = raw & !Self::all().bits();
+
+        if unknown != 0 {
+            return Err(unsupported("vm_map.flags.unknown", unknown));
+        }
+
+        if flags != REQUIRED_FLAGS && flags != SUPPORTED_FLAGS {
+            return Err(unsupported("vm_map.flags", flags.bits()));
+        }
+
+        Ok(flags)
     }
-}
-
-fn parse_flags(bits: u64) -> Result<MapFlags, Errno> {
-    let flags = MapFlags::from_bits_retain(bits);
-    let unknown = bits & !MapFlags::all().bits();
-
-    if unknown != 0 {
-        return Err(unsupported("vm_map.flags.unknown", unknown));
-    }
-
-    if flags != REQUIRED_FLAGS && flags != SUPPORTED_FLAGS {
-        return Err(unsupported("vm_map.flags", flags.bits()));
-    }
-
-    Ok(flags)
 }
 
 fn parse_placement(address: Option<UserAddress>, flags: MapFlags) -> Result<MapPlacement, Errno> {
@@ -152,11 +162,11 @@ mod tests {
     use super::{MapPlacement, VmMapArguments};
 
     kernel_test!("roxy-syscall::vm-map-requests", requests, {
-        let fixed = VmMapArguments::parse([0x41_0000, 4096, 0x3, 0x32, u64::MAX, 0])
+        let fixed = VmMapArguments::parse(0x41_0000, 4096, 0x3, 0x32, u64::MAX, 0)
             .unwrap()
             .validate()
             .unwrap();
-        let anywhere = VmMapArguments::parse([0, 4096, 0x3, 0x22, u64::MAX, 0])
+        let anywhere = VmMapArguments::parse(0, 4096, 0x3, 0x22, u64::MAX, 0)
             .unwrap()
             .validate()
             .unwrap();

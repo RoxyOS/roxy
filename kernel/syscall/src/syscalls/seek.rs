@@ -1,9 +1,9 @@
 use roxy_fd::{Fd, SeekError, SeekFrom};
 use roxy_process::DescriptorError;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, args::SyscallArg, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Seek, handle);
+syscall!(SyscallNumber::Seek, handle(fd: Fd => BadFd, offset: i64, whence: SeekWhence => Invalid));
 
 #[repr(u64)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -16,17 +16,6 @@ enum SeekWhence {
 }
 
 impl SeekWhence {
-    fn parse(value: u64) -> Result<Self, Errno> {
-        match value {
-            0 => Ok(Self::Set),
-            1 => Ok(Self::Current),
-            2 => Ok(Self::End),
-            3 => Ok(Self::Data),
-            4 => Ok(Self::Hole),
-            _ => Err(Errno::Invalid),
-        }
-    }
-
     fn position(self, offset: i64) -> Result<SeekFrom, Errno> {
         match self {
             Self::Set => u64::try_from(offset)
@@ -43,13 +32,20 @@ impl SeekWhence {
     }
 }
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let fd = u32::try_from(arguments[0])
-        .map(Fd::new)
-        .map_err(|_| Errno::BadFd)?;
-    let offset = arguments[1].cast_signed();
-    let whence = SeekWhence::parse(arguments[2])?;
+impl SyscallArg for SeekWhence {
+    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        match raw {
+            0 => Ok(Self::Set),
+            1 => Ok(Self::Current),
+            2 => Ok(Self::End),
+            3 => Ok(Self::Data),
+            4 => Ok(Self::Hole),
+            _ => Err(error),
+        }
+    }
+}
 
+fn handle(fd: Fd, offset: i64, whence: SeekWhence) -> SyscallResult {
     let file = roxy_process::current_open_file(fd).map_err(map_process_error)?;
     let position = whence.position(offset)?;
 
@@ -72,31 +68,31 @@ fn map_seek_error(error: SeekError) -> Errno {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_fd::SeekFrom;
+    use roxy_test::kernel_test;
 
     use super::SeekWhence;
-    use crate::errno::Errno;
+    use crate::{args::SyscallArg, errno::Errno};
 
-    #[test]
-    fn parses_standard_seek_positions() {
+    kernel_test!("roxy-syscall::seek-positions", parses_standard_positions, {
         assert_eq!(
-            SeekWhence::parse(0).unwrap().position(7),
+            SeekWhence::parse(0, Errno::Invalid).unwrap().position(7),
             Ok(SeekFrom::Start(7))
         );
         assert_eq!(
-            SeekWhence::parse(1).unwrap().position(-2),
+            SeekWhence::parse(1, Errno::Invalid).unwrap().position(-2),
             Ok(SeekFrom::Current(-2))
         );
         assert_eq!(
-            SeekWhence::parse(2).unwrap().position(3),
+            SeekWhence::parse(2, Errno::Invalid).unwrap().position(3),
             Ok(SeekFrom::End(3))
         );
         assert_eq!(
-            SeekWhence::parse(0).unwrap().position(-1),
+            SeekWhence::parse(0, Errno::Invalid).unwrap().position(-1),
             Err(Errno::Invalid)
         );
-        assert_eq!(SeekWhence::parse(5), Err(Errno::Invalid));
-    }
+        assert_eq!(SeekWhence::parse(5, Errno::Invalid), Err(Errno::Invalid));
+    });
 }

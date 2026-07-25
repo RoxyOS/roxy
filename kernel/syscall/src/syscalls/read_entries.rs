@@ -1,12 +1,12 @@
 use alloc::vec::Vec;
-use core::{mem, slice};
+use core::mem;
 
 use roxy_fd::{DirectoryEntry, Fd, FileError, FileType};
 use roxy_memory::UserAddress;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, args::Slice, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::ReadEntries, handle);
+syscall!(SyscallNumber::ReadEntries, handle(fd: Fd => BadFd, address: UserAddress => Fault, max_size: usize => Fault));
 
 const DIRENT_RECORD_SIZE: u16 = 280;
 const NAME_SIZE: usize = 256;
@@ -25,32 +25,25 @@ struct DirentAbi {
 const DIRENT_SIZE: usize = mem::size_of::<DirentAbi>();
 const _: () = assert!(DIRENT_SIZE == 280);
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let fd = u32::try_from(arguments[0])
-        .map(Fd::new)
-        .map_err(|_| Errno::BadFd)?;
-    let address = UserAddress::new(arguments[1]).ok_or(Errno::Fault)?;
-    let max_size = usize::try_from(arguments[2]).map_err(|_| Errno::Fault)?;
-
+fn handle(fd: Fd, address: UserAddress, max_size: usize) -> SyscallResult {
     if max_size < DIRENT_SIZE {
         return Err(Errno::Invalid);
     }
 
     let file = roxy_process::current_open_file(fd).map_err(|_| Errno::BadFd)?;
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
+    Slice::<u8>::new(address, max_size).validate_writable()?;
 
-    addrspace
-        .validate_writable(address, max_size)
-        .map_err(|_| Errno::Fault)?;
-
+    let output = Slice::<DirentAbi>::new(address, max_size / DIRENT_SIZE);
     let entries = file
         .read_directory_entries(max_size / DIRENT_SIZE)
         .map_err(map_file_error)?;
-    let output = encode_entries(&entries)?;
+    let encoded = encode_entries(&entries)?;
 
-    write_entries(&addrspace, address, &output)?;
+    // SAFETY: DirentAbi's repr(C) layout explicitly represents trailing padding, and encode_entry
+    // initializes every integer, byte-array, and padding field.
+    unsafe { output.write(&encoded) }?;
 
-    Ok(u64::try_from(mem::size_of_val(output.as_slice())).unwrap())
+    Ok(u64::try_from(mem::size_of_val(encoded.as_slice())).unwrap())
 }
 
 fn encode_entries(entries: &[DirectoryEntry]) -> Result<Vec<DirentAbi>, Errno> {
@@ -73,21 +66,6 @@ fn encode_entry(entry: &DirectoryEntry) -> Result<DirentAbi, Errno> {
         name,
         padding: [0; 5],
     })
-}
-
-fn write_entries(
-    addrspace: &roxy_vm::AddrSpaceHandle,
-    address: UserAddress,
-    entries: &[DirentAbi],
-) -> Result<(), Errno> {
-    // SAFETY: DirentAbi is repr(C), explicitly includes and initializes all ABI padding, and the
-    // byte slice does not outlive the borrowed entries.
-    let bytes =
-        unsafe { slice::from_raw_parts(entries.as_ptr().cast::<u8>(), mem::size_of_val(entries)) };
-
-    addrspace
-        .write_bytes(address, bytes)
-        .map_err(|_| Errno::Fault)
 }
 
 const fn encode_file_type(file_type: FileType) -> u8 {

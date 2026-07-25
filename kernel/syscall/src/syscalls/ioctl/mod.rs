@@ -5,24 +5,17 @@ mod terminal_abi;
 use roxy_fd::Fd;
 use roxy_memory::UserAddress;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, args::SyscallArg, errno::Errno, numbers::SyscallNumber, syscall};
 
 use execute::execute;
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Ioctl, handle);
+syscall!(SyscallNumber::Ioctl, handle(fd: Fd => BadFd, raw_request: u64, raw_argument: u64));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let fd = u32::try_from(arguments[0])
-        .map(Fd::new)
-        .map_err(|_| Errno::BadFd)?;
-    let raw_request = arguments[1];
-    let raw_argument = arguments[2];
-
+fn handle(fd: Fd, raw_request: u64, raw_argument: u64) -> SyscallResult {
     let file = roxy_process::current_open_file(fd).map_err(|_| Errno::BadFd)?;
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
-    let argument = UserAddress::new(raw_argument).ok_or(Errno::Fault)?;
+    let argument = UserAddress::parse(raw_argument, Errno::Fault)?;
 
-    execute(file.as_ref(), raw_request, argument, &addrspace)?;
+    execute(file.as_ref(), raw_request, argument)?;
 
     Ok(0)
 }

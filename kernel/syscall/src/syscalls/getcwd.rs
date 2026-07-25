@@ -3,21 +3,17 @@ use alloc::vec::Vec;
 use roxy_memory::UserAddress;
 use roxy_vfs::ResolvedPath;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, args::Slice, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Getcwd, handle);
+syscall!(SyscallNumber::Getcwd, handle(output: UserAddress => Fault, size: usize => Range));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let output = UserAddress::new(arguments[0]).ok_or(Errno::Fault)?;
-    let size = usize::try_from(arguments[1]).map_err(|_| Errno::Range)?;
-
+fn handle(output: UserAddress, size: usize) -> SyscallResult {
     let path = roxy_process::current_working_directory();
     let encoded = encode(&path, size)?;
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
+    let output = Slice::<u8>::new(output, size);
 
-    addrspace
-        .write_bytes(output, &encoded)
-        .map_err(|_| Errno::Fault)?;
+    // SAFETY: u8 has no padding and encoded contains only initialized bytes.
+    unsafe { output.write(&encoded) }?;
 
     Ok(u64::try_from(encoded.len()).unwrap())
 }

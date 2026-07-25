@@ -1,14 +1,11 @@
 use roxy_futex::FutexError;
 use roxy_memory::UserAddress;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::FutexWake, handle);
+syscall!(SyscallNumber::FutexWake, handle(address: UserAddress => Fault, count: usize => Invalid));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let address = UserAddress::new(arguments[0]).ok_or(Errno::Fault)?;
-    let count = usize::try_from(arguments[1]).map_err(|_| Errno::Invalid)?;
-
+fn handle(address: UserAddress, count: usize) -> SyscallResult {
     if !address.as_u64().is_multiple_of(4) {
         return Err(Errno::Invalid);
     }

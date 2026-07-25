@@ -1,14 +1,12 @@
-use roxy_memory::UserAddress;
 use roxy_process::MemoryError;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use roxy_memory::UserAddress;
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::AnonFree, handle);
+use crate::{SyscallResult, errno::Errno, numbers::SyscallNumber, syscall};
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let address = UserAddress::new(arguments[0]).ok_or(Errno::Invalid)?;
-    let size = usize::try_from(arguments[1]).map_err(|_| Errno::Invalid)?;
+syscall!(SyscallNumber::AnonFree, handle(address: UserAddress => Invalid, size: usize => Invalid));
 
+fn handle(address: UserAddress, size: usize) -> SyscallResult {
     if size == 0 {
         return Err(Errno::Invalid);
     }

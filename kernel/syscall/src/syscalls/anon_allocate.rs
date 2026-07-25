@@ -1,12 +1,10 @@
 use roxy_process::MemoryError;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::AnonAllocate, handle);
+syscall!(SyscallNumber::AnonAllocate, handle(size: usize => Invalid));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let size = usize::try_from(arguments[0]).map_err(|_| Errno::Invalid)?;
-
+fn handle(size: usize) -> SyscallResult {
     if size == 0 {
         return Err(Errno::Invalid);
     }

@@ -1,8 +1,8 @@
-use crate::{Syscall, SyscallResult, numbers::SyscallNumber};
+use crate::{SyscallResult, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Getpid, handle);
+syscall!(SyscallNumber::Getpid, handle());
 
 #[allow(clippy::unnecessary_wraps)]
-fn handle(_arguments: [u64; 6]) -> SyscallResult {
+fn handle() -> SyscallResult {
     Ok(roxy_process::current_process_id().as_u64())
 }

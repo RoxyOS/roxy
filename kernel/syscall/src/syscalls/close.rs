@@ -1,15 +1,11 @@
 use roxy_fd::Fd;
 use roxy_process::DescriptorError;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Close, handle);
+syscall!(SyscallNumber::Close, handle(fd: Fd => BadFd));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let fd = u32::try_from(arguments[0])
-        .map(Fd::new)
-        .map_err(|_| Errno::BadFd)?;
-
+fn handle(fd: Fd) -> SyscallResult {
     roxy_process::close_file(fd).map_err(map_process_error)?;
 
     Ok(0)

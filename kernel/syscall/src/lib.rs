@@ -2,13 +2,14 @@
 
 extern crate alloc;
 
+pub(crate) mod args;
 mod dispatch;
+pub(crate) use args::syscall;
 mod errno;
 mod numbers;
 mod registry;
 mod syscalls;
 mod unsupported;
-mod user;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, RawSyscall};
 

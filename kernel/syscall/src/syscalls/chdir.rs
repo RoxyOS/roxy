@@ -1,21 +1,15 @@
-use roxy_memory::UserAddress;
 use roxy_vfs::{FileType, ResolvedPath, VfsError};
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, args::CString, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Chdir, handle);
+syscall!(SyscallNumber::Chdir, handle(path: CString => Fault));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let path_address = UserAddress::new(arguments[0]).ok_or(Errno::Fault)?;
-
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
-    let path = crate::user::read_c_string(&addrspace, path_address, ResolvedPath::MAX_LEN)?;
-
+fn handle(path: CString) -> SyscallResult {
     if path.is_empty() {
         return Err(Errno::NotFound);
     }
 
-    let path = ResolvedPath::resolve(path).map_err(map_vfs_error)?;
+    let path = ResolvedPath::resolve(path.into_inner()).map_err(map_vfs_error)?;
     let metadata = roxy_vfs::metadata(path.as_bytes()).map_err(map_vfs_error)?;
 
     if metadata.file_type != FileType::Directory {

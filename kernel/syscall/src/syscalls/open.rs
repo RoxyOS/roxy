@@ -3,11 +3,17 @@ use alloc::boxed::Box;
 use bitflags::bitflags;
 use roxy_fd::OpenFile;
 use roxy_memory::UserAddress;
-use roxy_vfs::{CreationMode, FilePermissions, OpenAccess, OpenOptions, ResolvedPath, VfsError};
+use roxy_vfs::{CreationMode, FilePermissions, OpenAccess, OpenOptions, VfsError};
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{
+    SyscallResult,
+    args::{CString, SyscallArg},
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
+};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Open, handle);
+syscall!(SyscallNumber::Open, handle(path_address: UserAddress => Fault, flags: OpenFlags => Invalid, mode: u64));
 
 const ACCESS_MASK: u64 = 0o3;
 
@@ -31,17 +37,8 @@ struct OpenRequest {
 }
 
 impl OpenRequest {
-    fn parse(flags: u64, mode: u64) -> Result<Self, Errno> {
-        let unknown = flags & !OpenFlags::all().bits();
-
-        if unknown != 0 {
-            return Err(unsupported("open.flags", unknown));
-        }
-
-        Ok(Self {
-            flags: OpenFlags::from_bits_retain(flags),
-            mode,
-        })
+    const fn new(flags: OpenFlags, mode: u64) -> Self {
+        Self { flags, mode }
     }
 
     fn options(self) -> Result<OpenOptions, Errno> {
@@ -93,12 +90,22 @@ impl OpenRequest {
     }
 }
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let path_address = UserAddress::new(arguments[0]).ok_or(Errno::Fault)?;
-    let request = OpenRequest::parse(arguments[1], arguments[2])?;
+impl SyscallArg for OpenFlags {
+    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
+        let unknown = raw & !Self::all().bits();
 
-    let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
-    let path = crate::user::read_c_string(&addrspace, path_address, ResolvedPath::MAX_LEN)?;
+        if unknown != 0 {
+            return Err(unsupported("open.flags", unknown));
+        }
+
+        Ok(Self::from_bits_retain(raw))
+    }
+}
+
+fn handle(path_address: UserAddress, flags: OpenFlags, mode: u64) -> SyscallResult {
+    let request = OpenRequest::new(flags, mode);
+
+    let path = CString::from_address(path_address)?;
 
     if path.is_empty() {
         return Err(Errno::NotFound);
@@ -106,7 +113,7 @@ fn handle(arguments: [u64; 6]) -> SyscallResult {
 
     let options = request.options()?;
 
-    let file = roxy_vfs::open(path, options).map_err(map_vfs_error)?;
+    let file = roxy_vfs::open(path.into_inner(), options).map_err(map_vfs_error)?;
     let fd = roxy_process::insert_open_file(OpenFile::new(Box::new(file)));
 
     Ok(u64::from(fd.as_u32()))
@@ -152,10 +159,7 @@ mod tests {
                 | OpenFlags::EXCLUSIVE
                 | OpenFlags::TRUNCATE
                 | OpenFlags::LARGE_FILE;
-            let options = OpenRequest::parse(flags.bits(), 0o640)
-                .unwrap()
-                .options()
-                .unwrap();
+            let options = OpenRequest::new(flags, 0o640).options().unwrap();
 
             assert_eq!(options.access, OpenAccess::ReadWrite);
             assert_eq!(options.creation, CreationMode::CreateNew);
@@ -169,8 +173,8 @@ mod tests {
         "roxy-syscall::invalid-open-options",
         rejects_invalid_open_flags,
         {
-            let invalid_access = OpenRequest::parse(0o3, 0).unwrap();
-            let read_only_append = OpenRequest::parse(OpenFlags::APPEND.bits(), 0).unwrap();
+            let invalid_access = OpenRequest::new(OpenFlags::from_bits_retain(0o3), 0);
+            let read_only_append = OpenRequest::new(OpenFlags::APPEND, 0);
 
             assert_eq!(invalid_access.options(), Err(Errno::Invalid));
             assert_eq!(read_only_append.options(), Err(Errno::Invalid));

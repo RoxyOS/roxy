@@ -2,46 +2,31 @@ use roxy_fd::{Fd, FileError};
 use roxy_memory::UserAddress;
 use roxy_process::{self, DescriptorError};
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, args::Slice, errno::Errno, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Write, handle);
+syscall!(SyscallNumber::Write, handle(fd: Fd => BadFd, address: UserAddress => Fault, count: usize => Fault));
 
 const BUFFER_SIZE: usize = 4096;
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let fd = u32::try_from(arguments[0])
-        .map(Fd::new)
-        .map_err(|_| Errno::BadFd)?;
-    let address = UserAddress::new(arguments[1]).ok_or(Errno::Fault)?;
-    let count = usize::try_from(arguments[2]).map_err(|_| Errno::Fault)?;
-
+fn handle(fd: Fd, address: UserAddress, count: usize) -> SyscallResult {
     if count == 0 {
         return Ok(0);
     }
 
     let file = roxy_process::current_open_file(fd).map_err(map_process_error)?;
-    let addrspace = roxy_process::current_addrspace().map_err(map_process_error)?;
-    let last_offset = u64::try_from(count - 1).map_err(|_| Errno::Fault)?;
-
-    address.checked_add(last_offset).ok_or(Errno::Fault)?;
-
-    let mut buffer = [0u8; BUFFER_SIZE];
+    let input = Slice::<u8>::new(address, count);
+    input.validate()?;
     let mut transferred = 0;
 
     while transferred < count {
-        let length = (count - transferred).min(buffer.len());
-        let source = address
-            .checked_add(u64::try_from(transferred).unwrap())
-            .ok_or(Errno::Fault)?;
+        let remaining = input.skip(transferred)?;
+        // SAFETY: u8 has no padding and every bit pattern is valid.
+        let buffer = unsafe { remaining.read_with_limit(BUFFER_SIZE) }?;
 
-        addrspace
-            .read_bytes(source, &mut buffer[..length])
-            .map_err(|_| Errno::Fault)?;
-
-        let written = file.write(&buffer[..length]).map_err(map_file_error)?;
+        let written = file.write(&buffer).map_err(map_file_error)?;
         transferred += written;
 
-        if written < length {
+        if written < buffer.len() {
             break;
         }
     }

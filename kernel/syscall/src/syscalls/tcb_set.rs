@@ -1,13 +1,12 @@
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_memory::UserAddress;
 
-use crate::{Syscall, SyscallResult, errno::Errno, numbers::SyscallNumber};
+use crate::{SyscallResult, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::TcbSet, handle);
+syscall!(SyscallNumber::TcbSet, handle(pointer: UserAddress => Invalid));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    let pointer = UserAddress::new(arguments[0]).ok_or(Errno::Invalid)?;
-
+#[allow(clippy::unnecessary_wraps)]
+fn handle(pointer: UserAddress) -> SyscallResult {
     CurrentArchitectureBackend::set_user_thread_pointer(pointer.as_u64());
 
     Ok(0)

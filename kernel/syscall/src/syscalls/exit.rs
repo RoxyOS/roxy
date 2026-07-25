@@ -1,9 +1,9 @@
 use roxy_process::ExitStatus;
 
-use crate::{Syscall, SyscallResult, numbers::SyscallNumber};
+use crate::{SyscallResult, numbers::SyscallNumber, syscall};
 
-pub(super) const SYSCALL: Syscall = Syscall::new(SyscallNumber::Exit, handle);
+syscall!(SyscallNumber::Exit, handle(status: u64));
 
-fn handle(arguments: [u64; 6]) -> SyscallResult {
-    roxy_process::exit_current(ExitStatus::new(arguments[0]))
+fn handle(status: u64) -> SyscallResult {
+    roxy_process::exit_current(ExitStatus::new(status))
 }
