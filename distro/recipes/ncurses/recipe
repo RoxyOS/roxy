@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+version=6.6
+revision=1
+
+tarball_url="https://invisible-mirror.net/archives/ncurses/ncurses-${version}.tar.gz"
+tarball_sha256="355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11"
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make ncurses-bin"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+configure() {
+	export CPPFLAGS=-D_GNU_SOURCE
+
+	autotools_configure \
+		--disable-db-install \
+		--disable-ext-colors \
+		--disable-stripping \
+		--enable-widec \
+		--without-ada \
+		--without-cxx \
+		--without-cxx-binding \
+		--without-debug \
+		--without-manpages \
+		--without-normal \
+		--without-progs \
+		--without-tests \
+		--with-shared
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 autotools_configure() {
+	local configure_script="${autotools_configure_script:-${source_dir}/configure}"
+
 	export AR=llvm-ar
 	export CC="clang --target=x86_64-unknown-roxy --sysroot=/sysroot"
 	export CC_FOR_BUILD=clang
@@ -8,7 +10,7 @@ autotools_configure() {
 	export RANLIB=llvm-ranlib
 	export STRIP=llvm-strip
 
-	"${source_dir}/configure" \
+	"${configure_script}" \
 		--build="$(clang -dumpmachine)" \
 		--host=x86_64-unknown-none \
 		--prefix="${prefix}" \

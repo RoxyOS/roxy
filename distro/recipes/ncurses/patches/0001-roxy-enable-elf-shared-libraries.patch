@@ -1,0 +1,26 @@
+diff --git a/aclocal.m4 b/aclocal.m4
+index 1463b24..ef0f2cc 100644
+--- a/aclocal.m4
++++ b/aclocal.m4
+@@ -7843,7 +7843,7 @@ CF_EOF
+ 		fi
+ 		cf_cv_rm_so_locs=yes
+ 		;;
+-	(linux*|gnu*|k*bsd*-gnu)
++	(none*|linux*|gnu*|k*bsd*-gnu)
+ 		if test "$DFT_LWR_MODEL" = "shared" && test -n "$LD_RPATH_OPT" ; then
+ 			LOCAL_LDFLAGS="${LD_RPATH_OPT}\$(LOCAL_LIBDIR)"
+ 			LOCAL_LDFLAGS2="$LOCAL_LDFLAGS"
+diff --git a/configure b/configure
+index 48ad381..cb66925 100755
+--- a/configure
++++ b/configure
+@@ -7123,7 +7123,7 @@ echo "${ECHO_T}$cf_cv_ldflags_search_paths_first" >&6
+ 		fi
+ 		cf_cv_rm_so_locs=yes
+ 		;;
+-	(linux*|gnu*|k*bsd*-gnu)
++	(none*|linux*|gnu*|k*bsd*-gnu)
+ 		if test "$DFT_LWR_MODEL" = "shared" && test -n "$LD_RPATH_OPT" ; then
+ 			LOCAL_LDFLAGS="${LD_RPATH_OPT}\$(LOCAL_LIBDIR)"
+ 			LOCAL_LDFLAGS2="$LOCAL_LDFLAGS"

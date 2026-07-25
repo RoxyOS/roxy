@@ -31,6 +31,11 @@ expected by GNU userspace, including the `sys/ioctl.h` contract used by Bash job
 Packages that execute native build generators must separately declare a Linux host development
 environment; `roxy-llvm` intentionally does not bundle distribution C headers or host CRT objects.
 
+The base image provides Vim as its interactive editor. Vim uses the `tiny` feature set and disables
+GUI, X11, localization, channels, and optional system integrations, while retaining the upstream
+runtime installed by its Autotools flow. Its terminal dependency is the shared wide-character
+ncurses library; Roxy enables ncurses' ordinary ELF shared-library rules with a package patch.
+
 Meson identifies the host system as Roxy. Autotools packages temporarily use the compatible
 `x86_64-unknown-none` host tuple because GNU `config.sub` rejects the Roxy OS name; the compiler's
 `x86_64-unknown-roxy` target remains authoritative for generated code and linking.
