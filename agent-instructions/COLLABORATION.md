@@ -1,18 +1,24 @@
-# Multi-Agent Collaboration
+# Conditional Multi-Agent Collaboration
 
-Use this protocol for every task. Always assume that other independently launched Codex instances
-may be operating in the same worktree, even when no other agent is visible in the current instance.
-Process-local agent discovery is not proof that the worktree is exclusive. The filesystem locks
-defined here are the source of truth for edit ownership.
+Read this document for every task, but enable its lock protocol only when the user explicitly says
+that another agent or Codex instance is working in the same worktree. By default, assume that no
+other agent is working.
 
-The purpose of the protocol is to make edit ownership visible across isolated processes, prevent
+In the default single-agent mode, do not scan for, inspect, create, respect, or remove
+`.agent-lock` files. Existing locks are ignored and must not block or otherwise affect the task.
+The presence of a lock, process-local agent discovery, a dirty worktree, or any other indirect
+signal does not enable collaboration mode. Only an explicit statement from the user does so.
+
+An explicit statement enables collaboration mode only for the task or scope to which the user
+applies it. Do not carry that assumption into later tasks unless the user states it again. When
+collaboration mode is enabled, the filesystem locks defined here are the source of truth for edit
+ownership. Their purpose is to make ownership visible across isolated processes, prevent
 overlapping writes, and preserve changes made by other agents.
 
 ## Shared Worktree Rules
 
+- Apply the lock-specific rules in this document only while collaboration mode is enabled.
 - Divide work along subsystem boundaries and give each active edit scope one owner.
-- Inspect filesystem locks unconditionally. Never skip lock discovery because the current Codex
-  instance believes that it is working alone.
 - Treat all pre-existing and concurrent changes as belonging to their authors. Do not rewrite,
   stage, revert, move, or delete another agent's changes unless that agent explicitly hands them
   over.
@@ -38,14 +44,14 @@ owned by different agents are forbidden.
 
 ## Agent Lock Protocol
 
-At the start of a task, each Codex instance must generate a unique random UUID for its owner ID.
-Prefer a UUIDv4. Reuse the same UUID for every lock owned by that instance during the task; a new
-Codex window must generate a different UUID. Names such as `codex`, `root`, agent roles, timestamps,
-or process IDs are not valid owner IDs.
+When the user explicitly enables collaboration mode, each Codex instance must generate a unique
+random UUID for its owner ID before its first write. Prefer a UUIDv4. Reuse the same UUID for every
+lock owned by that instance during the task; a new Codex window must generate a different UUID.
+Names such as `codex`, `root`, agent roles, timestamps, or process IDs are not valid owner IDs.
 
 Every agent **must** create a `.agent-lock` in the subsystem root before it begins editing that
-subsystem. This requirement applies even when the agent has no evidence that another instance
-exists. The lock must contain enough information to identify its owner and purpose:
+subsystem while collaboration mode is enabled. The lock must contain enough information to
+identify its owner and purpose:
 
 ```text
 owner: <UUIDv4>
@@ -58,8 +64,8 @@ Do not include credentials or other secrets in a lock.
 Acquire a lock as follows:
 
 1. Scan the worktree for `.agent-lock` files, then inspect the target directory, every ancestor up
-   to the repository root, and the target's descendants. Perform this scan unconditionally before
-   every write phase. Any lock with an overlapping scope is a conflict.
+   to the repository root, and the target's descendants before every write phase. Any lock with an
+   overlapping scope is a conflict.
 2. Create the target `.agent-lock` with a create-if-absent operation. Never overwrite or truncate
    an existing lock. An `apply_patch` `Add File` operation is acceptable because it fails when the
    path already exists.
