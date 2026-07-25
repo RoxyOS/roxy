@@ -45,6 +45,13 @@
 - Do not create placeholder crates, speculative abstractions, compatibility shims, silent stubs,
   or test-name special cases.
 
+## Userspace Debugging
+
+- When debugging userspace software, locate and inspect the relevant version of its source code as
+  needed. Do not guess at its behavior or attempt to infer it from the binary alone when source is
+  available; use disassembly or other binary analysis only when the source is unavailable or the
+  investigation specifically requires it.
+
 ## Module Layout
 
 - Do not place a `foo.rs` file beside a `foo/` directory. Use `foo/mod.rs` as the module entry
