@@ -742,6 +742,7 @@ dependencies = [
  "roxy-interrupt",
  "roxy-memory",
  "roxy-test",
+ "roxy-time",
  "roxy-utils",
  "roxy-vm",
  "spin 0.12.2",

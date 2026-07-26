@@ -43,6 +43,7 @@ pub fn exit_current() -> ! {
 /// Panics when called with interrupts enabled.
 pub(super) fn on_timer_interrupt() {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
+    SCHEDULER.lock().wake_expired(roxy_time::monotonic_time());
 
     if preemption::is_disabled() {
         return;

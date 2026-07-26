@@ -1,18 +1,22 @@
 use alloc::vec::Vec;
 
-use crate::{SavedContext, Thread, ThreadId};
+use super::timer_wait::{TimerWaiter, WaitToken};
+use crate::{SavedContext, Thread, ThreadId, scheduler::timer_wait};
 
 pub(super) struct Scheduler {
     pub(super) entries: Vec<SchedulerEntry>,
     pub(super) current: Option<ThreadIndex>,
     pub(super) control_context: Option<SavedContext>,
     pub(super) pending_reap: Option<ThreadIndex>,
+    pub(super) timer_waiters: Vec<TimerWaiter>,
+    pub(super) next_wait_token: u64,
 }
 
 pub(super) struct SchedulerEntry {
     pub(super) thread: Thread,
     pub(super) kind: ThreadKind,
     pub(super) state: ThreadState,
+    pub(super) current_timer_wait: Option<timer_wait::WaitToken>,
 }
 
 #[derive(Clone, Copy)]
@@ -38,6 +42,8 @@ impl Scheduler {
             current: None,
             control_context: None,
             pending_reap: None,
+            timer_waiters: Vec::new(),
+            next_wait_token: 1,
         }
     }
 
@@ -46,6 +52,7 @@ impl Scheduler {
             thread,
             kind,
             state: ThreadState::Runnable,
+            current_timer_wait: None,
         });
     }
 

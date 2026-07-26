@@ -35,6 +35,10 @@ shared line discipline, before process initialization registers the initial-FD i
 hardware is required on the supported platform; a missing controller or handshake timeout is
 boot-fatal rather than a reason to expose an output-only framebuffer terminal.
 
+Timer handlers run in registration order. The time handler is registered before the scheduler
+handler so each periodic interrupt advances the monotonic clock before scheduler deadline waiters
+are evaluated.
+
 After memory initialization, normal builds initialize `fbterm` and select it as the kernel
 terminal, falling back to serial after a serial diagnostic when the framebuffer mode is
 unavailable. Kernel-test builds select serial directly so test progress remains visible on the

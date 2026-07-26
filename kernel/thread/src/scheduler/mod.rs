@@ -2,6 +2,7 @@ mod control;
 mod reap;
 mod state;
 mod switch;
+mod timer_wait;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
 use roxy_utils::Lock;
@@ -72,7 +73,23 @@ pub struct PendingBlock(switch::PendingContextSwitch);
 pub fn prepare_block_current() -> PendingBlock {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
-    PendingBlock(SCHEDULER.lock().prepare_block())
+    PendingBlock(SCHEDULER.lock().prepare_block(None))
+}
+
+/// Marks the current thread blocked until explicitly woken or the deadline is reached.
+///
+/// # Panics
+///
+/// Panics when called outside a scheduled thread, with interrupts enabled, or with an elapsed
+/// deadline.
+pub fn prepare_block_current_until(deadline: core::time::Duration) -> PendingBlock {
+    assert!(!CurrentArchitectureBackend::interrupts_enabled());
+    assert!(
+        deadline > roxy_time::monotonic_time(),
+        "deadline already elapsed"
+    );
+
+    PendingBlock(SCHEDULER.lock().prepare_block(Some(deadline)))
 }
 
 impl PendingBlock {

@@ -16,6 +16,7 @@ roxy-arch.workspace = true
 roxy-interrupt.workspace = true
 roxy-memory.workspace = true
 roxy-test = { workspace = true, optional = true }
+roxy-time.workspace = true
 roxy-utils.workspace = true
 roxy-vm.workspace = true
 

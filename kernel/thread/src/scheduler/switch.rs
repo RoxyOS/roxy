@@ -1,4 +1,4 @@
-use core::ptr;
+use core::{ptr, time::Duration};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_memory::activate_kernel_page_table;
@@ -119,8 +119,15 @@ impl Scheduler {
         }
     }
 
-    pub(super) fn prepare_block(&mut self) -> PendingContextSwitch {
+    pub(super) fn prepare_block(&mut self, deadline: Option<Duration>) -> PendingContextSwitch {
         let current = self.current.expect("no current thread");
+        let thread_id = self.entry(current).thread.id();
+
+        if let Some(deadline) = deadline {
+            let token = self.register_timer_waiter(thread_id, deadline);
+            self.entry(current).current_timer_wait = Some(token);
+        }
+
         self.entry(current).state = ThreadState::Blocked;
         let previous = ptr::from_mut(self.entry(current).thread.context());
         let next = self.next_runnable(ThreadIndex((current.0 + 1) % self.entries.len()));
@@ -141,13 +148,14 @@ impl Scheduler {
         let Some(index) = self.index_of(thread_id) else {
             return false;
         };
-        let entry = self.entry(index);
-
-        if entry.state != ThreadState::Blocked {
+        if self.entry(index).state != ThreadState::Blocked {
             return false;
         }
 
-        entry.state = ThreadState::Runnable;
+        if let Some(token) = self.entry(index).current_timer_wait.take() {
+            self.remove_timer_waiter(token);
+        }
+        self.entry(index).state = ThreadState::Runnable;
 
         true
     }
@@ -253,7 +261,7 @@ mod tests {
         scheduler.enqueue(second, ThreadKind::Kernel);
         scheduler.current = Some(ThreadIndex(0));
 
-        let _pending = scheduler.prepare_block();
+        let _pending = scheduler.prepare_block(None);
         assert_eq!(scheduler.entries[0].state, ThreadState::Blocked);
         assert_eq!(scheduler.current, Some(ThreadIndex(1)));
         assert!(scheduler.wake(first_id));

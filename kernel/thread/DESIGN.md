@@ -32,6 +32,11 @@ The current thread cannot be removed while its kernel stack is active. Exit mark
 records a pending reap, switches away, and removes the entry on a later scheduler pass running on a
 different stack.
 
+Timed blocking registers a scheduler-owned timer waiter before marking the current thread blocked.
+Each registration has a unique token shared with the scheduler entry. An explicit wake cancels
+that token, while timer processing wakes only a blocked entry that still owns the expired token,
+preventing a stale deadline from affecting a later wait by the same thread.
+
 ## User dispatch hook
 
 The thread crate cannot depend on the process crate because process already depends on thread.
@@ -51,12 +56,19 @@ the time subsystem unmasks periodic timer delivery. The handler runs after inter
 EOI, with interrupts disabled, and may perform a context switch; the interrupt subsystem therefore
 does not retain scheduler policy or call this handler directly.
 
+The time subsystem registers its timer handler before the scheduler during composition-root
+initialization. Each tick therefore advances monotonic time before the scheduler scans deadline
+waiters. Expiration only changes matching blocked threads to runnable; ordinary scheduling policy
+decides when they execute.
+
 ## Invariants and limits
 
 - Context switching never occurs while the scheduler lock is held.
 - A thread is reaped only after execution has moved off its kernel stack.
 - Blocking code must prepare the block while protecting its wait queue, release that queue's lock,
   then perform the switch.
+- Timer waiter registration, thread blocking, cancellation, and expiration are serialized by the
+  scheduler lock; timer interrupt processing does not allocate.
 - The dispatch hook is registered once during boot before any user thread runs.
 
 The scheduler is currently global and BSP-oriented. It has no priorities, CPU affinity, SMP run

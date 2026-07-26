@@ -83,9 +83,11 @@ non-writable userspace range returns `EFAULT`. No process-table lock spans resul
 userspace write.
 
 `poll` decodes the userspace `pollfd` array inside this subsystem and queries each descriptor's
-ABI-neutral readiness through `roxy-fd`. The initial interface is non-blocking (`timeout == 0`):
-it reports TTY and regular-file readiness, returns `POLLNVAL` for invalid descriptors, and does
-not yet provide wait queues, timer deadlines, or signal-mask replacement.
+ABI-neutral readiness through `roxy-fd`. Descriptor polling remains non-blocking (`timeout == 0`):
+it reports TTY and regular-file readiness and returns `POLLNVAL` for invalid descriptors. A finite
+timeout with no descriptors uses the scheduler's deadline waiter as a pure sleep and returns zero
+after the monotonic deadline. Descriptor readiness wait queues, infinite empty polls, and
+signal-mask replacement remain unsupported.
 
 `ioctl` validates and resolves the descriptor before decoding the raw request number and any mode
 encoded in it. For terminal requests, the syscall layer copies the Roxy mlibc

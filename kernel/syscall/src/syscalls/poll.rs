@@ -1,4 +1,4 @@
-use core::mem;
+use core::{mem, time::Duration};
 
 use bitflags::bitflags;
 use roxy_fd::{Fd, FileError, PollEvents};
@@ -42,16 +42,20 @@ struct PollFdAbi {
 const _: () = assert!(mem::size_of::<PollFdAbi>() == 8);
 
 fn handle(raw_address: u64, count: usize, timeout: i64) -> SyscallResult {
+    if timeout < -1 {
+        return Err(Errno::Invalid);
+    }
+
+    if count == 0 {
+        return wait_without_descriptors(timeout);
+    }
+
     if timeout != 0 {
         return Err(unsupported_argument(
             "poll.timeout",
             timeout,
             Errno::NotSupported,
         ));
-    }
-
-    if count == 0 {
-        return Ok(0);
     }
 
     let address = UserAddress::parse(raw_address, Errno::Fault)?;
@@ -74,6 +78,29 @@ fn handle(raw_address: u64, count: usize, timeout: i64) -> SyscallResult {
     // SAFETY: PollFdAbi has no padding and every field in entries is initialized.
     unsafe { entries.write(&values) }?;
     Ok(ready)
+}
+
+fn wait_without_descriptors(timeout: i64) -> SyscallResult {
+    if timeout == 0 {
+        return Ok(0);
+    }
+
+    if timeout == -1 {
+        return Err(unsupported_argument(
+            "poll.timeout-without-fds",
+            timeout,
+            Errno::NotSupported,
+        ));
+    }
+
+    let duration = Duration::from_millis(timeout.cast_unsigned());
+    let deadline = roxy_time::monotonic_time().saturating_add(duration);
+
+    while roxy_time::monotonic_time() < deadline {
+        roxy_thread::scheduler::prepare_block_current_until(deadline).perform();
+    }
+
+    Ok(0)
 }
 
 fn poll_entry(entry: PollFdAbi) -> i16 {
