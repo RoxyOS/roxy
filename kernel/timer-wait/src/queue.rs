@@ -34,15 +34,18 @@ impl TimerWaiters {
 
     pub(super) fn register(&mut self, thread_id: ThreadId, deadline: Duration) -> TimerWaiter {
         let key = WaitKey::new(NonZeroU64::new(self.next_key).unwrap());
+
         self.next_key = self
             .next_key
             .checked_add(1)
             .expect("timer wait key overflow");
+
         let waiter = TimerWaiter {
             deadline,
             thread_id,
             key,
         };
+
         self.entries.push(waiter);
 
         waiter
