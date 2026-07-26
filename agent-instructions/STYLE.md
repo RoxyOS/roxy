@@ -84,6 +84,8 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
 
 - Express resource lifetimes through ownership, RAII, `Drop`, `Clone`, and lexical scopes. Avoid
   manual cleanup or reference bookkeeping when the type system can enforce the lifecycle.
+- Use RAII only when it makes the resource lifecycle and surrounding control flow more readable;
+  prefer explicit operations when a guard would obscure timing or ownership.
 - Name RAII guard types with a `Guard` suffix so their scoped lifetime and `Drop` behavior are
   visible at call sites.
 - Prefer a smaller lexical scope over an explicit `drop()`. Use explicit `drop()` only when the
@@ -95,6 +97,8 @@ when doing so makes the code demonstrably clearer or preserves a stronger local 
 
 - Use the newest appropriate Rust and standard-library features supported by the pinned nightly
   toolchain. Do not retain compatibility patterns for older compilers.
+- Prefer separate, named operations over method chains. Use a chain when it is more convenient or
+  makes the code easier to read.
 - Use `tap` to configure a value that is immediately returned or passed onward. Do not introduce a
   `let mut value; ...; value` pattern solely for configuration.
 - Avoid turbofish syntax when a local type annotation communicates the same information more
