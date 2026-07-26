@@ -83,11 +83,13 @@ non-writable userspace range returns `EFAULT`. No process-table lock spans resul
 userspace write.
 
 `poll` decodes the userspace `pollfd` array inside this subsystem and queries each descriptor's
-ABI-neutral readiness through `roxy-fd`. Descriptor polling remains non-blocking (`timeout == 0`):
-it reports TTY and regular-file readiness and returns `POLLNVAL` for invalid descriptors. A finite
-timeout with no descriptors uses the timer-wait subsystem as a pure sleep and returns zero
-after the monotonic deadline. Descriptor readiness wait queues, infinite empty polls, and
-signal-mask replacement remain unsupported.
+ABI-neutral readiness through `roxy-fd`. For a nonzero timeout it rechecks in a loop: with
+interrupts disabled, it queries all descriptors, registers one `roxy-poll` listener with each
+unready source, adds a cancelable monotonic timer registration when finite, and prepares a keyed
+block. A notification or deadline wake always causes a fresh readiness query before results are
+encoded. It reports TTY and regular-file readiness and returns `POLLNVAL` for invalid descriptors.
+No-descriptor finite polls are sleeps; an infinite no-descriptor poll remains blocked. Signals and
+temporary signal-mask replacement remain unsupported.
 
 `sleep` copies a Roxy x86_64 `timespec` request and validates nonnegative seconds with
 nanoseconds in the half-open range `[0, 1_000_000_000)`. It converts the relative duration into a

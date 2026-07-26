@@ -16,6 +16,7 @@ roxy-fd.workspace = true
 roxy-arch.workspace = true
 roxy-input.workspace = true
 roxy-line-discipline.workspace = true
+roxy-poll.workspace = true
 roxy-terminal.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-tty-types.workspace = true

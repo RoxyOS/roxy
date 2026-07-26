@@ -7,7 +7,7 @@ mod queue;
 use core::time::Duration;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
-use roxy_thread::scheduler::PendingBlock;
+use roxy_thread::scheduler::{PendingBlock, WaitKey};
 
 use crate::queue::TIMER_WAITERS;
 
@@ -28,10 +28,43 @@ pub fn block_current(deadline: Duration) -> PendingBlock {
         "deadline already elapsed"
     );
 
-    let thread_id = roxy_thread::scheduler::current_thread_id();
-    let wait_key = TIMER_WAITERS.lock().register(thread_id, deadline).key();
+    let wait_key = TIMER_WAITERS.lock().next_key();
+    register_wakeup_deadline(deadline, wait_key);
 
     roxy_thread::scheduler::prepare_block_current_with_key(wait_key)
+}
+
+/// Registers a deadline that wakes the current thread with `wait_key`.
+///
+/// This only registers a wakeup source. It does not block, change scheduler state, or perform a
+/// context switch. The caller must prepare and perform the block separately.
+///
+/// # Panics
+///
+/// Panics when interrupts are enabled or the deadline has already elapsed.
+pub fn register_wakeup_deadline(deadline: Duration, wait_key: WaitKey) {
+    assert!(!CurrentArchitectureBackend::interrupts_enabled());
+    assert!(
+        deadline > roxy_time::monotonic_time(),
+        "deadline already elapsed"
+    );
+
+    let thread_id = roxy_thread::scheduler::current_thread_id();
+    TIMER_WAITERS.lock().register(thread_id, deadline, wait_key);
+}
+
+/// Removes the wakeup deadline registered with `wait_key`, if it has not expired.
+///
+/// This only cancels the wakeup source. It does not wake, block, or change the current thread's
+/// scheduler state.
+///
+/// # Panics
+///
+/// Panics when interrupts are enabled.
+pub fn cancel_wakeup_deadline(wait_key: WaitKey) {
+    assert!(!CurrentArchitectureBackend::interrupts_enabled());
+
+    TIMER_WAITERS.lock().cancel(wait_key);
 }
 
 fn on_timer_interrupt() {

@@ -1,8 +1,11 @@
+use alloc::vec::Vec;
 use core::{mem, time::Duration};
 
 use bitflags::bitflags;
+use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_fd::{Fd, FileError, PollEvents};
 use roxy_memory::UserAddress;
+use roxy_poll::{PollListener, PollRegistration};
 
 use crate::{
     SyscallResult,
@@ -10,7 +13,6 @@ use crate::{
     errno::Errno,
     numbers::SyscallNumber,
     syscall,
-    unsupported::unsupported_argument,
 };
 
 syscall!(SyscallNumber::Poll, handle(raw_address: u64, count: usize => Invalid, timeout: i64));
@@ -47,15 +49,7 @@ fn handle(raw_address: u64, count: usize, timeout: i64) -> SyscallResult {
     }
 
     if count == 0 {
-        return wait_without_descriptors(timeout);
-    }
-
-    if timeout != 0 {
-        return Err(unsupported_argument(
-            "poll.timeout",
-            timeout,
-            Errno::NotSupported,
-        ));
+        return Ok(wait_without_descriptors(timeout));
     }
 
     let address = UserAddress::parse(raw_address, Errno::Fault)?;
@@ -66,31 +60,101 @@ fn handle(raw_address: u64, count: usize, timeout: i64) -> SyscallResult {
     // integers, and every bit pattern is valid.
     let mut values = unsafe { entries.read() }?;
 
-    let mut ready = 0;
-
-    for entry in &mut values {
-        entry.revents = poll_entry(*entry);
-        if entry.revents != 0 {
-            ready += 1;
-        }
-    }
+    let ready = poll_until_ready(&mut values, timeout);
 
     // SAFETY: PollFdAbi has no padding and every field in entries is initialized.
     unsafe { entries.write(&values) }?;
-    Ok(ready)
+    Ok(ready as u64)
 }
 
-fn wait_without_descriptors(timeout: i64) -> SyscallResult {
+fn poll_until_ready(values: &mut [PollFdAbi], timeout: i64) -> usize {
+    assert!(!CurrentArchitectureBackend::interrupts_enabled());
+
+    let deadline = match timeout {
+        -1 => None,
+        milliseconds => Some(
+            roxy_time::monotonic_time()
+                .saturating_add(Duration::from_millis(milliseconds.cast_unsigned())),
+        ),
+    };
+
+    loop {
+        let ready = poll_values(values);
+
+        if ready > 0 || timeout == 0 || deadline.is_some_and(deadline_elapsed) {
+            return ready;
+        }
+
+        block_until_poll_change(values, deadline);
+    }
+}
+
+fn deadline_elapsed(deadline: Duration) -> bool {
+    roxy_time::monotonic_time() >= deadline
+}
+
+fn poll_values(values: &mut [PollFdAbi]) -> usize {
+    let mut ready = 0;
+
+    for entry in values {
+        entry.revents = poll_entry(*entry);
+        ready += usize::from(entry.revents != 0);
+    }
+
+    ready
+}
+
+fn block_until_poll_change(values: &[PollFdAbi], deadline: Option<Duration>) {
+    assert!(!CurrentArchitectureBackend::interrupts_enabled());
+
+    let listener = PollListener::current_thread();
+    let registrations = register_poll_listeners(values, &listener);
+
+    if let Some(deadline) = deadline {
+        roxy_timer_wait::register_wakeup_deadline(deadline, listener.wait_key());
+    }
+
+    let block = roxy_thread::scheduler::prepare_block_current_with_key(listener.wait_key());
+
+    block.perform();
+
+    if deadline.is_some() {
+        roxy_timer_wait::cancel_wakeup_deadline(listener.wait_key());
+    }
+
+    drop(registrations);
+}
+
+fn register_poll_listeners(
+    values: &[PollFdAbi],
+    listener: &alloc::sync::Arc<PollListener>,
+) -> Vec<PollRegistration> {
+    let mut registrations = Vec::new();
+
+    for entry in values {
+        if entry.fd < 0 {
+            continue;
+        }
+
+        let Ok(file) = roxy_process::current_open_file(Fd::new(entry.fd.cast_unsigned())) else {
+            continue;
+        };
+
+        registrations.push(file.register_poll_listener(listener.clone()));
+    }
+
+    registrations
+}
+
+fn wait_without_descriptors(timeout: i64) -> u64 {
     if timeout == 0 {
-        return Ok(0);
+        return 0;
     }
 
     if timeout == -1 {
-        return Err(unsupported_argument(
-            "poll.timeout-without-fds",
-            timeout,
-            Errno::NotSupported,
-        ));
+        loop {
+            roxy_thread::scheduler::prepare_block_current().perform();
+        }
     }
 
     let duration = Duration::from_millis(timeout.cast_unsigned());
@@ -100,7 +164,7 @@ fn wait_without_descriptors(timeout: i64) -> SyscallResult {
         roxy_timer_wait::block_current(deadline).perform();
     }
 
-    Ok(0)
+    0
 }
 
 fn poll_entry(entry: PollFdAbi) -> i16 {

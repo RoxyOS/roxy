@@ -28,6 +28,12 @@ wake a later wait by the same thread.
 
 The deadline vector is protected by the timer-wait lock. Registration may allocate; timer interrupt
 processing only removes existing entries and must not allocate. The current implementation scans
-all registrations on each tick and has no cancellation API because its only current consumer is an
-uninterruptible sleep. A future wait source that can wake early must add token-based cancellation
-or tolerate stale registrations through the scheduler key check.
+all registrations on each tick. A caller with another wake source explicitly calls
+`cancel_wakeup_deadline` after it resumes to remove an unexpired deadline. A missing entry during
+cancellation means timer processing already consumed it; scheduler wait keys still reject stale
+expiry notifications from an earlier block.
+
+`register_wakeup_deadline` only creates that wakeup source. It never marks a thread blocked or
+switches contexts; callers that combine a deadline with another source must register every source,
+then prepare and perform one scheduler block with their shared wait key, and explicitly cancel the
+deadline after an early wakeup.

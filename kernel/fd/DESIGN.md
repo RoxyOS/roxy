@@ -53,11 +53,13 @@ to `roxy-syscall`.
 
 The process subsystem owns each `FdTable` and preserves it across `execve`; there is currently no
 `FD_CLOEXEC` state. Fork copies the table's references rather than duplicating open-file offsets.
-The model is synchronous. `OpenFile::poll` exposes ABI-neutral readiness for the syscall layer;
-each concrete object owns its readiness policy. VFS files and directories report immediate
-read/write readiness, while devices such as the TTY derive it from their state. The current
-interface does not block or register waiters; duplication syscalls and per-descriptor flags remain
-unsupported.
+`OpenFile::poll` exposes ABI-neutral readiness for the syscall layer; each concrete object owns its
+readiness policy. `File::register_poll_listener` is a separate operation that returns an RAII
+registration for notification when readiness may have changed. The caller queries, registers, and
+prepares its block with interrupts disabled, then rechecks readiness after any wakeup. VFS files
+and directories report immediate read/write readiness, while devices such as the TTY derive it
+from their state and register their listeners with a shared device queue. Duplication syscalls and
+per-descriptor flags remain unsupported.
 
 The typed request set covers terminal attribute get/set operations with their application timing
 and terminal window-size get/set operations. Other ioctl families have no typed request variant.

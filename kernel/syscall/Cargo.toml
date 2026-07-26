@@ -16,6 +16,7 @@ roxy-arch.workspace = true
 roxy-fd.workspace = true
 roxy-futex.workspace = true
 roxy-memory.workspace = true
+roxy-poll.workspace = true
 roxy-process.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-thread.workspace = true

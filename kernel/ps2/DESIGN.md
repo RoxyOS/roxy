@@ -39,8 +39,10 @@ apply terminal semantics; the TTY FD adapter owns those policies.
 ## Interrupt and locking contract
 
 The IRQ handler reads port `0x60` before taking driver state, then decodes and enqueues under the
-driver lock. It runs with interrupts disabled and must not allocate, block, switch threads, or
-retain terminal, process, descriptor, or scheduler locks across device I/O. The interrupt
+driver lock. After a successfully queued event it notifies registered input listeners, which may
+wake token-checked readiness waiters but do not process terminal input in interrupt context. It
+runs with interrupts disabled and must not allocate, block, switch threads, or retain terminal,
+process, descriptor, or scheduler locks across device I/O. The interrupt
 subsystem owns EOI delivery; the handler has the common `roxy_interrupt::Handler = fn()` signature
 and returns no disposition.
 

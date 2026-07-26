@@ -10,8 +10,9 @@ mod tty;
 use alloc::{sync::Arc, vec::Vec};
 
 use roxy_fd::OpenFile;
-use roxy_input::InputDevice;
+use roxy_input::{InputDevice, InputListener};
 use roxy_line_discipline::LineDiscipline;
+use roxy_poll::PollListeners;
 use roxy_terminal::TerminalOutput;
 use roxy_tty_types::WindowSize;
 use roxy_utils::Lock;
@@ -26,6 +27,7 @@ struct Tty {
     window_size: Lock<WindowSize>,
     buffered: Lock<Vec<u8>>,
     read_lock: Lock<()>,
+    poll_listeners: Arc<PollListeners>,
 }
 
 static TTY: Once<Arc<Tty>> = Once::new();
@@ -37,7 +39,15 @@ static TTY: Once<Arc<Tty>> = Once::new();
 /// Panics when called more than once.
 pub fn initialize(input: Arc<dyn InputDevice>, output: Arc<dyn TerminalOutput>) {
     assert!(TTY.get().is_none(), "TTY initialized twice");
-    TTY.call_once(|| Arc::new(Tty::new(input, output)));
+    let tty = Arc::new(Tty::new(input, output));
+    tty.input.register_listener(tty.clone());
+    TTY.call_once(|| tty);
+}
+
+impl InputListener for Tty {
+    fn on_recive_input(&self) {
+        self.poll_listeners.notify();
+    }
 }
 
 /// Opens an independent descriptor for the initialized TTY.

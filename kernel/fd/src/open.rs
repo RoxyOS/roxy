@@ -1,5 +1,6 @@
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
+use roxy_poll::{PollListener, PollRegistration};
 use roxy_utils::Lock;
 
 use crate::file::File;
@@ -70,6 +71,12 @@ impl OpenFile {
     /// Returns the underlying object's readiness error.
     pub fn poll(&self) -> Result<PollEvents, FileError> {
         self.state.lock().object.poll()
+    }
+
+    /// Registers a listener with the serialized open-file object.
+    #[must_use]
+    pub fn register_poll_listener(&self, listener: Arc<PollListener>) -> PollRegistration {
+        self.state.lock().object.register_poll_listener(listener)
     }
 
     /// Changes and returns the serialized open-file position.

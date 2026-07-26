@@ -19,19 +19,20 @@ impl KeyboardInput {
         }
     }
 
-    pub(crate) fn process_scancode(&mut self, scancode: u8) {
+    pub(crate) fn process_scancode(&mut self, scancode: u8) -> Result<(), ()> {
         let Some(event) = self.decoder.decode(scancode) else {
-            return;
+            return Err(());
         };
-        self.enqueue_event(event);
+
+        self.enqueue_event(event)
     }
 
     pub(crate) fn read(&mut self) -> Option<InputEvent> {
         self.events.pop_front()
     }
 
-    pub(crate) fn enqueue_event(&mut self, event: InputEvent) {
-        let _ = self.events.push_back(event);
+    pub(crate) fn enqueue_event(&mut self, event: InputEvent) -> Result<(), ()> {
+        self.events.push_back(event).map_err(|_| ())
     }
 }
 
@@ -47,12 +48,14 @@ mod tests {
         assert_eq!(input.read(), None);
 
         for value in 0..INPUT_CAPACITY {
-            input.enqueue_event(InputEvent::Character(
-                char::from_u32(u32::try_from(value).unwrap()).unwrap(),
-            ));
+            input
+                .enqueue_event(InputEvent::Character(
+                    char::from_u32(u32::try_from(value).unwrap()).unwrap(),
+                ))
+                .unwrap();
         }
 
-        input.enqueue_event(InputEvent::Character('\0'));
+        let _ = input.enqueue_event(InputEvent::Character('\0'));
         assert_eq!(input.read(), Some(InputEvent::Character('\0')));
         assert_eq!(input.read(), Some(InputEvent::Character('\u{1}')));
         assert_eq!(input.read(), Some(InputEvent::Character('\u{2}')));

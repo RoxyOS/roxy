@@ -352,6 +352,7 @@ dependencies = [
  "roxy-interrupt",
  "roxy-line-discipline",
  "roxy-memory",
+ "roxy-poll",
  "roxy-process",
  "roxy-ps2",
  "roxy-serial",
@@ -592,6 +593,7 @@ name = "roxy-fd"
 version = "0.1.0"
 dependencies = [
  "linkme",
+ "roxy-poll",
  "roxy-test",
  "roxy-tty-types",
  "roxy-utils",
@@ -612,6 +614,9 @@ dependencies = [
 [[package]]
 name = "roxy-input"
 version = "0.1.0"
+dependencies = [
+ "roxy-utils",
+]
 
 [[package]]
 name = "roxy-interrupt"
@@ -650,6 +655,16 @@ dependencies = [
  "roxy-utils",
  "spin 0.12.2",
  "x86_64",
+]
+
+[[package]]
+name = "roxy-poll"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-test",
+ "roxy-thread",
+ "roxy-utils",
 ]
 
 [[package]]
@@ -706,6 +721,7 @@ dependencies = [
  "roxy-fd",
  "roxy-futex",
  "roxy-memory",
+ "roxy-poll",
  "roxy-process",
  "roxy-test",
  "roxy-thread",
@@ -786,6 +802,7 @@ dependencies = [
  "roxy-fd",
  "roxy-input",
  "roxy-line-discipline",
+ "roxy-poll",
  "roxy-terminal",
  "roxy-test",
  "roxy-tty-types",

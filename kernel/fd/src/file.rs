@@ -1,5 +1,6 @@
 use crate::{IoctlError, IoctlRequest};
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
+use roxy_poll::{PollListener, PollRegistration};
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -18,6 +19,14 @@ pub trait File: Send {
     ///
     /// Returns an object-specific I/O error when readiness cannot be queried.
     fn poll(&mut self) -> Result<PollEvents, FileError>;
+
+    /// Registers a listener to be notified when this object's readiness may have changed.
+    ///
+    /// The caller must query readiness, register, and prepare its block with interrupts disabled.
+    /// Implementations that cannot become ready asynchronously return an inactive registration.
+    fn register_poll_listener(&mut self, _listener: Arc<PollListener>) -> PollRegistration {
+        PollRegistration::inactive()
+    }
 
     /// Reports whether this object is a terminal.
     fn is_terminal(&self) -> bool;

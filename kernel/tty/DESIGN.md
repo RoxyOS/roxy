@@ -28,6 +28,11 @@ readability without entering the interrupt wait. A canonical TTY becomes readabl
 complete line is committed; output is currently always writable because terminal output has no
 backpressure model.
 
+The TTY registers an input listener with its raw input device. Input arrival wakes its poll listener
+queue, after which the syscall layer re-runs `Tty::poll`; a canonical partial line may therefore
+produce a harmless wakeup but never a false readable result. Registration is separate from
+readiness querying and is retained by an RAII guard for the duration of one blocked poll attempt.
+
 Failed or partial echo returns an I/O error without discarding bytes already moved into the TTY
 buffer; echo itself is not retried. The read lock is released before waiting with the architecture's
 atomic interrupt wait. `Tty::write` delegates directly to output; `TtyFile` only adapts these

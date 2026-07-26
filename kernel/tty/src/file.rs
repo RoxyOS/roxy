@@ -1,5 +1,7 @@
 use alloc::{boxed::Box, sync::Arc};
 
+use roxy_poll::{PollListener, PollRegistration};
+
 use roxy_fd::{
     File, FileError, FileMetadata, FileType, IoctlError, IoctlRequest, OpenFile, PollEvents,
     SeekError, SeekFrom,
@@ -32,6 +34,10 @@ impl File for TtyFile {
 
     fn poll(&mut self) -> Result<PollEvents, FileError> {
         self.tty.poll()
+    }
+
+    fn register_poll_listener(&mut self, listener: Arc<PollListener>) -> PollRegistration {
+        self.tty.register_poll_listener(listener)
     }
 
     fn write(&mut self, _position: &mut u64, input: &[u8]) -> Result<usize, FileError> {

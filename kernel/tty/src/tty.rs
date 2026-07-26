@@ -4,6 +4,7 @@ use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_fd::{FileError, PollEvents};
 use roxy_input::InputDevice;
 use roxy_line_discipline::{LineDiscipline, ProcessResult};
+use roxy_poll::{PollListener, PollRegistration};
 use roxy_terminal::{OutputError, TerminalOutput};
 use roxy_utils::Lock;
 
@@ -21,6 +22,7 @@ impl Tty {
             window_size: Lock::new(window_size),
             buffered: Lock::new(alloc::vec::Vec::new()),
             read_lock: Lock::new(()),
+            poll_listeners: Arc::new(roxy_poll::PollListeners::new()),
         }
     }
 
@@ -53,6 +55,10 @@ impl Tty {
             writable: true,
             ..PollEvents::default()
         })
+    }
+
+    pub(super) fn register_poll_listener(&self, listener: Arc<PollListener>) -> PollRegistration {
+        self.poll_listeners.register(listener)
     }
 
     pub(super) fn write(&self, input: &[u8]) -> Result<usize, FileError> {
