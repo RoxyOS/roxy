@@ -3,16 +3,22 @@ mod c_string;
 mod c_string_array;
 mod fd;
 mod integer;
+mod nullable;
 mod out;
 mod process_id;
 mod signal;
+mod signal_mask;
 mod slice;
+mod timespec;
 pub(crate) mod user_memory;
 
 pub(crate) use c_string::CString;
 pub(crate) use c_string_array::CStringArray;
+pub(crate) use nullable::Nullable;
 pub(crate) use out::Out;
+pub(crate) use signal_mask::SignalMask;
 pub(crate) use slice::Slice;
+pub(crate) use timespec::Timespec;
 
 use crate::errno::Errno;
 

@@ -9,15 +9,6 @@ impl SyscallArg for UserAddress {
     }
 }
 
-impl SyscallArg for Option<UserAddress> {
-    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
-        match raw {
-            0 => Ok(None),
-            raw => UserAddress::parse(raw, error).map(Some),
-        }
-    }
-}
-
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_memory::UserAddress;

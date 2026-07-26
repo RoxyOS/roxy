@@ -99,6 +99,12 @@ encoded. It reports TTY and regular-file readiness and returns `POLLNVAL` for in
 No-descriptor finite polls are sleeps; an infinite no-descriptor poll remains blocked. Signals and
 temporary signal-mask replacement remain unsupported.
 
+`ppoll` shares `poll`'s descriptor readiness and timer-wait implementation, but decodes its
+relative timeout from the Roxy mlibc `timespec` ABI at nanosecond precision. A null timeout waits
+indefinitely. Its non-null signal mask is copied through the shared signal-mask argument parser
+before it is rejected through the centralized `UNSUPPORTED` diagnostic path with `ENOTSUP`; Roxy
+does not yet provide atomic temporary mask replacement.
+
 `sleep` copies a Roxy x86_64 `timespec` request and validates nonnegative seconds with
 nanoseconds in the half-open range `[0, 1_000_000_000)`. It converts the relative duration into a
 monotonic deadline and delegates blocking to the timer-wait subsystem. Signals are not implemented, so a

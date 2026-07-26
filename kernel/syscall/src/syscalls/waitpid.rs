@@ -2,14 +2,14 @@ use roxy_process::{ProcessId, WaitError, WaitResult, WaitTarget};
 
 use crate::{
     SyscallResult,
-    args::{Out, SyscallArg},
+    args::{Nullable, Out, SyscallArg},
     errno::Errno,
     numbers::SyscallNumber,
     syscall,
     unsupported::unsupported_argument,
 };
 
-syscall!(SyscallNumber::Waitpid, handle(target: WaitTarget => Invalid, status: Option<Out<u32>> => Fault, options: WaitOptions => Invalid, rusage: u64));
+syscall!(SyscallNumber::Waitpid, handle(target: WaitTarget => Invalid, status: Nullable<Out<u32>> => Fault, options: WaitOptions => Invalid, rusage: u64));
 
 const WNOHANG: u64 = 1;
 
@@ -21,10 +21,11 @@ enum WaitOptions {
 
 fn handle(
     target: WaitTarget,
-    status: Option<Out<u32>>,
+    status: Nullable<Out<u32>>,
     options: WaitOptions,
     rusage: u64,
 ) -> SyscallResult {
+    let status = status.into_option();
     let no_hang = matches!(options, WaitOptions::NoHang);
 
     if rusage != 0 {

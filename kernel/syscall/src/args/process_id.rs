@@ -6,10 +6,11 @@ use crate::{errno::Errno, unsupported::unsupported_argument};
 impl SyscallArg for ProcessId {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
         let pid = raw.cast_signed();
-        let Some(process_id) = (pid > 0).then(|| ProcessId::new(pid.cast_unsigned()).unwrap())
-        else {
+        if pid <= 0 {
             return Err(unsupported_argument("process_id", pid, Errno::NotSupported));
-        };
+        }
+
+        let process_id = ProcessId::new(pid.cast_unsigned()).unwrap();
 
         Ok(process_id)
     }

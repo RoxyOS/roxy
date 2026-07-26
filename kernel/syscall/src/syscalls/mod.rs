@@ -35,7 +35,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 36] = [
+pub(super) const SYSCALLS: [Syscall; 37] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -69,7 +69,8 @@ pub(super) const SYSCALLS: [Syscall; 36] = [
     chdir::SYSCALL,
     ioctl::SYSCALL,
     getcwd::SYSCALL,
-    poll::SYSCALL,
+    poll::POLL_SYSCALL,
     sleep::SYSCALL,
     send_signal::SYSCALL,
+    poll::PPOLL_SYSCALL,
 ];

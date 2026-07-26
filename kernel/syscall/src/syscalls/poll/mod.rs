@@ -1,3 +1,6 @@
+mod poll;
+mod ppoll;
+
 use alloc::vec::Vec;
 use core::{mem, time::Duration};
 
@@ -8,14 +11,30 @@ use roxy_memory::UserAddress;
 use roxy_poll::{PollListener, PollRegistration};
 
 use crate::{
-    SyscallResult,
+    Syscall, SyscallResult,
     args::{Slice, SyscallArg},
     errno::Errno,
-    numbers::SyscallNumber,
-    syscall,
 };
 
-syscall!(SyscallNumber::Poll, handle(raw_address: u64, count: usize => Invalid, timeout: i64));
+pub(super) const POLL_SYSCALL: Syscall = poll::SYSCALL;
+pub(super) const PPOLL_SYSCALL: Syscall = ppoll::SYSCALL;
+
+/// Nullable user address.
+pub(super) struct PollEntriesAddress(u64);
+
+impl PollEntriesAddress {
+    pub(super) fn for_count(self, count: usize) -> Result<UserAddress, Errno> {
+        assert_ne!(count, 0);
+
+        UserAddress::parse(self.0, Errno::Fault)
+    }
+}
+
+impl SyscallArg for PollEntriesAddress {
+    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
+        Ok(Self(raw))
+    }
+}
 
 bitflags! {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -43,17 +62,12 @@ struct PollFdAbi {
 
 const _: () = assert!(mem::size_of::<PollFdAbi>() == 8);
 
-fn handle(raw_address: u64, count: usize, timeout: i64) -> SyscallResult {
-    if timeout < -1 {
-        return Err(Errno::Invalid);
-    }
-
+fn poll(entries: PollEntriesAddress, count: usize, timeout: Option<Duration>) -> SyscallResult {
     if count == 0 {
         return Ok(wait_without_descriptors(timeout));
     }
 
-    let address = UserAddress::parse(raw_address, Errno::Fault)?;
-
+    let address = entries.for_count(count)?;
     let entries = Slice::<PollFdAbi>::new(address, count);
     entries.validate_writable()?;
     // SAFETY: PollFdAbi's checked repr(C) size equals its fields' combined size, all fields are
@@ -64,24 +78,22 @@ fn handle(raw_address: u64, count: usize, timeout: i64) -> SyscallResult {
 
     // SAFETY: PollFdAbi has no padding and every field in entries is initialized.
     unsafe { entries.write(&values) }?;
+
     Ok(ready as u64)
 }
 
-fn poll_until_ready(values: &mut [PollFdAbi], timeout: i64) -> usize {
+fn poll_until_ready(values: &mut [PollFdAbi], timeout: Option<Duration>) -> usize {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
-    let deadline = match timeout {
-        -1 => None,
-        milliseconds => Some(
-            roxy_time::monotonic_time()
-                .saturating_add(Duration::from_millis(milliseconds.cast_unsigned())),
-        ),
-    };
+    let deadline = timeout.map(|duration| roxy_time::monotonic_time().saturating_add(duration));
 
     loop {
         let ready = poll_values(values);
 
-        if ready > 0 || timeout == 0 || deadline.is_some_and(deadline_elapsed) {
+        if ready > 0
+            || timeout.is_some_and(|duration| duration.is_zero())
+            || deadline.is_some_and(deadline_elapsed)
+        {
             return ready;
         }
 
@@ -115,7 +127,6 @@ fn block_until_poll_change(values: &[PollFdAbi], deadline: Option<Duration>) {
     }
 
     let block = roxy_thread::scheduler::prepare_block_current_with_key(listener.wait_key());
-
     block.perform();
 
     if deadline.is_some() {
@@ -146,19 +157,18 @@ fn register_poll_listeners(
     registrations
 }
 
-fn wait_without_descriptors(timeout: i64) -> u64 {
-    if timeout == 0 {
-        return 0;
-    }
-
-    if timeout == -1 {
+fn wait_without_descriptors(timeout: Option<Duration>) -> u64 {
+    let Some(timeout) = timeout else {
         loop {
             roxy_thread::scheduler::prepare_block_current().perform();
         }
+    };
+
+    if timeout.is_zero() {
+        return 0;
     }
 
-    let duration = Duration::from_millis(timeout.cast_unsigned());
-    let deadline = roxy_time::monotonic_time().saturating_add(duration);
+    let deadline = roxy_time::monotonic_time().saturating_add(timeout);
 
     while roxy_time::monotonic_time() < deadline {
         roxy_timer_wait::block_current(deadline).perform();
@@ -213,10 +223,10 @@ fn encode_events(requested: PollEventFlags, events: PollEvents) -> i16 {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
+    use roxy_fd::PollEvents;
     use roxy_test::kernel_test;
 
     use super::{PollEventFlags, encode_events};
-    use roxy_fd::PollEvents;
 
     kernel_test!(
         "roxy-syscall::poll-event-codec",

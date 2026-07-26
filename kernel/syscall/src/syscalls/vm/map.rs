@@ -3,7 +3,13 @@ use roxy_memory::UserAddress;
 use roxy_process::MemoryError;
 
 use super::MemoryProtection;
-use crate::{SyscallResult, args::SyscallArg, errno::Errno, numbers::SyscallNumber, syscall};
+use crate::{
+    SyscallResult,
+    args::{Nullable, SyscallArg},
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
+};
 
 syscall!(SyscallNumber::VmMap, handle(address: u64, size: usize => Invalid, protection: u64, flags: u64, file_descriptor: u64, offset: u64));
 
@@ -80,7 +86,7 @@ impl VmMapArguments {
         offset: u64,
     ) -> Result<Self, Errno> {
         Ok(Self {
-            address: Option::<UserAddress>::parse(address, Errno::Invalid)?,
+            address: Nullable::<UserAddress>::parse(address, Errno::Invalid)?.into_option(),
             size,
             protection,
             flags,
