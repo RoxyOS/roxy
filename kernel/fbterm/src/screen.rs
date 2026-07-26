@@ -1,3 +1,7 @@
+//! Owns the framebuffer terminal's logical screen state and applies parsed terminal actions.
+//! `Screen` tracks cursor and erase state between writes, while byte parsing remains in `Console`
+//! and cell-to-pixel rendering remains in `TextRenderer`.
+
 use roxy_tty_types::WindowSize;
 
 use crate::{color::RgbColor, renderer::TextRenderer};
