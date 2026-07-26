@@ -19,7 +19,9 @@ use crate::{
 pub(super) const POLL_SYSCALL: Syscall = poll::SYSCALL;
 pub(super) const PPOLL_SYSCALL: Syscall = ppoll::SYSCALL;
 
-/// Nullable user address.
+/// Defers `pollfd` pointer validation until `count` is known.
+///
+/// `poll` and `ppoll` ignore `fds` entirely when `count` is zero.
 pub(super) struct PollEntriesAddress(u64);
 
 impl PollEntriesAddress {
