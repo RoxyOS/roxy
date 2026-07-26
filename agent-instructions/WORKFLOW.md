@@ -54,6 +54,8 @@ mutation in these phases still requires the explicit user confirmation mandated 
    that `git diff --check` passes. `git status --short` may contain only the intended files and the
    active collaboration lock, which must remain untracked and excluded from the commit. Record any
    unavailable or unrelated failing validation before requesting commit approval.
+   Every new sysdep implementation must register its tag in the Roxy `SysdepTags` definition in
+   the same commit; a compiled but undiscoverable sysdep is incomplete.
 4. After explicit user approval, commit in `distro/sources/mlibc-workdir`. Do not amend, squash,
    rebase, merge, or otherwise rewrite unrelated fork history as part of a feature commit.
 5. After separate explicit user approval, push the commit to the canonical RoxyOS mlibc fork. If a
