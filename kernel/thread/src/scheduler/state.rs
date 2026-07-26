@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use super::timer_wait::{TimerWaiter, WaitToken};
+use super::timer_wait::TimerWaiter;
 use crate::{SavedContext, Thread, ThreadId, scheduler::timer_wait};
 
 pub(super) struct Scheduler {

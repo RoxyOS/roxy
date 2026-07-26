@@ -74,6 +74,10 @@ decides when they execute.
 The scheduler is currently global and BSP-oriented. It has no priorities, CPU affinity, SMP run
 queues, or process-level multi-threading policy.
 
+The scheduler exposes relative-duration consumers through absolute monotonic deadlines. The syscall
+layer computes each deadline before registering a timed block; a deadline that is already reached
+does not block. Timed waits currently have no signal interruption or remaining-duration reporting.
+
 ## Rejected alternative
 
 Storing an address-space handle in each scheduler entry duplicates process ownership and leaves a
