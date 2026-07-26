@@ -676,6 +676,7 @@ dependencies = [
  "roxy-elf",
  "roxy-fd",
  "roxy-memory",
+ "roxy-signal",
  "roxy-test",
  "roxy-thread",
  "roxy-utils",
@@ -712,6 +713,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-signal"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-test",
+]
+
+[[package]]
 name = "roxy-syscall"
 version = "0.1.0"
 dependencies = [
@@ -723,6 +732,7 @@ dependencies = [
  "roxy-memory",
  "roxy-poll",
  "roxy-process",
+ "roxy-signal",
  "roxy-test",
  "roxy-thread",
  "roxy-time",

@@ -24,6 +24,13 @@ impl ProcessTable {
             .expect("thread has no process")
     }
 
+    pub(super) fn current_process(&mut self) -> Option<&mut Process> {
+        let thread_id = roxy_thread::scheduler::try_current_thread_id()?;
+        let process_id = *self.thread_owners.get(&thread_id)?;
+
+        self.processes.get_mut(&process_id)
+    }
+
     pub(super) fn current_parent_process_id(&self) -> Option<ProcessId> {
         let process_id = self.current_process_id();
 

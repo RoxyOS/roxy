@@ -93,11 +93,11 @@ mod tests {
         table.insert(process);
         table.insert(child_process);
 
-        table.begin_exit(thread_id, ExitStatus::new(42));
+        table.begin_exit(thread_id, ExitStatus::exited(42));
         table.finish_thread_reap(thread_id);
         assert_eq!(
             table.reap_exited_process(process_id),
-            Some(ExitStatus::new(42))
+            Some(ExitStatus::exited(42))
         );
         assert_eq!(table.processes[&child_process_id].parent_process_id, None);
         table.processes.remove(&child_process_id);

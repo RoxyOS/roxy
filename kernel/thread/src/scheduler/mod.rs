@@ -52,6 +52,12 @@ pub fn current_thread_id() -> ThreadId {
     SCHEDULER.lock().current_thread_id()
 }
 
+/// Returns the current thread identifier when scheduling has started.
+#[must_use]
+pub fn try_current_thread_id() -> Option<ThreadId> {
+    SCHEDULER.lock().try_current_thread_id()
+}
+
 /// Registers the hook responsible for activating the next user thread's address space.
 ///
 /// The scheduler invokes the hook with the target thread immediately before switching to it.

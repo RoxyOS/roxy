@@ -167,7 +167,7 @@ mod tests {
         let first = child(parent_id, first_thread.id(), ProcessState::Running);
         let first_id = first.id;
         let second_thread = Thread::new(unused_thread).unwrap();
-        let second_status = ExitStatus::new(22);
+        let second_status = ExitStatus::exited(22);
         let second = child(
             parent_id,
             second_thread.id(),
@@ -175,7 +175,7 @@ mod tests {
         );
         let second_id = second.id;
         let third_thread = Thread::new(unused_thread).unwrap();
-        let third_status = ExitStatus::new(33);
+        let third_status = ExitStatus::exited(33);
         let third = child(
             parent_id,
             third_thread.id(),
@@ -222,14 +222,14 @@ mod tests {
         assert!(!table.has_matching_child(parent_id, WaitTarget::Process(second_id)));
 
         table.processes.get_mut(&first_id).unwrap().state =
-            ProcessState::Exited(ExitStatus::new(11));
+            ProcessState::Exited(ExitStatus::exited(11));
         assert_eq!(
             table.find_exited_matching_child(parent_id, WaitTarget::Process(first_id)),
             Some(first_id)
         );
         assert_eq!(
             table.reap_exited_process(first_id),
-            Some(ExitStatus::new(11))
+            Some(ExitStatus::exited(11))
         );
         assert!(!table.has_matching_child(parent_id, WaitTarget::Any));
     });

@@ -46,7 +46,7 @@ fn handle(
         };
 
     if let Some(output) = status {
-        let encoded = encode_status(exit_status.code());
+        let encoded = encode_status(exit_status);
 
         // SAFETY: u32 has no padding and encoded is initialized.
         unsafe { output.write(&encoded) }?;
@@ -87,8 +87,11 @@ impl SyscallArg for WaitOptions {
     }
 }
 
-fn encode_status(code: u8) -> u32 {
-    u32::from(code) << 8
+fn encode_status(status: roxy_process::ExitStatus) -> u32 {
+    match status {
+        roxy_process::ExitStatus::Exited(code) => u32::from(code) << 8,
+        roxy_process::ExitStatus::Signaled(signal) => u32::from(signal.number()),
+    }
 }
 
 const fn map_wait_error(error: WaitError) -> Errno {
@@ -101,11 +104,18 @@ const fn map_wait_error(error: WaitError) -> Errno {
 mod tests {
     use roxy_test::kernel_test;
 
+    use roxy_process::ExitStatus;
+    use roxy_signal::Signal;
+
     use super::encode_status;
 
     kernel_test!("roxy-syscall::waitpid-status", waitpid_status, {
-        assert_eq!(encode_status(0), 0);
-        assert_eq!(encode_status(23), 0x1700);
-        assert_eq!(encode_status(u8::MAX), 0xff00);
+        assert_eq!(encode_status(ExitStatus::exited(0)), 0);
+        assert_eq!(encode_status(ExitStatus::exited(23)), 0x1700);
+        assert_eq!(
+            encode_status(ExitStatus::exited(u64::from(u8::MAX))),
+            0xff00
+        );
+        assert_eq!(encode_status(ExitStatus::signaled(Signal::Terminate)), 15);
     });
 }

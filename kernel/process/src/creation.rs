@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use roxy_thread::{Thread, ThreadCreateError, ThreadId, scheduler};
@@ -48,6 +49,7 @@ impl Process {
             main_thread_id,
             working_directory: ResolvedPath::root(),
             fds,
+            pending_signals: Vec::new(),
             state: ProcessState::Running,
         }
     }
@@ -66,6 +68,7 @@ impl Process {
             main_thread_id,
             working_directory,
             fds,
+            pending_signals: Vec::new(),
             state: ProcessState::Running,
         }
     }

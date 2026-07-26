@@ -34,10 +34,14 @@ pub(super) fn dispatch(request: RawSyscall) -> u64 {
         })
         .and_then(|number| REGISTRY.dispatch(number, request));
 
-    match result {
+    let value = match result {
         Ok(value) => value,
         Err(error) => error.encode(),
-    }
+    };
+
+    roxy_process::process_latest_signal();
+
+    value
 }
 
 #[cfg(feature = "kernel-test")]

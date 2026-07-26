@@ -10,6 +10,7 @@ mod image;
 mod initial_fds;
 mod lifecycle;
 mod memory;
+mod signal;
 mod startup_stack;
 mod table;
 mod wait;
@@ -24,12 +25,14 @@ pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, protect_memory,
     unmap_anonymous,
 };
+pub use signal::{SignalError, process_latest_signal, send_signal};
 pub use table::{current_parent_process_id, current_process_id};
 pub use wait::{WaitError, WaitResult, WaitTarget, wait_current};
 
-use alloc::sync::Arc;
+use alloc::{sync::Arc, vec::Vec};
 
 use roxy_fd::{Fd, FdTable, OpenFile};
+use roxy_signal::Signal;
 use roxy_thread::ThreadId;
 use roxy_vfs::ResolvedPath;
 use roxy_vm::AddrSpaceHandle;
@@ -45,6 +48,7 @@ struct Process {
     main_thread_id: ThreadId,
     working_directory: ResolvedPath,
     fds: FdTable,
+    pending_signals: Vec<Signal>,
     state: ProcessState,
 }
 
@@ -71,17 +75,20 @@ impl ProcessId {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ExitStatus(u8);
+pub enum ExitStatus {
+    Exited(u8),
+    Signaled(Signal),
+}
 
 impl ExitStatus {
     #[must_use]
-    pub fn new(raw: u64) -> Self {
-        Self(raw.to_le_bytes()[0])
+    pub fn exited(raw: u64) -> Self {
+        Self::Exited(raw.to_le_bytes()[0])
     }
 
     #[must_use]
-    pub const fn code(self) -> u8 {
-        self.0
+    pub const fn signaled(signal: Signal) -> Self {
+        Self::Signaled(signal)
     }
 }
 

@@ -29,6 +29,19 @@ The scheduler owns threads and saved contexts, but never owns a process address-
 ELF and VM crates provide construction primitives; process decides when a constructed image becomes
 published.
 
+## Signals
+
+Each running process owns a `Vec<Signal>` of pending process-directed signals. Sending a
+signal appends it while holding the process-table lock and wakes the target's main thread after the
+lock is released. The sender never tears down the target directly: that target may still execute
+on its own kernel stack.
+
+At a syscall return boundary, `process_latest_signal` removes the most recently queued signal of the current
+process and calls `process_signal`, which maps it through `Signal::default_action`. The
+initial terminating action exits the current thread with a signal-derived `ExitStatus`; normal
+`waitpid` reaping then observes the corresponding low-byte signal status. This applies at most one
+action because termination does not return.
+
 ## Initial descriptor injection
 
 Initialization registers one `InitialFdInjector` before any process is spawned. Every direct
@@ -94,7 +107,11 @@ at the syscall boundary; process reports whether a matching child is pending or 
 
 The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
 survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
-multi-threaded exec cleanup, credentials, signals, process groups, and PID 1 reparenting are not.
+multi-threaded exec cleanup, credentials, signal masks, handlers, asynchronous interrupt-return
+delivery, process groups, and PID 1 reparenting are not. Consequently, a process that never enters
+a syscall does not yet observe a pending terminating signal. Signal queues currently preserve
+duplicate deliveries; it delivers the most recently queued signal first. POSIX standard-signal
+coalescing is not implemented.
 Orphan zombies are retained because no init reaper adopts them. Process-identity callers encode an
 absent parent as PID 0. `chdir` can replace cwd after VFS validation; descriptor-based `fchdir`
 remains unsupported.

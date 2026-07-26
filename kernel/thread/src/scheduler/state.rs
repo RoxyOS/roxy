@@ -61,6 +61,11 @@ impl Scheduler {
         self.entry(current).thread.id()
     }
 
+    pub(super) fn try_current_thread_id(&self) -> Option<ThreadId> {
+        self.current
+            .map(|current| self.entries[current.0].thread.id())
+    }
+
     pub(super) fn entry(&mut self, index: ThreadIndex) -> &mut SchedulerEntry {
         &mut self.entries[index.0]
     }
