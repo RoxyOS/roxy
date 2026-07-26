@@ -85,13 +85,13 @@ userspace write.
 `poll` decodes the userspace `pollfd` array inside this subsystem and queries each descriptor's
 ABI-neutral readiness through `roxy-fd`. Descriptor polling remains non-blocking (`timeout == 0`):
 it reports TTY and regular-file readiness and returns `POLLNVAL` for invalid descriptors. A finite
-timeout with no descriptors uses the scheduler's deadline waiter as a pure sleep and returns zero
+timeout with no descriptors uses the timer-wait subsystem as a pure sleep and returns zero
 after the monotonic deadline. Descriptor readiness wait queues, infinite empty polls, and
 signal-mask replacement remain unsupported.
 
 `sleep` copies a Roxy x86_64 `timespec` request and validates nonnegative seconds with
 nanoseconds in the half-open range `[0, 1_000_000_000)`. It converts the relative duration into a
-monotonic deadline and delegates blocking to the scheduler. Signals are not implemented, so a
+monotonic deadline and delegates blocking to the timer-wait subsystem. Signals are not implemented, so a
 sleep cannot be interrupted and no remaining duration is reported.
 
 `ioctl` validates and resolves the descriptor before decoding the raw request number and any mode

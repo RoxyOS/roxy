@@ -360,6 +360,7 @@ dependencies = [
  "roxy-test",
  "roxy-thread",
  "roxy-time",
+ "roxy-timer-wait",
  "roxy-tty",
  "roxy-vfs",
  "roxy-vm",
@@ -709,6 +710,7 @@ dependencies = [
  "roxy-test",
  "roxy-thread",
  "roxy-time",
+ "roxy-timer-wait",
  "roxy-tty-types",
  "roxy-utils",
  "roxy-vfs",
@@ -742,7 +744,6 @@ dependencies = [
  "roxy-interrupt",
  "roxy-memory",
  "roxy-test",
- "roxy-time",
  "roxy-utils",
  "roxy-vm",
  "spin 0.12.2",
@@ -761,6 +762,19 @@ dependencies = [
  "spin 0.12.2",
  "x2apic",
  "x86_64",
+]
+
+[[package]]
+name = "roxy-timer-wait"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-arch",
+ "roxy-interrupt",
+ "roxy-test",
+ "roxy-thread",
+ "roxy-time",
+ "roxy-utils",
 ]
 
 [[package]]

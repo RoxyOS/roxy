@@ -75,7 +75,7 @@ pub fn wake(
             break;
         };
 
-        if scheduler::wake(thread_id) {
+        if scheduler::wake_unconditionally(thread_id) {
             woken += 1;
         }
     }

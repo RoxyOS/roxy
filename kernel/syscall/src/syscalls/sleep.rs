@@ -15,6 +15,7 @@ syscall!(SyscallNumber::Sleep, handle(request: SleepRequest => Fault));
 const NANOS_PER_SECOND: i64 = 1_000_000_000;
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 struct TimespecAbi {
     seconds: i64,
     nanoseconds: i64,
@@ -22,6 +23,7 @@ struct TimespecAbi {
 
 const _: () = assert!(mem::size_of::<TimespecAbi>() == 16);
 
+#[derive(Clone, Copy)]
 struct SleepRequest(Duration);
 
 impl SyscallArg for SleepRequest {
@@ -40,11 +42,12 @@ impl SyscallArg for SleepRequest {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn handle(request: SleepRequest) -> SyscallResult {
     let deadline = roxy_time::monotonic_time().saturating_add(request.0);
 
     if deadline > roxy_time::monotonic_time() {
-        roxy_thread::scheduler::prepare_block_current_until(deadline).perform();
+        roxy_timer_wait::block_current(deadline).perform();
     }
 
     Ok(0)

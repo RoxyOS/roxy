@@ -20,6 +20,7 @@ roxy-process.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-thread.workspace = true
 roxy-time.workspace = true
+roxy-timer-wait.workspace = true
 roxy-tty-types.workspace = true
 roxy-utils.workspace = true
 roxy-vfs.workspace = true

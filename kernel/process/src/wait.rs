@@ -103,7 +103,10 @@ impl ProcessTable {
             return;
         };
 
-        assert!(scheduler::wake(thread_id), "child waiter was not blocked");
+        assert!(
+            scheduler::wake_unconditionally(thread_id),
+            "child waiter was not blocked"
+        );
     }
 
     /// Returns the thread ID of the process waiting for `process_id` to exit and removes its

@@ -97,7 +97,7 @@ fn wait_without_descriptors(timeout: i64) -> SyscallResult {
     let deadline = roxy_time::monotonic_time().saturating_add(duration);
 
     while roxy_time::monotonic_time() < deadline {
-        roxy_thread::scheduler::prepare_block_current_until(deadline).perform();
+        roxy_timer_wait::block_current(deadline).perform();
     }
 
     Ok(0)

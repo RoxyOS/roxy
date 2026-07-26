@@ -44,6 +44,7 @@ pub extern "C" fn _start() -> ! {
     });
     roxy_cpu::current_cpu().initialize(interrupt_init_result.hardware_id());
     roxy_time::initialize_periodic_timer();
+    roxy_timer_wait::initialize();
     roxy_thread::initialize();
     roxy_ps2::initialize();
     roxy_tty::initialize(roxy_ps2::input_device(), roxy_terminal::kernel_terminal());

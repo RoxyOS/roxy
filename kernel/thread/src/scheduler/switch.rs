@@ -1,10 +1,11 @@
-use core::{ptr, time::Duration};
+use core::ptr;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_memory::activate_kernel_page_table;
 use spin::Once;
 
-use super::state::{Scheduler, ThreadIndex, ThreadKind, ThreadState};
+use super::WaitKey;
+use super::state::{BlockState, Scheduler, ThreadIndex, ThreadKind, ThreadState};
 use crate::{SavedContext, ThreadId};
 
 /// Activates the target user thread's address space immediately before switching to it.
@@ -119,18 +120,17 @@ impl Scheduler {
         }
     }
 
-    pub(super) fn prepare_block(&mut self, deadline: Option<Duration>) -> PendingContextSwitch {
+    pub(super) fn prepare_block(&mut self, wait_key: Option<WaitKey>) -> PendingContextSwitch {
         let current = self.current.expect("no current thread");
-        let thread_id = self.entry(current).thread.id();
 
-        if let Some(deadline) = deadline {
-            let token = self.register_timer_waiter(thread_id, deadline);
-            self.entry(current).current_timer_wait = Some(token);
-        }
+        self.entry(current).state = ThreadState::Blocked(match wait_key {
+            Some(wait_key) => BlockState::Keyed(wait_key),
+            None => BlockState::Unkeyed,
+        });
 
-        self.entry(current).state = ThreadState::Blocked;
         let previous = ptr::from_mut(self.entry(current).thread.context());
         let next = self.next_runnable(ThreadIndex((current.0 + 1) % self.entries.len()));
+
         self.current = next;
 
         match next {
@@ -144,17 +144,29 @@ impl Scheduler {
         }
     }
 
-    pub(super) fn wake(&mut self, thread_id: ThreadId) -> bool {
+    pub(super) fn wake_unconditionally(&mut self, thread_id: ThreadId) -> bool {
         let Some(index) = self.index_of(thread_id) else {
             return false;
         };
-        if self.entry(index).state != ThreadState::Blocked {
+
+        if !matches!(self.entry(index).state, ThreadState::Blocked(_)) {
             return false;
         }
 
-        if let Some(token) = self.entry(index).current_timer_wait.take() {
-            self.remove_timer_waiter(token);
+        self.entry(index).state = ThreadState::Runnable;
+
+        true
+    }
+
+    pub(super) fn wake_if_waiting(&mut self, thread_id: ThreadId, wait_key: WaitKey) -> bool {
+        let Some(index) = self.index_of(thread_id) else {
+            return false;
+        };
+
+        if self.entry(index).state != ThreadState::Blocked(BlockState::Keyed(wait_key)) {
+            return false;
         }
+
         self.entry(index).state = ThreadState::Runnable;
 
         true
@@ -249,7 +261,7 @@ mod tests {
     use roxy_test::kernel_test;
 
     use super::ThreadKind;
-    use super::{Scheduler, ThreadIndex, ThreadState};
+    use super::{BlockState, Scheduler, ThreadIndex, ThreadState};
     use crate::Thread;
 
     kernel_test!("roxy-thread::scheduler-block-wake", scheduler_block_wake, {
@@ -262,11 +274,14 @@ mod tests {
         scheduler.current = Some(ThreadIndex(0));
 
         let _pending = scheduler.prepare_block(None);
-        assert_eq!(scheduler.entries[0].state, ThreadState::Blocked);
+        assert_eq!(
+            scheduler.entries[0].state,
+            ThreadState::Blocked(BlockState::Unkeyed)
+        );
         assert_eq!(scheduler.current, Some(ThreadIndex(1)));
-        assert!(scheduler.wake(first_id));
+        assert!(scheduler.wake_unconditionally(first_id));
         assert_eq!(scheduler.entries[0].state, ThreadState::Runnable);
-        assert!(!scheduler.wake(first_id));
+        assert!(!scheduler.wake_unconditionally(first_id));
     });
 
     fn unused_thread() -> ! {

@@ -2,7 +2,8 @@ mod control;
 mod reap;
 mod state;
 mod switch;
-mod timer_wait;
+
+use core::num::NonZeroU64;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
 use roxy_utils::Lock;
@@ -65,6 +66,21 @@ pub fn register_user_dispatch_hook(hook: fn(ThreadId)) {
 #[must_use = "a prepared block must be performed"]
 pub struct PendingBlock(switch::PendingContextSwitch);
 
+/// Uniquely identifies one keyed block registration.
+///
+/// The key belongs to one block operation rather than one thread. An external wait source must
+/// present the same key to wake the thread, preventing a stale notification from an earlier block
+/// from waking a later block by that thread.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WaitKey(NonZeroU64);
+
+impl WaitKey {
+    #[must_use]
+    pub const fn new(value: NonZeroU64) -> Self {
+        Self(value)
+    }
+}
+
 /// Marks the current thread blocked and prepares its context switch.
 ///
 /// # Panics
@@ -76,20 +92,15 @@ pub fn prepare_block_current() -> PendingBlock {
     PendingBlock(SCHEDULER.lock().prepare_block(None))
 }
 
-/// Marks the current thread blocked until explicitly woken or the deadline is reached.
+/// Marks the current thread blocked with a caller-owned wait key.
 ///
 /// # Panics
 ///
-/// Panics when called outside a scheduled thread, with interrupts enabled, or with an elapsed
-/// deadline.
-pub fn prepare_block_current_until(deadline: core::time::Duration) -> PendingBlock {
+/// Panics when called outside a scheduled thread or with interrupts enabled.
+pub fn prepare_block_current_with_key(wait_key: WaitKey) -> PendingBlock {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
-    assert!(
-        deadline > roxy_time::monotonic_time(),
-        "deadline already elapsed"
-    );
 
-    PendingBlock(SCHEDULER.lock().prepare_block(Some(deadline)))
+    PendingBlock(SCHEDULER.lock().prepare_block(Some(wait_key)))
 }
 
 impl PendingBlock {
@@ -99,12 +110,22 @@ impl PendingBlock {
     }
 }
 
-/// Makes a blocked thread runnable.
+/// Makes a blocked thread runnable regardless of its block state.
 ///
 /// Returns `false` when the thread does not exist or is not blocked.
 #[must_use]
-pub fn wake(thread_id: ThreadId) -> bool {
-    CurrentArchitectureBackend::without_interrupts(|| SCHEDULER.lock().wake(thread_id))
+pub fn wake_unconditionally(thread_id: ThreadId) -> bool {
+    CurrentArchitectureBackend::without_interrupts(|| {
+        SCHEDULER.lock().wake_unconditionally(thread_id)
+    })
+}
+
+/// Makes a thread runnable only if it is blocked with the supplied wait key.
+#[must_use]
+pub fn wake_if_waiting(thread_id: ThreadId, wait_key: WaitKey) -> bool {
+    CurrentArchitectureBackend::without_interrupts(|| {
+        SCHEDULER.lock().wake_if_waiting(thread_id, wait_key)
+    })
 }
 
 fn enqueue(thread: Thread, kind: ThreadKind) {

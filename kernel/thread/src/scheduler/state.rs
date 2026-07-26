@@ -1,22 +1,19 @@
 use alloc::vec::Vec;
 
-use super::timer_wait::TimerWaiter;
-use crate::{SavedContext, Thread, ThreadId, scheduler::timer_wait};
+use super::WaitKey;
+use crate::{SavedContext, Thread, ThreadId};
 
 pub(super) struct Scheduler {
     pub(super) entries: Vec<SchedulerEntry>,
     pub(super) current: Option<ThreadIndex>,
     pub(super) control_context: Option<SavedContext>,
     pub(super) pending_reap: Option<ThreadIndex>,
-    pub(super) timer_waiters: Vec<TimerWaiter>,
-    pub(super) next_wait_token: u64,
 }
 
 pub(super) struct SchedulerEntry {
     pub(super) thread: Thread,
     pub(super) kind: ThreadKind,
     pub(super) state: ThreadState,
-    pub(super) current_timer_wait: Option<timer_wait::WaitToken>,
 }
 
 #[derive(Clone, Copy)]
@@ -28,8 +25,14 @@ pub(super) enum ThreadKind {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ThreadState {
     Runnable,
-    Blocked,
+    Blocked(BlockState),
     Exiting,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum BlockState {
+    Unkeyed,
+    Keyed(WaitKey),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -42,8 +45,6 @@ impl Scheduler {
             current: None,
             control_context: None,
             pending_reap: None,
-            timer_waiters: Vec::new(),
-            next_wait_token: 1,
         }
     }
 
@@ -52,7 +53,6 @@ impl Scheduler {
             thread,
             kind,
             state: ThreadState::Runnable,
-            current_timer_wait: None,
         });
     }
 
