@@ -8,16 +8,53 @@ pub use action::SignalAction;
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Signal {
+    Hangup = 1,
     Interrupt = 2,
+    Quit = 3,
+    IllegalInstruction = 4,
+    BusError = 7,
+    Abort = 6,
+    FloatingPointException = 8,
     Kill = 9,
+    User1 = 10,
+    SegmentationFault = 11,
+    User2 = 12,
+    BrokenPipe = 13,
+    Alarm = 14,
     Terminate = 15,
+    Child = 17,
+    Continue = 18,
+    Stop = 19,
+    TerminalStop = 20,
+    TerminalInput = 21,
+    TerminalOutput = 22,
+    WindowChanged = 28,
 }
 
 impl Signal {
     #[must_use]
     pub const fn default_action(self) -> SignalAction {
         match self {
-            Self::Interrupt | Self::Kill | Self::Terminate => SignalAction::Terminate,
+            Self::Hangup
+            | Self::Interrupt
+            | Self::Kill
+            | Self::User1
+            | Self::User2
+            | Self::BrokenPipe
+            | Self::Alarm
+            | Self::Terminate => SignalAction::Terminate,
+            Self::Child | Self::WindowChanged => SignalAction::Ignore,
+            Self::Quit
+            | Self::IllegalInstruction
+            | Self::BusError
+            | Self::Abort
+            | Self::FloatingPointException
+            | Self::SegmentationFault
+            | Self::Continue
+            | Self::Stop
+            | Self::TerminalStop
+            | Self::TerminalInput
+            | Self::TerminalOutput => SignalAction::Unsupported,
         }
     }
 
@@ -34,8 +71,44 @@ mod tests {
     use super::{Signal, SignalAction};
 
     kernel_test!("roxy-signal::default-actions", default_actions, {
-        assert_eq!(Signal::Interrupt.default_action(), SignalAction::Terminate);
-        assert_eq!(Signal::Kill.default_action(), SignalAction::Terminate);
-        assert_eq!(Signal::Terminate.default_action(), SignalAction::Terminate);
+        assert_actions(
+            &[
+                Signal::Hangup,
+                Signal::Interrupt,
+                Signal::Kill,
+                Signal::User1,
+                Signal::User2,
+                Signal::BrokenPipe,
+                Signal::Alarm,
+                Signal::Terminate,
+            ],
+            SignalAction::Terminate,
+        );
+        assert_actions(
+            &[Signal::Child, Signal::WindowChanged],
+            SignalAction::Ignore,
+        );
+        assert_actions(
+            &[
+                Signal::Quit,
+                Signal::IllegalInstruction,
+                Signal::BusError,
+                Signal::Abort,
+                Signal::FloatingPointException,
+                Signal::SegmentationFault,
+                Signal::Continue,
+                Signal::Stop,
+                Signal::TerminalStop,
+                Signal::TerminalInput,
+                Signal::TerminalOutput,
+            ],
+            SignalAction::Unsupported,
+        );
     });
+
+    fn assert_actions(signals: &[Signal], action: SignalAction) {
+        for signal in signals {
+            assert_eq!(signal.default_action(), action);
+        }
+    }
 }

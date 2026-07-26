@@ -2,4 +2,6 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SignalAction {
     Terminate,
+    Ignore,
+    Unsupported,
 }

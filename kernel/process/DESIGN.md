@@ -34,7 +34,8 @@ published.
 Each running process owns a `Vec<Signal>` of pending process-directed signals. Sending a
 signal appends it while holding the process-table lock and wakes the target's main thread after the
 lock is released. The sender never tears down the target directly: that target may still execute
-on its own kernel stack.
+on its own kernel stack. Signals whose default action is currently unsupported are rejected before
+they enter this queue.
 
 At a syscall return boundary, `process_latest_signal` removes the most recently queued signal of the current
 process and calls `process_signal`, which maps it through `Signal::default_action`. The

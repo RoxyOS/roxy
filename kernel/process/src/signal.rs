@@ -6,6 +6,7 @@ use crate::{ExitStatus, Process, ProcessId, ProcessState, table::PROCESS_TABLE};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SignalError {
     NoSuchProcess,
+    UnsupportedAction,
 }
 
 /// Queues a signal for a running process and wakes it if it is blocked.
@@ -13,6 +14,10 @@ pub enum SignalError {
 /// The target consumes the queued signal at a userspace return boundary. Sending never exits the
 /// target directly because its thread may still be executing on its own kernel stack.
 pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalError> {
+    if matches!(signal.default_action(), SignalAction::Unsupported) {
+        return Err(SignalError::UnsupportedAction);
+    }
+
     let thread_id = {
         let mut table = PROCESS_TABLE.lock();
         let Some(process) = table.processes.get_mut(&process_id) else {
@@ -51,9 +56,11 @@ fn take_latest_signal() -> Option<Signal> {
     process.take_latest_signal()
 }
 
-fn process_signal(signal: Signal) -> ! {
+fn process_signal(signal: Signal) {
     match signal.default_action() {
         SignalAction::Terminate => crate::exit_current(ExitStatus::signaled(signal)),
+        SignalAction::Ignore => {}
+        SignalAction::Unsupported => unreachable!("unsupported signal actions cannot be queued"),
     }
 }
 

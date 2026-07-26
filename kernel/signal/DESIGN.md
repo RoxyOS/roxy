@@ -19,6 +19,9 @@ when a userspace sending interface is added.
 
 ## Limits
 
-The initial signal set contains only `SIGINT`, `SIGKILL`, and `SIGTERM`; every one terminates the
-target. Signal masks, user handlers, stop and continue actions, realtime queues, process groups,
-and userspace signal ABI records are not implemented.
+The initial signal set includes the conventional process, fault, timer, child, and terminal signal
+identities. `SIGHUP`, `SIGINT`, `SIGKILL`, `SIGPIPE`, `SIGALRM`, `SIGTERM`, `SIGUSR1`, and
+`SIGUSR2` terminate; `SIGCHLD` and `SIGWINCH` are ignored. Core-dump, stop, continue, and terminal
+job-control actions map to `Unsupported` and must be rejected before they enter a process queue.
+Signal masks, user handlers, realtime queues, process groups, and userspace signal ABI records are
+not implemented.
