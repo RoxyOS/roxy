@@ -105,6 +105,12 @@ indefinitely. A non-null signal mask temporarily replaces the current process ma
 duration of the wait, then restores the old mask before returning to userspace. An unmasked pending
 signal wakes the waiting thread, returns `EINTR`, and is processed before that restoration.
 
+`pselect` adapts the Roxy mlibc 1024-bit `fd_set` ABI to the same poll readiness and timer-wait
+path. It combines requested read, write, and exceptional events for each descriptor, then replaces
+each non-null input set with its ready descriptors. A non-null signal mask has the same temporary
+replacement and `EINTR` behavior as `ppoll`. Roxy mlibc's standard `select` wrapper uses this
+`pselect` sysdep after translating its timeout to `timespec`.
+
 `sleep` copies a Roxy x86_64 `timespec` request and validates nonnegative seconds with
 nanoseconds in the half-open range `[0, 1_000_000_000)`. It converts the relative duration into a
 monotonic deadline and delegates blocking to the timer-wait subsystem. Signals are not implemented, so a

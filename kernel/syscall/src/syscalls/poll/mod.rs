@@ -1,5 +1,6 @@
 mod poll;
 mod ppoll;
+mod pselect;
 
 use alloc::vec::Vec;
 use core::{mem, time::Duration};
@@ -18,6 +19,7 @@ use crate::{
 
 pub(super) const POLL_SYSCALL: Syscall = poll::SYSCALL;
 pub(super) const PPOLL_SYSCALL: Syscall = ppoll::SYSCALL;
+pub(super) const PSELECT_SYSCALL: Syscall = pselect::SYSCALL;
 
 /// Defers `pollfd` pointer validation until `count` is known.
 ///
