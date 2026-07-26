@@ -66,7 +66,7 @@ const _: () = assert!(mem::size_of::<PollFdAbi>() == 8);
 
 fn poll(entries: PollEntriesAddress, count: usize, timeout: Option<Duration>) -> SyscallResult {
     if count == 0 {
-        return Ok(wait_without_descriptors(timeout));
+        return wait_without_descriptors(timeout);
     }
 
     let address = entries.for_count(count)?;
@@ -76,7 +76,7 @@ fn poll(entries: PollEntriesAddress, count: usize, timeout: Option<Duration>) ->
     // integers, and every bit pattern is valid.
     let mut values = unsafe { entries.read() }?;
 
-    let ready = poll_until_ready(&mut values, timeout);
+    let ready = poll_until_ready(&mut values, timeout)?;
 
     // SAFETY: PollFdAbi has no padding and every field in entries is initialized.
     unsafe { entries.write(&values) }?;
@@ -84,19 +84,23 @@ fn poll(entries: PollEntriesAddress, count: usize, timeout: Option<Duration>) ->
     Ok(ready as u64)
 }
 
-fn poll_until_ready(values: &mut [PollFdAbi], timeout: Option<Duration>) -> usize {
+fn poll_until_ready(values: &mut [PollFdAbi], timeout: Option<Duration>) -> Result<usize, Errno> {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
     let deadline = timeout.map(|duration| roxy_time::monotonic_time().saturating_add(duration));
 
     loop {
+        if roxy_process::has_pending_signal() {
+            return Err(Errno::Interrupted);
+        }
+
         let ready = poll_values(values);
 
         if ready > 0
             || timeout.is_some_and(|duration| duration.is_zero())
             || deadline.is_some_and(deadline_elapsed)
         {
-            return ready;
+            return Ok(ready);
         }
 
         block_until_poll_change(values, deadline);
@@ -159,24 +163,27 @@ fn register_poll_listeners(
     registrations
 }
 
-fn wait_without_descriptors(timeout: Option<Duration>) -> u64 {
-    let Some(timeout) = timeout else {
-        loop {
-            roxy_thread::scheduler::prepare_block_current().perform();
+fn wait_without_descriptors(timeout: Option<Duration>) -> SyscallResult {
+    if timeout.is_some_and(|duration| duration.is_zero()) {
+        return Ok(0);
+    }
+
+    let deadline = timeout.map(|duration| roxy_time::monotonic_time().saturating_add(duration));
+
+    loop {
+        if roxy_process::has_pending_signal() {
+            return Err(Errno::Interrupted);
         }
-    };
 
-    if timeout.is_zero() {
-        return 0;
+        if deadline.is_some_and(deadline_elapsed) {
+            return Ok(0);
+        }
+
+        match deadline {
+            Some(deadline) => roxy_timer_wait::block_current(deadline).perform(),
+            None => roxy_thread::scheduler::prepare_block_current().perform(),
+        }
     }
-
-    let deadline = roxy_time::monotonic_time().saturating_add(timeout);
-
-    while roxy_time::monotonic_time() < deadline {
-        roxy_timer_wait::block_current(deadline).perform();
-    }
-
-    0
 }
 
 fn poll_entry(entry: PollFdAbi) -> i16 {

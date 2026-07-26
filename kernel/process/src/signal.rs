@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use roxy_signal::{Signal, SignalAction};
 use roxy_thread::scheduler;
 
@@ -49,6 +51,37 @@ pub fn process_latest_signal() {
     process_signal(signal);
 }
 
+/// Replaces the current process's signal mask.
+///
+/// `SIGKILL` and `SIGSTOP` are always removed because Unix does not permit masking them.
+/// Returns the mask that was active before replacement.
+pub fn replace_masked_signals(signals: Vec<Signal>) -> Vec<Signal> {
+    let mut table = PROCESS_TABLE.lock();
+    let process = table
+        .current_process()
+        .expect("current thread has no process");
+
+    process.replace_masked_signals(signals)
+}
+
+#[must_use]
+fn filter_unmaskable_signals(mut signals: Vec<Signal>) -> Vec<Signal> {
+    signals.retain(|signal| !matches!(signal, Signal::Kill | Signal::Stop));
+
+    signals
+}
+
+/// Reports whether the current process has a pending signal that its mask permits.
+#[must_use]
+pub fn has_pending_signal() -> bool {
+    let mut table = PROCESS_TABLE.lock();
+    let Some(process) = table.current_process() else {
+        return false;
+    };
+
+    process.has_pending_signal()
+}
+
 fn take_latest_signal() -> Option<Signal> {
     let mut table = PROCESS_TABLE.lock();
     let process = table.current_process()?;
@@ -70,19 +103,38 @@ impl Process {
     }
 
     fn take_latest_signal(&mut self) -> Option<Signal> {
-        self.pending_signals.pop()
+        let index = self
+            .pending_signals
+            .iter()
+            .rposition(|signal| !self.masked_signals.contains(signal))?;
+
+        Some(self.pending_signals.remove(index))
+    }
+
+    fn has_pending_signal(&self) -> bool {
+        self.pending_signals
+            .iter()
+            .any(|signal| !self.masked_signals.contains(signal))
+    }
+
+    fn replace_masked_signals(&mut self, signals: Vec<Signal>) -> Vec<Signal> {
+        let signals = filter_unmaskable_signals(signals);
+
+        core::mem::replace(&mut self.masked_signals, signals)
     }
 }
 
 #[cfg(feature = "kernel-test")]
 mod tests {
+    use alloc::{vec, vec::Vec};
+
     use roxy_memory::statistics;
     use roxy_signal::Signal;
     use roxy_test::kernel_test;
     use roxy_thread::Thread;
     use roxy_vm::AddrSpace;
 
-    use super::Process;
+    use super::{Process, filter_unmaskable_signals};
 
     kernel_test!(
         "roxy-process::pending-signals-keep-order",
@@ -94,6 +146,7 @@ mod tests {
             let mut process =
                 Process::new(thread.id(), address_space.clone(), roxy_fd::FdTable::new());
 
+            assert!(process.masked_signals.is_empty());
             process.queue_signal(Signal::Terminate);
             process.queue_signal(Signal::Interrupt);
 
@@ -104,6 +157,68 @@ mod tests {
             drop(thread);
             drop(address_space);
             assert_eq!(statistics().allocated_frames, baseline);
+        }
+    );
+
+    kernel_test!(
+        "roxy-process::masked-signals-stay-pending",
+        masked_signals_stay_pending,
+        {
+            let baseline = statistics().allocated_frames;
+            let address_space = AddrSpace::new().unwrap().into_handle();
+            let thread = Thread::new(unused_thread).unwrap();
+            let mut process =
+                Process::new(thread.id(), address_space.clone(), roxy_fd::FdTable::new());
+
+            process.queue_signal(Signal::Terminate);
+            process.queue_signal(Signal::Interrupt);
+            assert_eq!(
+                process.replace_masked_signals(vec![Signal::Interrupt]),
+                Vec::new()
+            );
+
+            assert_eq!(process.take_latest_signal(), Some(Signal::Terminate));
+            assert_eq!(process.take_latest_signal(), None);
+            assert_eq!(
+                process.replace_masked_signals(Vec::new()),
+                vec![Signal::Interrupt]
+            );
+            assert_eq!(process.take_latest_signal(), Some(Signal::Interrupt));
+            drop(process);
+            drop(thread);
+            drop(address_space);
+            assert_eq!(statistics().allocated_frames, baseline);
+        }
+    );
+
+    kernel_test!(
+        "roxy-process::kill-and-stop-cannot-be-masked",
+        kill_and_stop_cannot_be_masked,
+        {
+            let baseline = statistics().allocated_frames;
+            let address_space = AddrSpace::new().unwrap().into_handle();
+            let thread = Thread::new(unused_thread).unwrap();
+            let mut process =
+                Process::new(thread.id(), address_space.clone(), roxy_fd::FdTable::new());
+
+            process.replace_masked_signals(vec![Signal::Kill, Signal::Stop, Signal::Terminate]);
+
+            assert_eq!(process.masked_signals, vec![Signal::Terminate]);
+            drop(process);
+            drop(thread);
+            drop(address_space);
+            assert_eq!(statistics().allocated_frames, baseline);
+        }
+    );
+
+    kernel_test!(
+        "roxy-process::filter-unmaskable-signals",
+        filter_unmaskable,
+        {
+            assert_eq!(
+                filter_unmaskable_signals(vec![Signal::Kill, Signal::Interrupt, Signal::Stop]),
+                vec![Signal::Interrupt]
+            );
         }
     );
 

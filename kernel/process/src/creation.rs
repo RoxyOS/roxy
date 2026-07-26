@@ -50,6 +50,7 @@ impl Process {
             working_directory: ResolvedPath::root(),
             fds,
             pending_signals: Vec::new(),
+            masked_signals: Vec::new(),
             state: ProcessState::Running,
         }
     }
@@ -69,6 +70,7 @@ impl Process {
             working_directory,
             fds,
             pending_signals: Vec::new(),
+            masked_signals: Vec::new(),
             state: ProcessState::Running,
         }
     }

@@ -25,7 +25,10 @@ pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, protect_memory,
     unmap_anonymous,
 };
-pub use signal::{SignalError, process_latest_signal, send_signal};
+pub use signal::{
+    SignalError, filter_unmaskable_signals, has_pending_signal, process_latest_signal,
+    replace_masked_signals, send_signal,
+};
 pub use table::{current_parent_process_id, current_process_id};
 pub use wait::{WaitError, WaitResult, WaitTarget, wait_current};
 
@@ -49,6 +52,7 @@ struct Process {
     working_directory: ResolvedPath,
     fds: FdTable,
     pending_signals: Vec<Signal>,
+    masked_signals: Vec<Signal>,
     state: ProcessState,
 }
 

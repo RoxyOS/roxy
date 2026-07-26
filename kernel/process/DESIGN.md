@@ -31,11 +31,13 @@ published.
 
 ## Signals
 
-Each running process owns a `Vec<Signal>` of pending process-directed signals. Sending a
-signal appends it while holding the process-table lock and wakes the target's main thread after the
-lock is released. The sender never tears down the target directly: that target may still execute
-on its own kernel stack. Signals whose default action is currently unsupported are rejected before
-they enter this queue.
+Each running process owns `Vec<Signal>` collections for pending process-directed signals and its
+signal mask. Both are empty when a process is constructed. Sending a signal appends it while
+holding the process-table lock and wakes the target's main thread after the lock is released. The
+sender never tears down the target directly: that target may still execute on its own kernel
+stack. Signals whose default action is currently unsupported are rejected before they enter this
+queue. A masked signal remains pending until the mask is replaced; `SIGKILL` and `SIGSTOP` cannot
+be masked.
 
 At a syscall return boundary, `process_latest_signal` removes the most recently queued signal of the current
 process and calls `process_signal`, which maps it through `Signal::default_action`. The
@@ -108,9 +110,10 @@ at the syscall boundary; process reports whether a matching child is pending or 
 
 The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
 survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
-multi-threaded exec cleanup, credentials, signal masks, handlers, asynchronous interrupt-return
-delivery, process groups, and PID 1 reparenting are not. Consequently, a process that never enters
-a syscall does not yet observe a pending terminating signal. Signal queues currently preserve
+multi-threaded exec cleanup, credentials, signal handlers, asynchronous interrupt-return delivery,
+process groups, and PID 1 reparenting are not. Process-owned signal-mask storage and pending
+delivery filtering are implemented, but the userspace `sigprocmask` ABI is not. Consequently, a
+process that never enters a syscall does not yet observe a pending terminating signal. Signal queues currently preserve
 duplicate deliveries; it delivers the most recently queued signal first. POSIX standard-signal
 coalescing is not implemented.
 Orphan zombies are retained because no init reaper adopts them. Process-identity callers encode an

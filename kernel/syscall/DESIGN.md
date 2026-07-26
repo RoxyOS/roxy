@@ -101,9 +101,9 @@ temporary signal-mask replacement remain unsupported.
 
 `ppoll` shares `poll`'s descriptor readiness and timer-wait implementation, but decodes its
 relative timeout from the Roxy mlibc `timespec` ABI at nanosecond precision. A null timeout waits
-indefinitely. Its non-null signal mask is copied through the shared signal-mask argument parser
-before it is rejected through the centralized `UNSUPPORTED` diagnostic path with `ENOTSUP`; Roxy
-does not yet provide atomic temporary mask replacement.
+indefinitely. A non-null signal mask temporarily replaces the current process mask for the
+duration of the wait, then restores the old mask before returning to userspace. An unmasked pending
+signal wakes the waiting thread, returns `EINTR`, and is processed before that restoration.
 
 `sleep` copies a Roxy x86_64 `timespec` request and validates nonnegative seconds with
 nanoseconds in the half-open range `[0, 1_000_000_000)`. It converts the relative duration into a

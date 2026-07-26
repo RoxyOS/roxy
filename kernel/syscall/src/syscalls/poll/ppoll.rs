@@ -4,7 +4,6 @@ use crate::{
     errno::Errno,
     numbers::SyscallNumber,
     syscall,
-    unsupported::unsupported_argument,
 };
 
 use super::{PollEntriesAddress, poll};
@@ -17,22 +16,27 @@ fn handle(
     timeout: Nullable<Timespec>,
     signal_mask: Nullable<SignalMask>,
 ) -> SyscallResult {
-    let timeout = timeout.into_option();
-    let signal_mask = signal_mask.into_option();
+    let timeout = match timeout {
+        Nullable::Null => None,
+        Nullable::Value(timeout) => Some(timeout.duration()),
+    };
 
-    if let Some(signal_mask) = signal_mask {
-        let argument = if signal_mask.is_empty() {
-            "empty"
-        } else {
-            "non-empty"
-        };
+    let old_mask = match signal_mask {
+        Nullable::Null => None,
+        Nullable::Value(signal_mask) => {
+            Some(roxy_process::replace_masked_signals(signal_mask.to_vec()))
+        }
+    };
 
-        return Err(unsupported_argument(
-            "ppoll.signal_mask",
-            argument,
-            Errno::NotSupported,
-        ));
+    let result = poll(entries, count, timeout);
+
+    if matches!(result, Err(Errno::Interrupted)) {
+        roxy_process::process_latest_signal();
     }
 
-    poll(entries, count, timeout.map(Timespec::duration))
+    if let Some(old_mask) = old_mask {
+        roxy_process::replace_masked_signals(old_mask);
+    }
+
+    result
 }
