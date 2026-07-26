@@ -4,6 +4,8 @@ mod c_string_array;
 mod fd;
 mod integer;
 mod out;
+mod process_id;
+mod signal;
 mod slice;
 pub(crate) mod user_memory;
 

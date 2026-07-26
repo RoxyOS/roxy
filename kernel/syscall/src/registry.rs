@@ -223,6 +223,12 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::Getcwd)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::SendSignal)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {

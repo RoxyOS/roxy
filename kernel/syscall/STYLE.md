@@ -24,3 +24,11 @@ the actual implementation starts only after those checks have completed.
 Keep argument parsing and checking in the syscall handler, but keep the actual implementation to
 10 lines or fewer. If the implementation exceeds 10 lines, move it to the owning subsystem and
 call it from the handler after validation succeeds.
+
+## Argument Parsers
+
+- Put a `SyscallArg` implementation for any argument type that can be shared by multiple syscalls
+  in `src/args/`. Syscall-local argument parsers are reserved for layouts or semantics unique to
+  that syscall.
+- Syscall handlers receive parsed domain values only. Do not use `raw_*` parameters or decode raw
+  ABI words in handler bodies.

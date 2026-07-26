@@ -67,6 +67,14 @@ delivery are not implemented. Their handlers do not dereference signal-structure
 emits the centralized `UNSUPPORTED` diagnostic with the requested mask operation or signal number
 and returns `ENOSYS`.
 
+`send_signal` is the Roxy ABI operation backing mlibc's `kill`. It accepts a positive process ID
+and a Linux-compatible signal number, translates both into ABI-neutral process and signal types,
+and delegates queuing to `roxy-process`. It supports only direct-process targets: zero, negative,
+and signal-zero selectors are rejected with an `UNSUPPORTED` diagnostic. A missing process returns
+`ESRCH`; a signal whose default action is not yet implemented returns the diagnostic `ENOTSUP`
+path. The syscall layer alone translates signal numbers; `roxy-process` never depends on a
+personality's numeric signal ABI.
+
 `open_dir` creates a descriptor backed by an opening-time VFS directory snapshot. `read_entries`
 serializes that descriptor into fixed-size Roxy x86_64 `dirent` records and advances the shared
 open-file position by entry count. A writable userspace range is validated before the position is

@@ -2,6 +2,7 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Errno {
     NotFound = 2,
+    NoSuchProcess = 3,
     TooBig = 7,
     ExecFormat = 8,
     Io = 5,

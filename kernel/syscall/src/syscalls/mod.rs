@@ -23,6 +23,7 @@ mod poll;
 mod read;
 mod read_entries;
 mod seek;
+mod send_signal;
 mod sigaction;
 mod sigprocmask;
 mod sleep;
@@ -34,7 +35,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 35] = [
+pub(super) const SYSCALLS: [Syscall; 36] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -70,4 +71,5 @@ pub(super) const SYSCALLS: [Syscall; 35] = [
     getcwd::SYSCALL,
     poll::SYSCALL,
     sleep::SYSCALL,
+    send_signal::SYSCALL,
 ];
