@@ -1,21 +1,20 @@
+use vte::Parser;
+
 use roxy_tty_types::WindowSize;
 
-use crate::renderer::TextRenderer;
+use crate::{renderer::TextRenderer, screen::Screen};
 
 pub(crate) struct Console {
-    renderer: TextRenderer,
-    column: usize,
-    row: usize,
+    // OSC is unsupported, so its raw payload does not need parser storage.
+    parser: Parser<0>,
+    screen: Screen,
 }
 
 impl Console {
-    pub(crate) fn new(mut renderer: TextRenderer) -> Self {
-        renderer.toggle_cursor(0, 0);
-
+    pub(crate) fn new(renderer: TextRenderer) -> Self {
         Self {
-            renderer,
-            column: 0,
-            row: 0,
+            parser: Parser::new_with_size(),
+            screen: Screen::new(renderer),
         }
     }
 
@@ -24,72 +23,14 @@ impl Console {
             return;
         }
 
-        self.toggle_cursor();
-
-        for byte in input {
-            match byte {
-                b'\n' => self.newline(),
-                b'\r' => self.column = 0,
-                8 => self.backspace(),
-                b'\t' => self.tab(),
-                0x20..=0x7e => self.put(*byte),
-                _ => {}
-            }
-        }
-
-        self.toggle_cursor();
+        self.screen.begin_update();
+        self.parser.advance(&mut self.screen, input);
+        self.screen.finish_update();
     }
 
     pub(crate) fn window_size(&self) -> WindowSize {
-        WindowSize {
-            rows: saturating_u16(self.renderer.rows()),
-            columns: saturating_u16(self.renderer.columns()),
-            pixel_width: saturating_u16(self.renderer.pixel_width()),
-            pixel_height: saturating_u16(self.renderer.pixel_height()),
-        }
+        self.screen.window_size()
     }
-
-    fn toggle_cursor(&mut self) {
-        self.renderer.toggle_cursor(self.column, self.row);
-    }
-
-    fn put(&mut self, byte: u8) {
-        self.renderer.draw_ascii(self.column, self.row, byte);
-        self.column += 1;
-
-        if self.column == self.renderer.columns() {
-            self.newline();
-        }
-    }
-
-    fn newline(&mut self) {
-        self.column = 0;
-        self.row += 1;
-
-        if self.row == self.renderer.rows() {
-            self.renderer.scroll_line();
-            self.row -= 1;
-        }
-    }
-
-    fn backspace(&mut self) {
-        if self.column > 0 {
-            self.column -= 1;
-            self.renderer.clear_cell(self.column, self.row);
-        }
-    }
-
-    fn tab(&mut self) {
-        let spaces = 8 - self.column % 8;
-
-        for _ in 0..spaces {
-            self.put(b' ');
-        }
-    }
-}
-
-fn saturating_u16(value: usize) -> u16 {
-    u16::try_from(value).unwrap_or(u16::MAX)
 }
 
 #[cfg(feature = "kernel-test")]
@@ -147,59 +88,129 @@ mod tests {
             .all(|pixel| *pixel == [0xff, 0xff, 0xff, 0])
     }
 
-    kernel_test!("roxy-fbterm::cursor-initial", shows_current_cell, {
+    kernel_test!("roxy-fbterm::cursor", maintains_cursor, {
         let mut storage = vec![0u8; 32 * 64];
         let mut console = console(&mut storage, 16, 32);
 
         assert!(is_solid_foreground(&storage, 64, 0, 0));
         console.write(b"A");
-        assert!(!is_solid_foreground(&storage, 64, 0, 0));
-        assert!(is_solid_foreground(&storage, 64, 1, 0));
-    });
-
-    kernel_test!("roxy-fbterm::cursor-restore", restores_cell_after_move, {
-        let mut storage = vec![0u8; 32 * 64];
-        let mut console = console(&mut storage, 16, 32);
-
-        console.write(b"A");
         let glyph = cell_bytes(&storage, 64, 0, 0);
+        assert!(is_solid_foreground(&storage, 64, 1, 0));
         console.write(b"\r\n");
 
         assert_eq!(cell_bytes(&storage, 64, 0, 0), glyph);
     });
 
-    kernel_test!("roxy-fbterm::controls", updates_cursor, {
+    kernel_test!("roxy-fbterm::controls", handles_basic_controls, {
         let mut storage = vec![0u8; 32 * 64];
         let mut console = console(&mut storage, 16, 32);
 
-        console.write(b"A\rB\x08\n");
+        console.write(b"AB\x08\t\n");
 
-        assert_eq!(console.column, 0);
-        assert_eq!(console.row, 1);
+        assert_eq!(console.screen.column(), 0);
+        assert_eq!(console.screen.row(), 1);
     });
 
-    kernel_test!("roxy-fbterm::wrap", wraps_at_last_column, {
+    kernel_test!("roxy-fbterm::wrap-scroll", wraps_and_scrolls, {
         let mut storage = vec![0u8; 32 * 64];
         let mut console = console(&mut storage, 16, 32);
 
         console.write(b"AB");
+        assert_eq!((console.screen.column(), console.screen.row()), (0, 1));
+        console.write(b"C\n");
 
-        assert_eq!(console.column, 0);
-        assert_eq!(console.row, 1);
+        assert_eq!(console.screen.row(), 1);
+        assert!(cell_bytes(&storage, 64, 0, 0).iter().any(|byte| *byte != 0));
     });
 
-    kernel_test!("roxy-fbterm::scroll-overflow", scrolls_after_last_row, {
+    kernel_test!("roxy-fbterm::split-csi", retains_parser_state, {
         let mut storage = vec![0u8; 32 * 64];
         let mut console = console(&mut storage, 16, 32);
 
-        console.write(b"A\nB");
-        let bottom_cell = cell_bytes(&storage, 64, 0, 1);
-        console.write(b"\n");
+        console.write(b"\x1b[");
+        console.write(b"2;2H");
 
-        assert_eq!(cell_bytes(&storage, 64, 0, 0), bottom_cell);
-        assert_eq!(console.column, 0);
-        assert_eq!(console.row, 1);
+        assert_eq!((console.screen.column(), console.screen.row()), (1, 1));
     });
+
+    kernel_test!("roxy-fbterm::ansi-cursor", moves_and_restores_cursor, {
+        let mut storage = vec![0u8; 32 * 64];
+        let mut console = console(&mut storage, 16, 32);
+
+        console.write(b"\x1b[?25l\x1b[2;2H\x1b7\x1b[99A\x1b8");
+        assert_eq!((console.screen.column(), console.screen.row()), (1, 1));
+        assert!(!is_solid_foreground(&storage, 64, 1, 1));
+        console.write(b"\x1b[?25h");
+
+        assert!(is_solid_foreground(&storage, 64, 1, 1));
+    });
+
+    kernel_test!("roxy-fbterm::ansi-color", applies_and_resets_colors, {
+        let mut storage = vec![0u8; 32 * 64];
+        let mut console = console(&mut storage, 16, 32);
+
+        console.write(b"\x1b[?25l\x1b[31;44mA\x1b[K");
+        let first = cell_bytes(&storage, 64, 0, 0);
+        let second = cell_bytes(&storage, 64, 1, 0);
+
+        assert!(first.as_chunks::<4>().0.contains(&[0, 0, 0xaa, 0]));
+        assert!(first.as_chunks::<4>().0.contains(&[0xaa, 0, 0, 0]));
+        assert!(
+            second
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|pixel| *pixel == [0xaa, 0, 0, 0])
+        );
+
+        console.write(b"\x1b[0mB");
+        let second = cell_bytes(&storage, 64, 1, 0);
+        assert!(second.as_chunks::<4>().0.contains(&[0xff, 0xff, 0xff, 0]));
+
+        console.write(b"\x1b[91;104mC");
+        let bright = cell_bytes(&storage, 64, 0, 1);
+        assert!(bright.as_chunks::<4>().0.contains(&[0x55, 0x55, 0xff, 0]));
+        assert!(bright.as_chunks::<4>().0.contains(&[0xff, 0x55, 0x55, 0]));
+    });
+
+    kernel_test!("roxy-fbterm::ansi-colored-cursor", restores_colored_cell, {
+        let mut storage = vec![0u8; 32 * 64];
+        let mut console = console(&mut storage, 16, 32);
+
+        console.write(b"\x1b[?25l\x1b[31mA");
+        let glyph = cell_bytes(&storage, 64, 0, 0);
+        console.write(b"\x1b[H\x1b[?25h");
+        console.write(b"\x1b[?25l");
+
+        assert_eq!(cell_bytes(&storage, 64, 0, 0), glyph);
+    });
+
+    kernel_test!("roxy-fbterm::ansi-erase", erases_selected_display, {
+        let mut storage = vec![0u8; 64 * 64];
+        let mut console = console(&mut storage, 32, 32);
+
+        console.write(b"\x1b[?25lAB\nCD\x1b[1J");
+
+        assert!(storage.iter().all(|byte| *byte == 0));
+    });
+
+    kernel_test!(
+        "roxy-fbterm::ansi-erase-modes",
+        handles_remaining_erase_modes,
+        {
+            let mut storage = vec![0u8; 32 * 64];
+            let mut console = console(&mut storage, 16, 32);
+
+            console.write(b"\x1b[?25lAB\x1b[H\x1b[J");
+            assert!(storage.iter().all(|byte| *byte == 0));
+            console.write(b"AB\x1b[1;2H\x1b[1K");
+            assert!(storage.iter().all(|byte| *byte == 0));
+            console.write(b"AB\x1b[H\x1b[2K");
+            assert!(storage.iter().all(|byte| *byte == 0));
+            console.write(b"AB\x1b[2J");
+            assert!(storage.iter().all(|byte| *byte == 0));
+        }
+    );
 
     kernel_test!("roxy-fbterm::ignored-byte", ignores_non_ascii, {
         let mut storage = vec![0u8; 32 * 64];
@@ -207,18 +218,7 @@ mod tests {
 
         console.write(&[0xff]);
 
-        assert_eq!(console.column, 0);
-        assert_eq!(console.row, 0);
-    });
-
-    kernel_test!("roxy-fbterm::tab", advances_to_next_tab_stop, {
-        let mut storage = vec![0u8; 128 * 16 * 4];
-        let mut console = console(&mut storage, 128, 16);
-
-        console.write(b"A\t");
-
-        assert_eq!(console.column, 8);
-        assert_eq!(console.row, 0);
+        assert_eq!((console.screen.column(), console.screen.row()), (0, 0));
     });
 
     kernel_test!("roxy-fbterm::window-size", reports_text_grid, {

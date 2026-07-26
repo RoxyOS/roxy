@@ -13,6 +13,7 @@ embedded-bitmap-fonts.workspace = true
 embedded-graphics.workspace = true
 linkme = { workspace = true, optional = true }
 spin.workspace = true
+vte.workspace = true
 
 roxy-boot.workspace = true
 roxy-terminal.workspace = true

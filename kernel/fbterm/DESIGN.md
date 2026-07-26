@@ -28,15 +28,26 @@ scrolls the framebuffer by one glyph row. Input is supplied by `roxy-input` impl
 `roxy-tty`; the framebuffer console itself only owns output rendering.
 
 Only Limine RGB 32-bit modes are accepted. Color masks determine packed foreground/background
-pixels. Full ANSI parsing, Unicode, input devices, PTYs, and diagnostic mirroring are outside the
-current contract.
+pixels. The console uses `vte` without its standard-library or ANSI semantic features to parse the
+output stream. Parser state persists across writes, while `fbterm` owns the meaning of supported
+events. Printable ASCII and C0 LF, CR, backspace, and tab retain their direct terminal behavior.
+CSI supports relative and absolute cursor movement, display and line erasure, cursor save and
+restore, cursor visibility, and SGR default plus standard and bright 16-color foreground and
+background selection. ESC `7` and `8` also save and restore the cursor. Coordinates are clamped to
+the text grid, and malformed, unknown, OSC, and DCS sequences are ignored without rendering their
+control bytes.
+
+Unicode glyphs, text attributes, indexed and true color, insertion and deletion, scroll regions,
+alternate screens, terminal replies, input devices, PTYs, and diagnostic mirroring are outside the
+current contract. Consequently this subset targets ordinary shell output rather than full-screen
+ncurses application compatibility.
 
 ## Rendering model
 
 Rendering is split into three ownership layers:
 
 ```text
-Console → TextRenderer → Framebuffer → framebuffer mapping
+vte Parser → Screen → TextRenderer → Framebuffer → framebuffer mapping
 ```
 
 `Framebuffer` is the pixel-addressed hardware boundary. It validates and owns the boot-provided
@@ -54,30 +65,34 @@ depends on third-party graphics types. The renderer can draw or clear a cell, re
 selected cell for cursor display, and scroll the complete text region upward by one cell row. It
 does not own a current cell, advance a cursor, or interpret control bytes.
 
-`Console` is the byte-level terminal state machine. It owns only the current cursor `column` and
-`row`, while querying `TextRenderer` for the grid bounds. Printable ASCII draws into the current
-cell and advances the cursor. The current cell is shown as a reversible full-cell inverse cursor
-while the console is idle; batched writes hide it before processing and restore it at the final
-position. Reaching the final column wraps to the next row. LF selects column zero of the next row,
-CR selects column zero without changing rows, backspace moves left and clears that cell when
-possible, and tab emits spaces until the next eight-column stop. Moving beyond the last row asks
-`TextRenderer` to scroll one cell row and leaves the cursor on the new final row. Cursor inversion
-uses the renderer's foreground/background XOR mask, so moving away from a cell restores its glyph
-instead of clearing it. Ignored bytes neither draw nor move the cursor.
+`Console` owns the persistent `vte` parser and one `Screen`. `Screen` implements `vte::Perform`,
+owns current and saved cursor positions plus cursor visibility, and translates supported parser
+events into renderer operations. Printable ASCII draws into the current cell and advances the
+cursor. Reaching the final column wraps to the next row. LF selects column zero of the next row, CR
+selects column zero without changing rows, backspace moves left and clears that cell when possible,
+and tab emits spaces until the next eight-column stop. Moving beyond the last row asks
+`TextRenderer` to scroll one cell row and leaves the cursor on the new final row.
+
+The current cell is shown with a reversible full-cell XOR cursor while the console is idle;
+batched writes hide it before parsing and restore it at the final position unless ANSI mode state
+hides it. The XOR mask is the framebuffer-native packed white value rather than a function of the
+current SGR colors. This makes cursor removal restore any previously rendered cell exactly even
+after the active foreground or background changes.
 
 The output path is therefore:
 
 ```text
-input byte
-  → Console interprets terminal semantics and selects a cell
+input bytes
+  → vte preserves parsing state and emits terminal events
+  → Screen applies the supported semantics and selects cells or regions
   → TextRenderer maps the cell and glyph to pixels
   → Framebuffer performs bounded writes to the mapping
 ```
 
 Construction follows the reverse ownership order: a validated `Framebuffer` is moved into a
-`TextRenderer`, which is moved into a `Console`. Consequently no renderer can exist without a
-validated mapping, no console can bypass the cell abstraction, and higher layers cannot access the
-raw pointer, pitch, or pixel format.
+`TextRenderer`, which is moved into a `Screen` owned alongside the parser by `Console`.
+Consequently no renderer can exist without a validated mapping, parsed events cannot bypass the
+cell abstraction, and higher layers cannot access the raw pointer, pitch, or pixel format.
 
 ## Concurrency and safety
 

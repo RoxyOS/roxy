@@ -3,9 +3,12 @@
 extern crate alloc;
 
 mod adapter;
+mod ansi;
+mod color;
 mod console;
 mod framebuffer;
 mod renderer;
+mod screen;
 
 use alloc::sync::Arc;
 use roxy_boot::BootInfo;

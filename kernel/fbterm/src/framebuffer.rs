@@ -2,7 +2,7 @@ use core::ptr;
 
 use roxy_boot::FramebufferInfo;
 
-use crate::InitError;
+use crate::{InitError, color::RgbColor};
 
 const RGB_MEMORY_MODEL: u8 = 1;
 const BYTES_PER_PIXEL: usize = 4;
@@ -60,8 +60,8 @@ impl Framebuffer {
         self.height
     }
 
-    pub(crate) fn pack_rgb(&self, components: [u8; 3]) -> u32 {
-        self.format.pack(components)
+    pub(crate) fn pack_rgb(&self, color: RgbColor) -> u32 {
+        self.format.pack(color)
     }
 
     pub(crate) fn clear(&mut self, color: u32) {
@@ -185,10 +185,10 @@ impl PixelFormat {
         }
     }
 
-    fn pack(&self, components: [u8; 3]) -> u32 {
-        let red = scale(components[0], self.red_size) << self.red_shift;
-        let green = scale(components[1], self.green_size) << self.green_shift;
-        let blue = scale(components[2], self.blue_size) << self.blue_shift;
+    fn pack(&self, color: RgbColor) -> u32 {
+        let red = scale(color.red, self.red_size) << self.red_shift;
+        let green = scale(color.green, self.green_size) << self.green_shift;
+        let blue = scale(color.blue, self.blue_size) << self.blue_shift;
 
         red | green | blue
     }
@@ -230,7 +230,7 @@ mod tests {
     use roxy_test::kernel_test;
 
     use super::Framebuffer;
-    use crate::InitError;
+    use crate::{InitError, color::RgbColor};
 
     fn info(address: u64) -> FramebufferInfo {
         FramebufferInfo {
@@ -292,6 +292,9 @@ mod tests {
         let mut storage = vec![0u8; 16 * 64];
         let framebuffer = Framebuffer::from_info(&info(storage.as_mut_ptr() as u64)).unwrap();
 
-        assert_eq!(framebuffer.pack_rgb([0x12, 0x34, 0x56]), 0x0012_3456);
+        assert_eq!(
+            framebuffer.pack_rgb(RgbColor::new(0x12, 0x34, 0x56)),
+            0x0012_3456
+        );
     });
 }

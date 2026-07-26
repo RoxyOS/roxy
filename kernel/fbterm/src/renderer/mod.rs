@@ -1,18 +1,13 @@
-use core::convert::Infallible;
+use crate::{InitError, color::RgbColor, framebuffer::Framebuffer};
 
-use embedded_bitmap_fonts::terminus::FONT_8x16;
-use embedded_graphics::{
-    Pixel,
-    draw_target::DrawTarget,
-    geometry::{Dimensions, Point, Size},
-    pixelcolor::BinaryColor,
-    primitives::Rectangle,
-};
-
-use crate::{InitError, framebuffer::Framebuffer};
+mod draw;
+mod glyph;
+mod style;
 
 pub(crate) const GLYPH_WIDTH: usize = 8;
 pub(crate) const GLYPH_HEIGHT: usize = 16;
+const DEFAULT_FOREGROUND: RgbColor = RgbColor::WHITE;
+const DEFAULT_BACKGROUND: RgbColor = RgbColor::BLACK;
 
 pub(crate) struct TextRenderer {
     framebuffer: Framebuffer,
@@ -20,6 +15,7 @@ pub(crate) struct TextRenderer {
     rows: usize,
     foreground: u32,
     background: u32,
+    cursor_mask: u32,
 }
 
 impl TextRenderer {
@@ -31,8 +27,9 @@ impl TextRenderer {
             return Err(InitError::UnsupportedMode);
         }
 
-        let foreground = framebuffer.pack_rgb([0xff, 0xff, 0xff]);
-        let background = framebuffer.pack_rgb([0, 0, 0]);
+        let foreground = framebuffer.pack_rgb(DEFAULT_FOREGROUND);
+        let background = framebuffer.pack_rgb(DEFAULT_BACKGROUND);
+        let cursor_mask = foreground;
 
         framebuffer.clear(background);
 
@@ -42,6 +39,7 @@ impl TextRenderer {
             rows,
             foreground,
             background,
+            cursor_mask,
         })
     }
 
@@ -59,102 +57,6 @@ impl TextRenderer {
 
     pub(crate) fn pixel_height(&self) -> usize {
         self.framebuffer.height()
-    }
-
-    pub(crate) fn draw_ascii(&mut self, column: usize, row: usize, byte: u8) {
-        assert!((0x20..=0x7e).contains(&byte));
-        self.clear_cell(column, row);
-
-        let glyph_index = FONT_8x16
-            .glyph_mapping
-            .index(char::from(byte))
-            .try_into()
-            .expect("Terminus glyph index exceeds u32");
-        let mut target = GlyphTarget {
-            framebuffer: &mut self.framebuffer,
-            left: column * GLYPH_WIDTH,
-            top: row * GLYPH_HEIGHT,
-            foreground: self.foreground,
-        };
-
-        if let Err(infallible) =
-            FONT_8x16.draw_glyph(glyph_index, &mut target, BinaryColor::On, Point::zero())
-        {
-            match infallible {}
-        }
-    }
-
-    pub(crate) fn clear_cell(&mut self, column: usize, row: usize) {
-        assert!(column < self.columns && row < self.rows);
-
-        self.framebuffer.fill_rect(
-            column * GLYPH_WIDTH,
-            row * GLYPH_HEIGHT,
-            GLYPH_WIDTH,
-            GLYPH_HEIGHT,
-            self.background,
-        );
-    }
-
-    /// Removes the cursor when this cell has one, or draws it when it is absent.
-    pub(crate) fn toggle_cursor(&mut self, column: usize, row: usize) {
-        assert!(column < self.columns && row < self.rows);
-        self.framebuffer.xor_rect(
-            column * GLYPH_WIDTH,
-            row * GLYPH_HEIGHT,
-            GLYPH_WIDTH,
-            GLYPH_HEIGHT,
-            self.foreground ^ self.background,
-        );
-    }
-
-    pub(crate) fn scroll_line(&mut self) {
-        let text_height = self.rows * GLYPH_HEIGHT;
-
-        self.framebuffer
-            .scroll_rows_up(GLYPH_HEIGHT, text_height, self.background);
-    }
-}
-
-struct GlyphTarget<'a> {
-    framebuffer: &'a mut Framebuffer,
-    left: usize,
-    top: usize,
-    foreground: u32,
-}
-
-impl Dimensions for GlyphTarget<'_> {
-    fn bounding_box(&self) -> Rectangle {
-        Rectangle::new(Point::zero(), Size::new(8, 16))
-    }
-}
-
-impl DrawTarget for GlyphTarget<'_> {
-    type Color = BinaryColor;
-    type Error = Infallible;
-
-    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
-    where
-        I: IntoIterator<Item = Pixel<Self::Color>>,
-    {
-        for Pixel(point, color) in pixels {
-            let Ok(glyph_x) = usize::try_from(point.x) else {
-                continue;
-            };
-            let Ok(glyph_y) = usize::try_from(point.y) else {
-                continue;
-            };
-
-            if color == BinaryColor::On && glyph_x < GLYPH_WIDTH && glyph_y < GLYPH_HEIGHT {
-                self.framebuffer.write_pixel(
-                    self.left + glyph_x,
-                    self.top + glyph_y,
-                    self.foreground,
-                );
-            }
-        }
-
-        Ok(())
     }
 }
 
