@@ -25,6 +25,7 @@ mod read_entries;
 mod seek;
 mod sigaction;
 mod sigprocmask;
+mod sleep;
 mod stat;
 mod tcb_set;
 mod vm;
@@ -33,7 +34,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 34] = [
+pub(super) const SYSCALLS: [Syscall; 35] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -68,4 +69,5 @@ pub(super) const SYSCALLS: [Syscall; 34] = [
     ioctl::SYSCALL,
     getcwd::SYSCALL,
     poll::SYSCALL,
+    sleep::SYSCALL,
 ];

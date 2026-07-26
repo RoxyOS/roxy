@@ -89,6 +89,11 @@ timeout with no descriptors uses the scheduler's deadline waiter as a pure sleep
 after the monotonic deadline. Descriptor readiness wait queues, infinite empty polls, and
 signal-mask replacement remain unsupported.
 
+`sleep` copies a Roxy x86_64 `timespec` request and validates nonnegative seconds with
+nanoseconds in the half-open range `[0, 1_000_000_000)`. It converts the relative duration into a
+monotonic deadline and delegates blocking to the scheduler. Signals are not implemented, so a
+sleep cannot be interrupted and no remaining duration is reported.
+
 `ioctl` validates and resolves the descriptor before decoding the raw request number and any mode
 encoded in it. For terminal requests, the syscall layer copies the Roxy mlibc
 `termios` or `winsize` record between userspace and an initialized typed kernel value. Setters own
