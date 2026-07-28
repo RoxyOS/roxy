@@ -123,7 +123,7 @@ Jinx applies ordinary patch files with `patch -p1` in lexical filename order.
 1. Review the generated diff for unrelated changes, build artifacts, absolute paths, and accidental
    edits to the clean tree. Keep the patch in unified-diff form with paths compatible with `-p1`.
 2. Rename the working file to an ordered, descriptive name such as
-   `0001-roxy-disable-unsupported-feature.patch`. Delete the old
+   `0001-disable-unsupported-feature.patch`. Delete the old
    `jinx-working-patch.patch`; do not leave both copies in the recipe.
 3. Bump the recipe `revision` when the package input changes without changing its upstream
    version. Keep the patch focused on the package's Roxy compatibility requirement; put dependency,
