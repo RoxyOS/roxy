@@ -1,6 +1,7 @@
 use roxy_fd::{
     File as FdFile, FileError as FdFileError, FileMetadata as FdFileMetadata,
     FileType as FdFileType, PollEvents, SeekError as FdSeekError, SeekFrom as FdSeekFrom,
+    TruncateError as FdTruncateError,
 };
 
 use crate::{SeekFrom as VfsSeekFrom, VfsError, VfsFile};
@@ -58,6 +59,10 @@ impl FdFile for VfsFile {
         self.sync().map_err(map_file_error)
     }
 
+    fn truncate(&mut self, size: u64) -> Result<(), FdTruncateError> {
+        self.truncate(size).map_err(map_truncate_error)
+    }
+
     fn seek(&mut self, current: u64, position: FdSeekFrom) -> Result<u64, FdSeekError> {
         self.seek(VfsSeekFrom::Start(current))
             .map_err(map_seek_error)?;
@@ -89,6 +94,19 @@ fn map_seek_error(error: VfsError) -> FdSeekError {
             FdSeekError::NotSeekable
         }
         _ => FdSeekError::Io,
+    }
+}
+
+fn map_truncate_error(error: VfsError) -> FdTruncateError {
+    match error {
+        VfsError::PermissionDenied => FdTruncateError::PermissionDenied,
+        VfsError::ReadOnly => FdTruncateError::ReadOnly,
+        VfsError::InvalidInput => FdTruncateError::InvalidSize,
+        VfsError::NoSpace => FdTruncateError::NoSpace,
+        VfsError::Unsupported | VfsError::IsDirectory | VfsError::NotDirectory => {
+            FdTruncateError::BadOperation
+        }
+        _ => FdTruncateError::Io,
     }
 }
 
@@ -237,7 +255,10 @@ mod tests {
         }
 
         fn metadata(&self) -> Result<Metadata, VfsError> {
-            Ok(metadata())
+            Ok(Metadata {
+                size: u64::try_from(self.data.len()).map_err(|_| VfsError::InvalidInput)?,
+                ..metadata()
+            })
         }
 
         fn sync(&mut self) -> Result<(), VfsError> {
@@ -288,5 +309,12 @@ mod tests {
         assert_eq!(&output, b"helXo");
         assert_eq!(file.metadata().unwrap().size, 5);
         assert_eq!(file.metadata().unwrap().permissions, 0o644);
+        assert_eq!(file.truncate(2), Ok(()));
+        assert_eq!(file.metadata().unwrap().size, 2);
+        assert_eq!(file.seek(FdSeekFrom::Current(0)), Ok(5));
+        assert_eq!(file.truncate(7), Ok(()));
+        assert_eq!(file.seek(FdSeekFrom::Start(2)), Ok(2));
+        assert_eq!(file.read(&mut output), Ok(5));
+        assert_eq!(&output, &[0; 5]);
     });
 }

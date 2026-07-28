@@ -67,6 +67,15 @@ pub trait File: Send {
         Err(FileError::BadOperation)
     }
 
+    /// Changes this object's length.
+    ///
+    /// # Errors
+    ///
+    /// Returns an operation-specific truncate error.
+    fn truncate(&mut self, _size: u64) -> Result<(), TruncateError> {
+        Err(TruncateError::BadOperation)
+    }
+
     /// Returns the absolute byte offset to seek to.
     ///
     /// # Errors
@@ -135,6 +144,16 @@ pub enum FileType {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileError {
     BadOperation,
+    Io,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TruncateError {
+    BadOperation,
+    PermissionDenied,
+    ReadOnly,
+    InvalidSize,
+    NoSpace,
     Io,
 }
 

@@ -7,11 +7,12 @@ mod file;
 mod ioctl;
 mod open;
 mod table;
+mod truncate;
 
 pub use fd::Fd;
 pub use file::{
     Directory, DirectoryEntry, File, FileError, FileMetadata, FileType, PollEvents, SeekError,
-    SeekFrom,
+    SeekFrom, TruncateError,
 };
 pub use ioctl::{ApplyWhen, IoctlError, IoctlRequest, LocalFlags, Termios, WindowSize};
 pub use open::OpenFile;

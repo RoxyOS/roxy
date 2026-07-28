@@ -24,7 +24,8 @@ The syscall boundary decodes personality-specific request numbers and layouts, c
 ABI payloads, and constructs an `IoctlRequest` containing only layout-neutral kernel values or a
 borrowed typed output. A getter fills that output directly during object dispatch, so the interface
 cannot produce a response type that mismatches its request. `OpenFile::ioctl` holds the open-file
-lock across this dispatch. The `File` trait's default implementation returns
+lock across this dispatch. `OpenFile::truncate` uses the same lock to serialize a length change
+without changing the shared open-file offset. The `File` trait's default implementation returns
 `IoctlError::NotTty`; file kinds override it only for supported requests.
 
 Terminal-specific ioctl payload types belong to `roxy-tty-types`, which both this crate and
@@ -36,7 +37,8 @@ to `roxy-syscall`.
 ## Invariants
 
 - Descriptor numbers are valid only in the table that returned them.
-- Reads, writes, directory iteration, and seeks serialize access to one open file's offset.
+- Reads, writes, directory iteration, seeks, and truncation serialize through one open file.
+- Truncation changes the underlying object length without changing the shared open-file offset.
 - Ioctl operations serialize against other operations on the same open file.
 - A `File` receives only ioctl requests whose request-specific argument has already been decoded
   and copied out of userspace.

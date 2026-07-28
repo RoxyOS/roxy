@@ -55,7 +55,8 @@ string and rejects an empty path during argument parsing. The `mkdirat`, `unlink
 `linkat`, `symlinkat`, and `renameat` handlers currently accept only `AT_FDCWD`; descriptor-relative
 resolution remains unsupported and is reported through the centralized diagnostic path. `sync`
 delegates to the global VFS, while `fsync` resolves an open file and dispatches synchronization
-through the FD object boundary.
+through the FD object boundary. `ftruncate` accepts a descriptor and a nonnegative Roxy `off_t`
+length, dispatches the length change through that boundary, and leaves the shared offset unchanged.
 
 Process-identity queries delegate to the process subsystem. `getpid` returns the stable process ID
 owned by the current thread's process and does not expose scheduler thread IDs through the ABI.

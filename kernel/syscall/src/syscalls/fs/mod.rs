@@ -1,6 +1,7 @@
 mod dir;
 mod link;
 mod misc;
+mod truncate;
 
 use roxy_fd::FileError;
 use roxy_vfs::VfsError;
@@ -15,6 +16,7 @@ pub(super) const SYMLINKAT_SYSCALL: Syscall = link::SYMLINKAT_SYSCALL;
 pub(super) const RENAMEAT_SYSCALL: Syscall = link::RENAMEAT_SYSCALL;
 pub(super) const SYNC_SYSCALL: Syscall = misc::SYNC_SYSCALL;
 pub(super) const FSYNC_SYSCALL: Syscall = misc::FSYNC_SYSCALL;
+pub(super) const FTRUNCATE_SYSCALL: Syscall = truncate::SYSCALL;
 
 const AT_FDCWD: i64 = -100;
 

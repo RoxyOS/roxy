@@ -37,7 +37,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 47] = [
+pub(super) const SYSCALLS: [Syscall; 48] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -85,4 +85,5 @@ pub(super) const SYSCALLS: [Syscall; 47] = [
     fs::RENAMEAT_SYSCALL,
     fs::SYNC_SYSCALL,
     fs::FSYNC_SYSCALL,
+    fs::FTRUNCATE_SYSCALL,
 ];
