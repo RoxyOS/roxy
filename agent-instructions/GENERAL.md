@@ -28,6 +28,9 @@
   worktree state, ask the user for explicit confirmation. This includes `add`, `commit`, `switch`,
   `checkout`, `restore`, `rebase`, `reset`, `stash`, `merge`, `pull`, `push`, `clean`, and commands
   that invoke equivalent mutation through options or subcommands.
+- The mlibc publication and recipe-integration workflow in `agent-instructions/WORKFLOW.md` is an
+  explicit exception. When a task changes Roxy's mlibc sysdeps, follow that workflow through its
+  ordinary commits, pushes, and recipe update without requesting additional confirmation.
 
 ## Architecture and Dependencies
 

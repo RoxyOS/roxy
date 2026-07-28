@@ -11,9 +11,12 @@ sets `clean_workdirs=no`, so this worktree is intentionally retained between bui
 
 Roxy maintains mlibc as a thin fork. Keep Roxy-specific work as a reviewable commit stack on top of
 the selected upstream base, and upstream generally useful changes when practical. Local iteration,
-publication to the canonical RoxyOS fork, and recipe integration are separate phases. Every Git
-mutation in these phases still requires the explicit user confirmation mandated by
-`agent-instructions/GENERAL.md`.
+publication to the canonical RoxyOS fork, and recipe integration are separate phases. A task that
+changes Roxy's mlibc sysdeps authorizes the ordinary Git mutations required by this workflow: after
+validation, commit and push the mlibc change, verify the published commit, update the recipe pin,
+and continue integration without requesting additional user confirmation. This exception does not
+authorize history rewriting, force-pushes, unrelated repository changes, or recovery from a moved
+remote branch.
 
 ### Iterate locally
 
@@ -53,15 +56,15 @@ mutation in these phases still requires the explicit user confirmation mandated 
 3. Confirm that the intended mlibc diff builds from `mlibc-workdir`, that relevant tests pass, and
    that `git diff --check` passes. `git status --short` may contain only the intended files and the
    active collaboration lock, which must remain untracked and excluded from the commit. Record any
-   unavailable or unrelated failing validation before requesting commit approval.
+   unavailable or unrelated failing validation in the final handoff.
    Every new sysdep implementation must register its tag in the Roxy `SysdepTags` definition in
    the same commit; a compiled but undiscoverable sysdep is incomplete.
-4. After explicit user approval, commit in `distro/sources/mlibc-workdir`. Do not amend, squash,
-   rebase, merge, or otherwise rewrite unrelated fork history as part of a feature commit.
-5. After separate explicit user approval, push the commit to the canonical RoxyOS mlibc fork. If a
-   change is suitable for the mlibc project, also prepare or submit it upstream, but never make the
-   Roxy recipe depend on an unmerged pull-request ref. Verify that the exact commit SHA is reachable
-   from the canonical fork before changing the recipe.
+4. Commit in `distro/sources/mlibc-workdir` immediately after validation succeeds. Do not amend,
+   squash, rebase, merge, or otherwise rewrite unrelated fork history as part of a feature commit.
+5. Push the commit to the canonical RoxyOS mlibc fork immediately after committing. If a change is
+   suitable for the mlibc project, also prepare or submit it upstream, but never make the Roxy
+   recipe depend on an unmerged pull-request ref. Verify that the exact commit SHA is reachable from
+   the canonical fork before changing the recipe.
 6. Never force-push the canonical fork as part of this workflow. If the push is rejected or the
    remote branch moved, stop and request approval for a separate fetch and synchronization step.
 
@@ -78,11 +81,12 @@ mutation in these phases still requires the explicit user confirmation mandated 
    graph and rebuild affected userspace packages. Refresh the rootfs and run Roxy when installed
    userspace behavior or the kernel ABI changed. Treat the recipe update as reproducible only after
    the clean build fetches the published commit and all required integration validation succeeds.
-4. Commit the recipe update in the main Roxy OS repository only after the clean build succeeds and
-   after obtaining the explicit Git confirmation required by `agent-instructions/GENERAL.md`.
-   Keep the compatible kernel ABI change and recipe pin in the same integration series. If
-   integration exposes a defect, publish a follow-up mlibc commit instead of rewriting a commit
-   already referenced by a recipe.
+4. After the clean build succeeds, leave the recipe update ready for the main Roxy OS repository's
+   normal integration boundary. If the user's task also explicitly requests committing the main
+   repository, commit and push it without another confirmation; otherwise do not infer permission
+   to commit unrelated or accompanying kernel changes. Keep the compatible kernel ABI change and
+   recipe pin in the same integration series. If integration exposes a defect, publish a follow-up
+   mlibc commit instead of rewriting a commit already referenced by a recipe.
 
 ## Patching a distro package
 
