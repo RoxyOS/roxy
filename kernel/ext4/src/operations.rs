@@ -2,7 +2,8 @@ use alloc::{boxed::Box, vec::Vec};
 
 use ext4plus::file::File;
 use roxy_vfs::{
-    CreationMode, DirEntry, FileHandle, FileSystem, Metadata, OpenOptions, ResolvedPath, VfsError,
+    CreationMode, DirEntry, FileHandle, FilePermissions, FileSystem, Metadata, OpenOptions,
+    ResolvedPath, VfsError,
 };
 
 use crate::{Ext4FileSystem, error::map_ext4, file::Ext4File, metadata};
@@ -68,10 +69,10 @@ impl FileSystem for Ext4FileSystem {
             .collect()
     }
 
-    fn mkdir(&self, path: &ResolvedPath) -> Result<(), VfsError> {
+    fn mkdir(&self, path: &ResolvedPath, permissions: FilePermissions) -> Result<(), VfsError> {
         let _mutation = self.mutation.lock();
 
-        self.mkdir_inner(path)
+        self.mkdir_inner(path, permissions)
     }
 
     fn rmdir(&self, path: &ResolvedPath) -> Result<(), VfsError> {

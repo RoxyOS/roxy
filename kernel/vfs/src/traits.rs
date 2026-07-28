@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use crate::{DirEntry, Metadata, OpenOptions, ResolvedPath, SeekFrom, VfsError};
+use crate::{DirEntry, FilePermissions, Metadata, OpenOptions, ResolvedPath, SeekFrom, VfsError};
 
 pub trait FileHandle: Send {
     fn read(&mut self, destination: &mut [u8]) -> Result<usize, VfsError>;
@@ -19,7 +19,7 @@ pub trait FileSystem: Send + Sync {
     ) -> Result<Box<dyn FileHandle>, VfsError>;
     fn metadata(&self, path: &ResolvedPath, follow_symlink: bool) -> Result<Metadata, VfsError>;
     fn read_dir(&self, path: &ResolvedPath) -> Result<Vec<DirEntry>, VfsError>;
-    fn mkdir(&self, path: &ResolvedPath) -> Result<(), VfsError>;
+    fn mkdir(&self, path: &ResolvedPath, permissions: FilePermissions) -> Result<(), VfsError>;
     fn rmdir(&self, path: &ResolvedPath) -> Result<(), VfsError>;
     fn unlink(&self, path: &ResolvedPath) -> Result<(), VfsError>;
     fn hard_link(&self, source: &ResolvedPath, destination: &ResolvedPath) -> Result<(), VfsError>;

@@ -4,8 +4,8 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use roxy_utils::Lock;
 
 use crate::{
-    DirEntry, FileHandle, FileSystem, FileType, Metadata, OpenOptions, ResolvedPath, SeekFrom,
-    VfsError,
+    DirEntry, FileHandle, FilePermissions, FileSystem, FileType, Metadata, OpenOptions,
+    ResolvedPath, SeekFrom, VfsError,
 };
 
 pub(crate) struct MockFileSystem {
@@ -72,7 +72,7 @@ impl FileSystem for MockFileSystem {
         Ok(Vec::new())
     }
 
-    fn mkdir(&self, _path: &ResolvedPath) -> Result<(), VfsError> {
+    fn mkdir(&self, _path: &ResolvedPath, _permissions: FilePermissions) -> Result<(), VfsError> {
         Ok(())
     }
 

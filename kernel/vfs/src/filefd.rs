@@ -110,8 +110,8 @@ mod tests {
     use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
     use crate::{
-        DirEntry, FileHandle, FileSystem, FileType, Metadata, OpenAccess, OpenOptions,
-        ResolvedPath, SeekFrom as VfsSeekFrom, Vfs, VfsError,
+        DirEntry, FileHandle, FilePermissions, FileSystem, FileType, Metadata, OpenAccess,
+        OpenOptions, ResolvedPath, SeekFrom as VfsSeekFrom, Vfs, VfsError,
     };
 
     use roxy_fd::{OpenFile as FdOpenFile, SeekFrom as FdSeekFrom};
@@ -143,7 +143,11 @@ mod tests {
             Err(VfsError::Unsupported)
         }
 
-        fn mkdir(&self, _path: &ResolvedPath) -> Result<(), VfsError> {
+        fn mkdir(
+            &self,
+            _path: &ResolvedPath,
+            _permissions: FilePermissions,
+        ) -> Result<(), VfsError> {
             Err(VfsError::Unsupported)
         }
 

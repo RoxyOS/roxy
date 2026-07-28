@@ -4,7 +4,11 @@ use roxy_vfs::{FilePermissions, FileType, ResolvedPath, VfsError};
 use crate::{Ext4FileSystem, error::map_ext4, metadata};
 
 impl Ext4FileSystem {
-    pub(crate) fn mkdir_inner(&self, path: &ResolvedPath) -> Result<(), VfsError> {
+    pub(crate) fn mkdir_inner(
+        &self,
+        path: &ResolvedPath,
+        permissions: FilePermissions,
+    ) -> Result<(), VfsError> {
         match self.resolve_inode(path, false) {
             Ok(_) => return Err(VfsError::AlreadyExists),
             Err(VfsError::NotFound) => {}
@@ -12,7 +16,7 @@ impl Ext4FileSystem {
         }
 
         let (mut parent, name) = self.parent(path)?;
-        let inode = self.new_inode(FileType::Directory, FilePermissions::DEFAULT_DIRECTORY)?;
+        let inode = self.new_inode(FileType::Directory, permissions)?;
         let mut directory =
             Dir::init(self.filesystem.clone(), inode, parent.inode().index).map_err(map_ext4)?;
 

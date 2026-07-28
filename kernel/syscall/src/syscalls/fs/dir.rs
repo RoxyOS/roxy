@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use roxy_vfs::FilePermissions;
 
 use super::{DirectoryFd, map_vfs_error};
 use crate::{
@@ -36,12 +37,12 @@ impl SyscallArg for UnlinkFlags {
 mod mkdirat {
     use super::*;
 
-    syscall!(SyscallNumber::Mkdirat, handle(dirfd: DirectoryFd => Invalid, path: Path => Fault, mode: u64));
+    syscall!(SyscallNumber::Mkdirat, handle(dirfd: DirectoryFd => Invalid, path: Path => Fault, permissions: FilePermissions => Invalid));
 
-    fn handle(dirfd: DirectoryFd, path: Path, _mode: u64) -> SyscallResult {
+    fn handle(dirfd: DirectoryFd, path: Path, permissions: FilePermissions) -> SyscallResult {
         dirfd.require_cwd("mkdirat.dirfd")?;
 
-        roxy_vfs::mkdir(path.into_inner()).map_err(map_vfs_error)?;
+        roxy_vfs::mkdir(path.into_inner(), permissions).map_err(map_vfs_error)?;
 
         Ok(0)
     }

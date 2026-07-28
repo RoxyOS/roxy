@@ -1,6 +1,9 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use crate::{FileSystem, FileType, Metadata, ResolvedPath, Vfs, VfsError, file::ActiveHandles};
+use crate::{
+    FilePermissions, FileSystem, FileType, Metadata, ResolvedPath, Vfs, VfsError,
+    file::ActiveHandles,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DirEntry {
@@ -52,8 +55,10 @@ impl Vfs {
         resolved.filesystem.read_dir(&resolved.local_path)
     }
 
-    pub fn mkdir(&self, path: &ResolvedPath) -> Result<(), VfsError> {
-        self.with_path(path, |filesystem, local| filesystem.mkdir(local))
+    pub fn mkdir(&self, path: &ResolvedPath, permissions: FilePermissions) -> Result<(), VfsError> {
+        self.with_path(path, |filesystem, local| {
+            filesystem.mkdir(local, permissions)
+        })
     }
 
     pub fn rmdir(&self, path: &ResolvedPath) -> Result<(), VfsError> {

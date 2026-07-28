@@ -9,8 +9,9 @@ roxy_test::kernel_test!(
     ext4_vfs_operations,
     {
         assert_eq!(metadata(b"/").unwrap().file_type, FileType::Directory);
-        mkdir(b"/a").unwrap();
-        mkdir(b"/b").unwrap();
+        mkdir(b"/a", FilePermissions::new(0o750).unwrap()).unwrap();
+        mkdir(b"/b", FilePermissions::DEFAULT_DIRECTORY).unwrap();
+        assert_eq!(metadata(b"/a").unwrap().permissions.bits(), 0o750);
 
         let options = OpenOptions {
             access: OpenAccess::ReadWrite,
@@ -72,9 +73,9 @@ roxy_test::kernel_test!(
         unlink(b"/b/file").unwrap();
         assert_eq!(metadata(b"/hard").unwrap().size, 2);
 
-        mkdir(b"/old").unwrap();
+        mkdir(b"/old", FilePermissions::DEFAULT_DIRECTORY).unwrap();
         rename(b"/old", b"/new").unwrap();
-        mkdir(b"/a/dir").unwrap();
+        mkdir(b"/a/dir", FilePermissions::DEFAULT_DIRECTORY).unwrap();
 
         assert_eq!(rename(b"/a/dir", b"/b/dir"), Err(VfsError::Unsupported));
 

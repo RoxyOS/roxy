@@ -35,6 +35,11 @@ until close/drop so namespace mutations and unmount cannot invalidate an open ob
 These VFS-owned types implement the descriptor-layer `File` and `Directory` capabilities directly;
 the descriptor crate remains independent of VFS and contains no concrete file implementations.
 
+Creation operations receive validated `FilePermissions` from their caller. In particular, directory
+creation passes the requested permission bits through the global facade, mount routing, and the
+filesystem callback without replacing them with a VFS default. Credential-based filtering and
+process umask application remain outside VFS.
+
 Symbolic-link targets remain raw validated bytes because a relative target is stored data whose
 meaning depends on the directory containing the link. The link location itself is a
 `ResolvedPath`, and `read_link` returns the stored target without resolving it. Normal metadata

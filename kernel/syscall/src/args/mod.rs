@@ -2,6 +2,7 @@ mod address;
 mod c_string;
 mod c_string_array;
 mod fd;
+mod file_permissions;
 mod integer;
 mod nullable;
 mod out;

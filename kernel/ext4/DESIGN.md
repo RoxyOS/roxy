@@ -23,6 +23,10 @@ Loading must finish successfully before an instance is exposed to VFS. VFS resol
 passes normalized local paths to this filesystem. File handles remain valid until their active
 reference is released; unmount is controlled by VFS and is rejected while active handles exist.
 
+File and directory creation use the validated permission bits supplied by VFS when constructing
+the ext4 inode. The adapter adds the inode type bits but does not apply a process umask or replace
+the requested permissions with filesystem defaults.
+
 Errors from ext4plus are mapped to `VfsError` without leaking upstream types through the public
 API. `sync` must reach the underlying filesystem and block device when durability is requested.
 
