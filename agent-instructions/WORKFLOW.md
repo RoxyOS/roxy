@@ -94,6 +94,9 @@ Package recipes live under `distro/recipes/<package>/recipe`; host-tool recipes 
 `distro/host-recipes/<package>/recipe`. Patches belong in the owning recipe's `patches/` directory.
 Jinx applies ordinary patch files with `patch -p1` in lexical filename order.
 
+Never hand-write or directly edit a Jinx package patch. Make the source change in the package
+`<package>-workdir` and run `jinx regen <package>` to generate the patch from that change.
+
 ### Prepare a working patch
 
 1. Read `distro/DESIGN.md` and the target recipe. Confirm whether the package is a normal recipe,
