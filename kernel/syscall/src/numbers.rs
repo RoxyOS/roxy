@@ -39,6 +39,7 @@ pub(crate) enum SyscallNumber {
     SendSignal = 35,
     Ppoll = 36,
     Pselect = 37,
+    Uname = 38,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -84,6 +85,7 @@ impl TryFrom<u64> for SyscallNumber {
             35 => Ok(Self::SendSignal),
             36 => Ok(Self::Ppoll),
             37 => Ok(Self::Pselect),
+            38 => Ok(Self::Uname),
             _ => Err(()),
         }
     }
@@ -133,6 +135,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(35), Ok(SyscallNumber::SendSignal));
         assert_eq!(SyscallNumber::try_from(36), Ok(SyscallNumber::Ppoll));
         assert_eq!(SyscallNumber::try_from(37), Ok(SyscallNumber::Pselect));
-        assert!(SyscallNumber::try_from(38).is_err());
+        assert_eq!(SyscallNumber::try_from(38), Ok(SyscallNumber::Uname));
+        assert!(SyscallNumber::try_from(39).is_err());
     });
 }

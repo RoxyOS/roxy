@@ -90,6 +90,11 @@ including the terminator. A buffer shorter than the complete result returns `ERA
 non-writable userspace range returns `EFAULT`. No process-table lock spans result encoding or the
 userspace write.
 
+`uname` writes a fully initialized Roxy x86_64 `utsname` record with static system identity. The
+syscall layer owns its six 65-byte, null-terminated ABI fields; it does not expose the record or
+identity strings to ABI-neutral kernel subsystems. Hostname configuration and runtime kernel build
+metadata are not yet supported.
+
 `poll` decodes the userspace `pollfd` array inside this subsystem and queries each descriptor's
 ABI-neutral readiness through `roxy-fd`. For a nonzero timeout it rechecks in a loop: with
 interrupts disabled, it queries all descriptors, registers one `roxy-poll` listener with each

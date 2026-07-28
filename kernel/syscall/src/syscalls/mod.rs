@@ -29,13 +29,14 @@ mod sigprocmask;
 mod sleep;
 mod stat;
 mod tcb_set;
+mod uname;
 mod vm;
 mod waitpid;
 mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 38] = [
+pub(super) const SYSCALLS: [Syscall; 39] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -74,4 +75,5 @@ pub(super) const SYSCALLS: [Syscall; 38] = [
     send_signal::SYSCALL,
     poll::PPOLL_SYSCALL,
     poll::PSELECT_SYSCALL,
+    uname::SYSCALL,
 ];
