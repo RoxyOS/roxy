@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+version=2.7.0
+revision=1
+
+tarball_url="https://duktape.org/duktape-${version}.tar.xz"
+tarball_sha256="90f8d2fa8b5567c6899830ddef2c03f3c27960b11aca222fa17aa7ac613c2890"
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make"
+
+configure() {
+	cp -a "${source_dir}/." .
+}
+
+duktape_make() {
+	local makefile="$1"
+	shift
+
+	make -f "${makefile}" \
+		CC="clang --target=x86_64-unknown-roxy --sysroot=/sysroot" \
+		CPPFLAGS="-D_GNU_SOURCE -D__unix__" \
+		"$@"
+}
+
+build() {
+	duktape_make Makefile.sharedlibrary \
+		INSTALL_PREFIX="${prefix}" \
+		LIBDIR=/lib \
+		-j "${parallelism}" \
+		all
+	duktape_make Makefile.cmdline -j "${parallelism}" duk
+}
+
+package() {
+	duktape_make Makefile.sharedlibrary \
+		DESTDIR="${dest_dir}" \
+		INSTALL_PREFIX="${prefix}" \
+		LIBDIR=/lib \
+		install
+
+	install -Dm755 duk "${dest_dir}${prefix}/bin/duk"
+}
