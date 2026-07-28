@@ -40,6 +40,14 @@ pub(crate) enum SyscallNumber {
     Ppoll = 36,
     Pselect = 37,
     Uname = 38,
+    Mkdirat = 39,
+    Unlinkat = 40,
+    Readlinkat = 41,
+    Linkat = 42,
+    Symlinkat = 43,
+    Renameat = 44,
+    Sync = 45,
+    Fsync = 46,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -86,6 +94,14 @@ impl TryFrom<u64> for SyscallNumber {
             36 => Ok(Self::Ppoll),
             37 => Ok(Self::Pselect),
             38 => Ok(Self::Uname),
+            39 => Ok(Self::Mkdirat),
+            40 => Ok(Self::Unlinkat),
+            41 => Ok(Self::Readlinkat),
+            42 => Ok(Self::Linkat),
+            43 => Ok(Self::Symlinkat),
+            44 => Ok(Self::Renameat),
+            45 => Ok(Self::Sync),
+            46 => Ok(Self::Fsync),
             _ => Err(()),
         }
     }
@@ -136,6 +152,14 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(36), Ok(SyscallNumber::Ppoll));
         assert_eq!(SyscallNumber::try_from(37), Ok(SyscallNumber::Pselect));
         assert_eq!(SyscallNumber::try_from(38), Ok(SyscallNumber::Uname));
-        assert!(SyscallNumber::try_from(39).is_err());
+        assert_eq!(SyscallNumber::try_from(39), Ok(SyscallNumber::Mkdirat));
+        assert_eq!(SyscallNumber::try_from(40), Ok(SyscallNumber::Unlinkat));
+        assert_eq!(SyscallNumber::try_from(41), Ok(SyscallNumber::Readlinkat));
+        assert_eq!(SyscallNumber::try_from(42), Ok(SyscallNumber::Linkat));
+        assert_eq!(SyscallNumber::try_from(43), Ok(SyscallNumber::Symlinkat));
+        assert_eq!(SyscallNumber::try_from(44), Ok(SyscallNumber::Renameat));
+        assert_eq!(SyscallNumber::try_from(45), Ok(SyscallNumber::Sync));
+        assert_eq!(SyscallNumber::try_from(46), Ok(SyscallNumber::Fsync));
+        assert!(SyscallNumber::try_from(47).is_err());
     });
 }

@@ -5,6 +5,7 @@ mod fd;
 mod integer;
 mod nullable;
 mod out;
+mod path;
 mod process_id;
 mod signal;
 mod signal_mask;
@@ -16,6 +17,7 @@ pub(crate) use c_string::CString;
 pub(crate) use c_string_array::CStringArray;
 pub(crate) use nullable::Nullable;
 pub(crate) use out::Out;
+pub(crate) use path::Path;
 pub(crate) use signal_mask::SignalMask;
 pub(crate) use slice::Slice;
 pub(crate) use timespec::Timespec;
@@ -30,15 +32,6 @@ pub(crate) trait SyscallArg: Sized {
     fn parse(raw: u64, error: Errno) -> Result<Self, Errno>;
 }
 
-macro_rules! parse_arg {
-    ($raw:expr, $type:ty) => {
-        <$type as $crate::args::RawSyscallArg>::parse($raw)
-    };
-    ($raw:expr, $type:ty => $error:ident) => {
-        <$type as $crate::args::SyscallArg>::parse($raw, $crate::errno::Errno::$error)?
-    };
-}
-
 macro_rules! syscall {
     ($number:expr, $handler:ident()) => {
         pub(super) const SYSCALL: $crate::Syscall = $crate::Syscall::new($number, parse);
@@ -48,21 +41,55 @@ macro_rules! syscall {
         }
     };
 
+    ($number:expr, $handler:ident($($name:ident: $type:ty),* $(,)?)) => {
+        pub(super) const SYSCALL: $crate::Syscall = $crate::Syscall::new($number, parse);
+
+        fn parse(arguments: [u64; 6]) -> $crate::SyscallResult {
+            let mut raw = arguments.into_iter();
+            $(
+                let $name = <$type as $crate::args::RawSyscallArg>::parse(raw.next().unwrap());
+            )*
+
+            $handler($($name),*)
+        }
+    };
+
+    ($number:expr, $handler:ident($($name:ident: $type:ty => $error:ident),* $(,)?)) => {
+        pub(super) const SYSCALL: $crate::Syscall = $crate::Syscall::new($number, parse);
+
+        fn parse(arguments: [u64; 6]) -> $crate::SyscallResult {
+            let mut raw = arguments.into_iter();
+            $(
+                let $name = <$type as $crate::args::SyscallArg>::parse(
+                    raw.next().unwrap(),
+                    $crate::errno::Errno::$error,
+                )?;
+            )*
+
+            $handler($($name),*)
+        }
+    };
+
     ($number:expr, $handler:ident($($name:ident: $type:ty $(=> $error:ident)?),* $(,)?)) => {
         pub(super) const SYSCALL: $crate::Syscall = $crate::Syscall::new($number, parse);
 
         fn parse(arguments: [u64; 6]) -> $crate::SyscallResult {
             let mut raw = arguments.into_iter();
             $(
-                let $name = $crate::args::parse_arg!(
-                    raw.next().unwrap(),
-                    $type $(=> $error)?
-                );
+                let $name = syscall!(@parse raw.next().unwrap(), $type $(=> $error)?);
             )*
 
             $handler($($name),*)
         }
     };
+
+    (@parse $raw:expr, $type:ty) => {
+        <$type as $crate::args::RawSyscallArg>::parse($raw)
+    };
+
+    (@parse $raw:expr, $type:ty => $error:ident) => {
+        <$type as $crate::args::SyscallArg>::parse($raw, $crate::errno::Errno::$error)?
+    };
 }
 
-pub(crate) use {parse_arg, syscall};
+pub(crate) use syscall;

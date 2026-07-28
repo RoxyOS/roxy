@@ -64,6 +64,15 @@ impl OpenFile {
         object.write(position, input)
     }
 
+    /// Flushes the serialized open-file object.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying object's error.
+    pub fn sync(&self) -> Result<(), FileError> {
+        self.state.lock().object.sync()
+    }
+
     /// Reports readiness through the serialized open-file object.
     ///
     /// # Errors

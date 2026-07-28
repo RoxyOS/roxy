@@ -54,6 +54,10 @@ impl FdFile for VfsFile {
         Ok(written)
     }
 
+    fn sync(&mut self) -> Result<(), FdFileError> {
+        self.sync().map_err(map_file_error)
+    }
+
     fn seek(&mut self, current: u64, position: FdSeekFrom) -> Result<u64, FdSeekError> {
         self.seek(VfsSeekFrom::Start(current))
             .map_err(map_seek_error)?;

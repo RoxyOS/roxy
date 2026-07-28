@@ -50,6 +50,13 @@ through its registered provider only for relative paths. Syscall handlers do not
 normalization or process-state lookup. Path-based `stat` accepts `AT_SYMLINK_NOFOLLOW` and uses the
 VFS link-metadata operation to report the final symbolic link instead of its target.
 
+Filesystem mutation syscalls use the shared `Path` argument type, which copies the userspace
+string and rejects an empty path during argument parsing. The `mkdirat`, `unlinkat`, `readlinkat`,
+`linkat`, `symlinkat`, and `renameat` handlers currently accept only `AT_FDCWD`; descriptor-relative
+resolution remains unsupported and is reported through the centralized diagnostic path. `sync`
+delegates to the global VFS, while `fsync` resolves an open file and dispatches synchronization
+through the FD object boundary.
+
 Process-identity queries delegate to the process subsystem. `getpid` returns the stable process ID
 owned by the current thread's process and does not expose scheduler thread IDs through the ABI.
 `getppid` returns the recorded fork parent while that process remains in the process table and

@@ -58,6 +58,15 @@ pub trait File: Send {
     /// Returns an object-specific I/O or unsupported-operation error.
     fn write(&mut self, position: &mut u64, input: &[u8]) -> Result<usize, FileError>;
 
+    /// Flushes this open object's durable state when the object supports synchronization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-operation error for objects without filesystem-backed sync.
+    fn sync(&mut self) -> Result<(), FileError> {
+        Err(FileError::BadOperation)
+    }
+
     /// Returns the absolute byte offset to seek to.
     ///
     /// # Errors

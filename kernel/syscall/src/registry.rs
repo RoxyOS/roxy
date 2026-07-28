@@ -241,6 +241,54 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::Uname)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Mkdirat)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Unlinkat)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Readlinkat)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Linkat)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Symlinkat)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Renameat)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Sync)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Fsync)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {
