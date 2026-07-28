@@ -1,0 +1,102 @@
+diff --git python-clean/configure python-workdir/configure
+index 2088290..d6fabba 100755
+--- python-clean/configure
++++ python-workdir/configure
+@@ -4112,6 +4112,9 @@ then
+ 	*-*-linux*)
+ 		ac_sys_system=Linux
+ 		;;
++	*-*-none*)
++		ac_sys_system=Roxy
++		;;
+ 	*-*-cygwin*)
+ 		ac_sys_system=Cygwin
+ 		;;
+@@ -4628,6 +4631,9 @@ printf "%s\n" "$IPHONEOS_DEPLOYMENT_TARGET" >&6; }
+ 	*-*-vxworks*)
+ 		_host_ident=$host_cpu
+ 		;;
++	*-*-none*)
++		_host_ident=$host_cpu
++		;;
+ 	*-*-emscripten)
+ 		_host_ident=$(emcc -dumpversion | cut -f1 -d-)-$host_cpu
+ 		;;
+@@ -13685,7 +13691,7 @@ then
+ 	Emscripten*|WASI*)
+ 		LDSHARED='$(CC) -shared'
+ 		LDCXXSHARED='$(CXX) -shared';;
+-	Linux*|GNU*|QNX*|VxWorks*|Haiku*)
++	Linux*|GNU*|QNX*|VxWorks*|Haiku*|Roxy*)
+ 		LDSHARED='$(CC) -shared'
+ 		LDCXXSHARED='$(CXX) -shared';;
+ 	FreeBSD*)
+@@ -13770,7 +13776,7 @@ then
+ 		 then CCSHARED="-fPIC";
+ 		 else CCSHARED="+z";
+ 		 fi;;
+-	Linux*|GNU*) CCSHARED="-fPIC";;
++	Linux*|GNU*|Roxy*) CCSHARED="-fPIC";;
+ 	Emscripten*|WASI*)
+ 		if test "x$enable_wasm_dynamic_linking" = xyes
+ then :
+@@ -13808,7 +13814,7 @@ then
+ 	    LINKFORSHARED="-Wl,-E -Wl,+s";;
+ #	    LINKFORSHARED="-Wl,-E -Wl,+s -Wl,+b\$(BINLIBDEST)/lib-dynload";;
+ 	Linux-android*) LINKFORSHARED="-pie -Xlinker -export-dynamic";;
+-	Linux*|GNU*) LINKFORSHARED="-Xlinker -export-dynamic";;
++	Linux*|GNU*|Roxy*) LINKFORSHARED="-Xlinker -export-dynamic";;
+ 	# -u libsys_s pulls in all symbols in libsys
+ 	Darwin/*|iOS/*)
+ 		LINKFORSHARED="$extra_undefs -framework CoreFoundation"
+diff --git python-clean/configure.ac python-workdir/configure.ac
+index aed1494..3b6b295 100644
+--- python-clean/configure.ac
++++ python-workdir/configure.ac
+@@ -324,6 +324,9 @@ then
+ 	*-*-linux*)
+ 		ac_sys_system=Linux
+ 		;;
++	*-*-none*)
++		ac_sys_system=Roxy
++		;;
+ 	*-*-cygwin*)
+ 		ac_sys_system=Cygwin
+ 		;;
+@@ -806,6 +809,9 @@ if test "$cross_compiling" = yes; then
+ 	*-*-vxworks*)
+ 		_host_ident=$host_cpu
+ 		;;
++	*-*-none*)
++		_host_ident=$host_cpu
++		;;
+ 	*-*-emscripten)
+ 		_host_ident=$(emcc -dumpversion | cut -f1 -d-)-$host_cpu
+ 		;;
+@@ -3510,7 +3516,7 @@ then
+ 	Emscripten*|WASI*)
+ 		LDSHARED='$(CC) -shared'
+ 		LDCXXSHARED='$(CXX) -shared';;
+-	Linux*|GNU*|QNX*|VxWorks*|Haiku*)
++	Linux*|GNU*|QNX*|VxWorks*|Haiku*|Roxy*)
+ 		LDSHARED='$(CC) -shared'
+ 		LDCXXSHARED='$(CXX) -shared';;
+ 	FreeBSD*)
+@@ -3591,7 +3597,7 @@ then
+ 		 then CCSHARED="-fPIC";
+ 		 else CCSHARED="+z";
+ 		 fi;;
+-	Linux*|GNU*) CCSHARED="-fPIC";;
++	Linux*|GNU*|Roxy*) CCSHARED="-fPIC";;
+ 	Emscripten*|WASI*)
+ 		AS_VAR_IF([enable_wasm_dynamic_linking], [yes], [
+ 			CCSHARED="-fPIC"
+@@ -3624,7 +3630,7 @@ then
+ 	    LINKFORSHARED="-Wl,-E -Wl,+s";;
+ #	    LINKFORSHARED="-Wl,-E -Wl,+s -Wl,+b\$(BINLIBDEST)/lib-dynload";;
+ 	Linux-android*) LINKFORSHARED="-pie -Xlinker -export-dynamic";;
+-	Linux*|GNU*) LINKFORSHARED="-Xlinker -export-dynamic";;
++	Linux*|GNU*|Roxy*) LINKFORSHARED="-Xlinker -export-dynamic";;
+ 	# -u libsys_s pulls in all symbols in libsys
+ 	Darwin/*|iOS/*)
+ 		LINKFORSHARED="$extra_undefs -framework CoreFoundation"

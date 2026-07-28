@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+version=3.14.6
+revision=1
+
+tarball_url="https://www.python.org/ftp/python/${version}/Python-${version}.tar.xz"
+tarball_sha256="143b1dddefaec3bd2e21e3b839b34a2b7fb9842272883c576420d605e9f30c63"
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+build_host_python() {
+	mkdir -p build-host-python
+
+	(
+		cd build-host-python
+		CC=gcc "${source_dir}/configure" \
+			--disable-test-modules \
+			--without-ensurepip \
+			--without-static-libpython \
+			--with-pkg-config=no
+	)
+
+	make -C build-host-python -j "${parallelism}" python
+}
+
+configure() {
+	build_host_python
+
+	export ac_cv_file__dev_ptc=no
+	export ac_cv_file__dev_ptmx=no
+
+	autotools_configure \
+		--disable-ipv6 \
+		--disable-test-modules \
+		--without-ensurepip \
+		--without-mimalloc \
+		--without-static-libpython \
+		--with-build-python="${PWD}/build-python/python" \
+		--with-pkg-config=no
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}
