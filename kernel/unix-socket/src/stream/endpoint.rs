@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
 use roxy_fd::{File, FileError, FileMetadata, FileType, PollEvents, SeekError, SeekFrom};
-use roxy_poll::{PollListener, PollListeners, PollRegistration};
+use roxy_poll::{PollListener, PollRegistration};
 use roxy_thread::scheduler;
 
 use super::{
@@ -20,15 +20,6 @@ impl Endpoint {
         Self { connection, side }
     }
 
-    fn state_ready(state: &State, peer: &State) -> PollEvents {
-        PollEvents {
-            readable: !state.received_data.is_empty() || !peer.open,
-            writable: peer.open && peer.received_data.len() < CAPACITY,
-            hangup: !peer.open,
-            ..PollEvents::default()
-        }
-    }
-
     fn prepare_wait(&self, states: &[State; 2]) -> (scheduler::PendingBlock, PollRegistration) {
         // Registers a listener for this endpoint state to be woken on read/write to it.
         let listener = PollListener::current_thread();
@@ -40,13 +31,6 @@ impl Endpoint {
 
         (pending, registration)
     }
-
-    fn listeners(states: &[State; 2], first: Side, second: Side) -> [Arc<PollListeners>; 2] {
-        [
-            states[first.index()].listeners.clone(),
-            states[second.index()].listeners.clone(),
-        ]
-    }
 }
 
 impl Drop for Endpoint {
@@ -55,6 +39,7 @@ impl Drop for Endpoint {
             let mut states = self.connection.states.lock();
             let index = self.side.index();
             let peer = self.side.other().index();
+
             states[index].open = false;
             states[index].received_data.clear();
             states[peer].listeners.clone()
@@ -70,7 +55,15 @@ impl File for Endpoint {
         let index = self.side.index();
         let peer = self.side.other().index();
 
-        Ok(Self::state_ready(&states[index], &states[peer]))
+        let state = &states[index];
+        let peer_state = &states[peer];
+
+        Ok(PollEvents {
+            readable: !state.received_data.is_empty() || !peer_state.open,
+            writable: peer_state.open && peer_state.received_data.len() < CAPACITY,
+            hangup: !peer_state.open,
+            ..PollEvents::default()
+        })
     }
 
     fn register_poll_listener(&mut self, listener: Arc<PollListener>) -> PollRegistration {
@@ -113,10 +106,14 @@ impl File for Endpoint {
                     let count = self_state.received_data.read_to(output);
 
                     // Notify poll listeners
-                    let listeners = Self::listeners(&states, self.side, self.side.other());
+                    let (self_listener, peer_listener) = (
+                        states[self.side.index()].listeners.clone(),
+                        states[self.side.other().index()].listeners.clone(),
+                    );
+
                     drop(states);
-                    listeners[0].notify();
-                    listeners[1].notify();
+                    self_listener.notify();
+                    peer_listener.notify();
 
                     return Ok(count);
                 }
@@ -155,10 +152,14 @@ impl File for Endpoint {
                     let count = peer_state.received_data.write_from(input);
 
                     // Notify poll listeners
-                    let listeners = Self::listeners(&states, self.side, self.side.other());
+                    let (self_listener, peer_listener) = (
+                        states[self.side.index()].listeners.clone(),
+                        states[self.side.other().index()].listeners.clone(),
+                    );
+
                     drop(states);
-                    listeners[0].notify();
-                    listeners[1].notify();
+                    self_listener.notify();
+                    peer_listener.notify();
 
                     return Ok(count);
                 }
