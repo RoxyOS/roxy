@@ -49,6 +49,7 @@ pub(crate) enum SyscallNumber {
     Sync = 45,
     Fsync = 46,
     Ftruncate = 47,
+    Socketpair = 48,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -104,6 +105,7 @@ impl TryFrom<u64> for SyscallNumber {
             45 => Ok(Self::Sync),
             46 => Ok(Self::Fsync),
             47 => Ok(Self::Ftruncate),
+            48 => Ok(Self::Socketpair),
             _ => Err(()),
         }
     }
@@ -163,6 +165,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(45), Ok(SyscallNumber::Sync));
         assert_eq!(SyscallNumber::try_from(46), Ok(SyscallNumber::Fsync));
         assert_eq!(SyscallNumber::try_from(47), Ok(SyscallNumber::Ftruncate));
-        assert!(SyscallNumber::try_from(48).is_err());
+        assert_eq!(SyscallNumber::try_from(48), Ok(SyscallNumber::Socketpair));
+        assert!(SyscallNumber::try_from(49).is_err());
     });
 }

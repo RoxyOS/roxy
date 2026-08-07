@@ -202,7 +202,7 @@ fn poll_entry(entry: PollFdAbi) -> i16 {
     match file.poll() {
         Ok(events) => encode_events(requested, events),
         Err(FileError::BadOperation) => 0,
-        Err(FileError::Io) => PollEventFlags::ERR.bits(),
+        Err(FileError::BrokenPipe | FileError::Io) => PollEventFlags::ERR.bits(),
     }
 }
 

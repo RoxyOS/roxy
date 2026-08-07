@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-kernel-test = ["dep:linkme", "dep:roxy-test", "roxy-arch/kernel-test"]
+kernel-test = ["dep:linkme", "dep:roxy-test", "roxy-arch/kernel-test", "roxy-unix-socket/kernel-test"]
 
 [dependencies]
 bitflags.workspace = true
@@ -25,6 +25,7 @@ roxy-thread.workspace = true
 roxy-time.workspace = true
 roxy-timer-wait.workspace = true
 roxy-tty-types.workspace = true
+roxy-unix-socket.workspace = true
 roxy-utils.workspace = true
 roxy-vfs.workspace = true
 roxy-vm.workspace = true

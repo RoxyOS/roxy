@@ -144,6 +144,7 @@ pub enum FileType {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileError {
     BadOperation,
+    BrokenPipe,
     Io,
 }
 

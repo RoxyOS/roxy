@@ -190,3 +190,9 @@ sysdeps. Every ABI change must keep syscall numbers, private layout adapters, re
 userspace symbols in sync. Terminal ioctls intentionally use Linux-compatible request numbers and
 mlibc's Linux `termios` layout inside the Roxy personality adapter; other ioctl families remain
 unsupported.
+
+`socketpair` is syscall 48 and accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero. It asks
+`roxy-unix-socket` to create the connected files, then owns descriptor insertion and the checked
+copy of the descriptor pair to userspace. The socket subsystem owns buffering, blocking,
+readiness, and close state. Other families, types, protocols, and socket operations emit the
+centralized unsupported diagnostic when they reach this ABI boundary.

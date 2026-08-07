@@ -28,6 +28,7 @@ mod send_signal;
 mod sigaction;
 mod sigprocmask;
 mod sleep;
+mod socketpair;
 mod stat;
 mod tcb_set;
 mod uname;
@@ -37,7 +38,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 48] = [
+pub(super) const SYSCALLS: [Syscall; 49] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -86,4 +87,5 @@ pub(super) const SYSCALLS: [Syscall; 48] = [
     fs::SYNC_SYSCALL,
     fs::FSYNC_SYSCALL,
     fs::FTRUNCATE_SYSCALL,
+    socketpair::SYSCALL,
 ];

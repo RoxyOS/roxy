@@ -1,6 +1,7 @@
 use roxy_fd::{Fd, FileError};
 use roxy_memory::UserAddress;
 use roxy_process::{self, DescriptorError};
+use roxy_signal::Signal;
 
 use crate::{SyscallResult, args::Slice, errno::Errno, numbers::SyscallNumber, syscall};
 
@@ -23,7 +24,17 @@ fn handle(fd: Fd, address: UserAddress, count: usize) -> SyscallResult {
         // SAFETY: u8 has no padding and every bit pattern is valid.
         let buffer = unsafe { remaining.read_with_limit(BUFFER_SIZE) }?;
 
-        let written = file.write(&buffer).map_err(map_file_error)?;
+        let written = match file.write(&buffer) {
+            Ok(written) => written,
+            Err(FileError::BrokenPipe) => {
+                let _ = roxy_process::send_signal(
+                    roxy_process::current_process_id(),
+                    Signal::BrokenPipe,
+                );
+                return Err(Errno::Pipe);
+            }
+            Err(error) => return Err(map_file_error(error)),
+        };
         transferred += written;
 
         if written < buffer.len() {
@@ -41,6 +52,7 @@ fn map_process_error(_: DescriptorError) -> Errno {
 fn map_file_error(error: FileError) -> Errno {
     match error {
         FileError::BadOperation => Errno::BadFd,
+        FileError::BrokenPipe => Errno::Pipe,
         FileError::Io => Errno::Io,
     }
 }

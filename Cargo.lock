@@ -739,6 +739,7 @@ dependencies = [
  "roxy-time",
  "roxy-timer-wait",
  "roxy-tty-types",
+ "roxy-unix-socket",
  "roxy-utils",
  "roxy-vfs",
  "roxy-vm",
@@ -827,6 +828,18 @@ name = "roxy-tty-types"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.13.1",
+]
+
+[[package]]
+name = "roxy-unix-socket"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-fd",
+ "roxy-poll",
+ "roxy-test",
+ "roxy-thread",
+ "roxy-utils",
 ]
 
 [[package]]

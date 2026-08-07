@@ -50,6 +50,8 @@ to `roxy-syscall`.
   references or active VFS handles exist.
 - Errors distinguish bad descriptors, unsupported operations, seekability, and underlying I/O
   failures at their owning layer.
+- Stream-specific broken-pipe errors remain ABI-neutral until the syscall layer translates them
+  into errno and signal behavior.
 
 ## Process interaction and limits
 
