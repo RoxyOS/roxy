@@ -6,8 +6,42 @@ use roxy_memory::UserAddress;
 use roxy_signal::Signal;
 use strum::IntoEnumIterator;
 
-use super::{SyscallArg, user_memory};
-use crate::{errno::Errno, unsupported::unsupported_argument};
+use crate::{
+    SyscallResult,
+    args::{SyscallArg, user_memory},
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
+    unsupported::unsupported_argument,
+};
+
+#[derive(Clone, Copy)]
+enum SignalMaskHow {
+    Block,
+    Unblock,
+    SetMask,
+}
+
+impl SignalMaskHow {
+    const fn number(self) -> u64 {
+        match self {
+            Self::Block => 0,
+            Self::Unblock => 1,
+            Self::SetMask => 2,
+        }
+    }
+}
+
+impl SyscallArg for SignalMaskHow {
+    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        match raw {
+            0 => Ok(Self::Block),
+            1 => Ok(Self::Unblock),
+            2 => Ok(Self::SetMask),
+            _ => Err(error),
+        }
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -50,15 +84,9 @@ bitflags! {
 
 impl SignalMask {
     pub(crate) fn to_vec(self) -> Vec<Signal> {
-        let mut signals = Vec::new();
-
-        for signal in Signal::iter() {
-            if self.bits() & signal_bit(signal) != 0 {
-                signals.push(signal);
-            }
-        }
-
-        signals
+        Signal::iter()
+            .filter(|signal| self.bits() & signal_bit(*signal) != 0)
+            .collect()
     }
 }
 
@@ -67,8 +95,7 @@ impl SyscallArg for SignalMask {
         let address = UserAddress::parse(raw, error)?;
         let mut mask = SignalMaskAbi { bits: [0; 16] };
 
-        // SAFETY: SignalMaskAbi has a checked C layout, its integer fields accept every bit
-        // pattern, and the output is fully initialized before userspace copies into it.
+        // SAFETY: SignalMaskAbi has a checked C layout and is fully initialized.
         unsafe { user_memory::read(address, &mut mask) }?;
 
         if mask.bits[1..].iter().any(|bits| *bits != 0) {
@@ -83,6 +110,16 @@ impl SyscallArg for SignalMask {
     }
 }
 
+syscall!(SyscallNumber::Sigprocmask, handle(how: SignalMaskHow => Invalid));
+
+fn handle(how: SignalMaskHow) -> SyscallResult {
+    Err(unsupported_argument(
+        "sigprocmask",
+        how.number(),
+        Errno::NoSys,
+    ))
+}
+
 #[cfg(feature = "kernel-test")]
 mod tests {
     use alloc::vec;
@@ -92,13 +129,9 @@ mod tests {
 
     use super::SignalMask;
 
-    kernel_test!(
-        "roxy-syscall::signal-mask-vector",
-        converts_to_signal_vector,
-        {
-            let mask = SignalMask::TERMINATE | SignalMask::INTERRUPT;
+    kernel_test!("roxy-syscall::signal-mask", converts_to_signal_vector, {
+        let mask = SignalMask::TERMINATE | SignalMask::INTERRUPT;
 
-            assert_eq!(mask.to_vec(), vec![Signal::Interrupt, Signal::Terminate]);
-        }
-    );
+        assert_eq!(mask.to_vec(), vec![Signal::Interrupt, Signal::Terminate]);
+    });
 }

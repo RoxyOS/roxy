@@ -24,9 +24,7 @@ mod poll;
 mod read;
 mod read_entries;
 mod seek;
-mod send_signal;
-mod sigaction;
-mod sigprocmask;
+pub(crate) mod signal;
 mod sleep;
 mod socketpair;
 mod stat;
@@ -65,8 +63,8 @@ pub(super) const SYSCALLS: [Syscall; 49] = [
     getgid::SYSCALL,
     getegid::SYSCALL,
     waitpid::SYSCALL,
-    sigprocmask::SYSCALL,
-    sigaction::SYSCALL,
+    signal::MASK_SYSCALL,
+    signal::ACTION_SYSCALL,
     open_dir::SYSCALL,
     read_entries::SYSCALL,
     chdir::SYSCALL,
@@ -74,7 +72,7 @@ pub(super) const SYSCALLS: [Syscall; 49] = [
     getcwd::SYSCALL,
     poll::POLL_SYSCALL,
     sleep::SYSCALL,
-    send_signal::SYSCALL,
+    signal::SEND_SYSCALL,
     poll::PPOLL_SYSCALL,
     poll::PSELECT_SYSCALL,
     uname::SYSCALL,

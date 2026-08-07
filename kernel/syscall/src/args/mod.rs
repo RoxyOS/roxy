@@ -8,18 +8,16 @@ mod nullable;
 mod out;
 mod path;
 mod process_id;
-mod signal;
-mod signal_mask;
 mod slice;
 mod timespec;
 pub(crate) mod user_memory;
 
+pub(crate) use crate::syscalls::signal::SignalMask;
 pub(crate) use c_string::CString;
 pub(crate) use c_string_array::CStringArray;
 pub(crate) use nullable::Nullable;
 pub(crate) use out::Out;
 pub(crate) use path::Path;
-pub(crate) use signal_mask::SignalMask;
 pub(crate) use slice::Slice;
 pub(crate) use timespec::Timespec;
 

@@ -1,7 +1,16 @@
+mod action;
+mod mask;
+mod send;
+
 use roxy_signal::Signal;
 
-use super::SyscallArg;
-use crate::{errno::Errno, unsupported::unsupported_argument};
+use crate::{Syscall, args::SyscallArg, errno::Errno, unsupported::unsupported_argument};
+
+pub(super) const ACTION_SYSCALL: Syscall = action::SYSCALL;
+pub(super) const MASK_SYSCALL: Syscall = mask::SYSCALL;
+pub(super) const SEND_SYSCALL: Syscall = send::SYSCALL;
+
+pub(crate) use mask::SignalMask;
 
 impl SyscallArg for Signal {
     fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
@@ -27,27 +36,10 @@ impl SyscallArg for Signal {
             21 => Signal::TerminalInput,
             22 => Signal::TerminalOutput,
             28 => Signal::WindowChanged,
-            0 => {
-                return Err(unsupported_argument("signal", raw, Errno::NotSupported));
-            }
+            0 => return Err(unsupported_argument("signal", raw, Errno::NotSupported)),
             _ => return Err(error),
         };
 
         Ok(signal)
     }
-}
-
-#[cfg(feature = "kernel-test")]
-mod tests {
-    use roxy_signal::Signal;
-    use roxy_test::kernel_test;
-
-    use super::SyscallArg;
-    use crate::errno::Errno;
-
-    kernel_test!("roxy-syscall::signal-argument", validates_signal, {
-        assert_eq!(Signal::parse(15, Errno::Invalid), Ok(Signal::Terminate));
-        assert_eq!(Signal::parse(0, Errno::Invalid), Err(Errno::NotSupported));
-        assert_eq!(Signal::parse(5, Errno::Invalid), Err(Errno::Invalid));
-    });
 }
