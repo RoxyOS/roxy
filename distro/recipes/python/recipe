@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=3.14.6
-revision=1
+revision=2
 
 tarball_url="https://www.python.org/ftp/python/${version}/Python-${version}.tar.xz"
 tarball_sha256="143b1dddefaec3bd2e21e3b839b34a2b7fb9842272883c576420d605e9f30c63"
@@ -41,7 +41,7 @@ configure() {
 		--without-ensurepip \
 		--without-mimalloc \
 		--without-static-libpython \
-		--with-build-python="${PWD}/build-python/python" \
+		--with-build-python="${PWD}/build-host-python/python" \
 		--with-pkg-config=no
 }
 
