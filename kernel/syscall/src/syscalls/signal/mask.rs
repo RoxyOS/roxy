@@ -1,25 +1,20 @@
+use alloc::vec::Vec;
+
 use crate::{
-    SyscallResult, args::SyscallArg, errno::Errno, numbers::SyscallNumber, syscall,
-    unsupported::unsupported_argument,
+    SyscallResult,
+    args::{Nullable, Out, SyscallArg},
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
 };
 
-use super::SignalSet;
+use super::{SignalSet, SignalSetAbi};
 
 #[derive(Clone, Copy)]
 enum SignalMaskHow {
     Block,
     Unblock,
     SetMask,
-}
-
-impl SignalMaskHow {
-    const fn number(self) -> u64 {
-        match self {
-            Self::Block => 0,
-            Self::Unblock => 1,
-            Self::SetMask => 2,
-        }
-    }
 }
 
 impl SyscallArg for SignalMaskHow {
@@ -33,12 +28,40 @@ impl SyscallArg for SignalMaskHow {
     }
 }
 
-syscall!(SyscallNumber::Sigprocmask, handle(how: SignalMaskHow => Invalid, set: SignalSet => Fault));
+syscall!(SyscallNumber::Sigprocmask, handle(how: SignalMaskHow => Invalid, set: Nullable<SignalSet> => Fault, old_set: Nullable<Out<SignalSetAbi>> => Fault));
 
-fn handle(how: SignalMaskHow, _set: SignalSet) -> SyscallResult {
-    Err(unsupported_argument(
-        "sigprocmask",
-        how.number(),
-        Errno::NoSys,
-    ))
+fn handle(
+    how: SignalMaskHow,
+    set: Nullable<SignalSet>,
+    old_set: Nullable<Out<SignalSetAbi>>,
+) -> SyscallResult {
+    let set = set.into_option();
+    let old_set = old_set.into_option();
+
+    if let Some(old_set) = old_set {
+        old_set.validate()?;
+    }
+
+    let old_signals = match set {
+        None => roxy_process::currently_blocked_signals(),
+        Some(set) => update_mask(how, set),
+    };
+
+    if let Some(old_set) = old_set {
+        let old_set_value = SignalSet::from_signals(&old_signals).to_abi();
+        // SAFETY: SignalSetAbi has a checked C layout and every byte is initialized.
+        unsafe { old_set.write(&old_set_value) }?;
+    }
+
+    Ok(0)
+}
+
+fn update_mask(how: SignalMaskHow, set: SignalSet) -> Vec<roxy_signal::Signal> {
+    let signals = set.to_vec();
+
+    match how {
+        SignalMaskHow::Block => roxy_process::block_signals(signals),
+        SignalMaskHow::Unblock => roxy_process::unblock_signals(signals),
+        SignalMaskHow::SetMask => roxy_process::replace_masked_signals(signals),
+    }
 }

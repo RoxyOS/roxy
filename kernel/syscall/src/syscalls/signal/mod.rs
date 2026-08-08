@@ -23,7 +23,7 @@ pub(super) const SEND_SYSCALL: Syscall = send::SYSCALL;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-struct SignalSetAbi {
+pub(super) struct SignalSetAbi {
     bits: [u64; 16],
 }
 
@@ -65,6 +65,20 @@ impl SignalSet {
         Signal::iter()
             .filter(|signal| self.bits() & signal_bit(*signal) != 0)
             .collect()
+    }
+
+    pub(super) fn from_signals(signals: &[Signal]) -> Self {
+        let mut set = Self::empty();
+        for signal in signals {
+            set.insert(Self::from_bits_retain(signal_bit(*signal)));
+        }
+        set
+    }
+
+    pub(super) const fn to_abi(self) -> SignalSetAbi {
+        let mut bits = [0; 16];
+        bits[0] = self.bits();
+        SignalSetAbi { bits }
     }
 }
 
@@ -133,5 +147,7 @@ mod tests {
         let set = SignalSet::TERMINATE | SignalSet::INTERRUPT;
 
         assert_eq!(set.to_vec(), vec![Signal::Interrupt, Signal::Terminate]);
+        assert_eq!(SignalSet::from_signals(&set.to_vec()), set);
+        assert_eq!(set.to_abi().bits[0], set.bits());
     });
 }

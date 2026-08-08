@@ -46,15 +46,6 @@ impl<T: ?Sized> SyscallArg for Out<T> {
     }
 }
 
-impl<T: ?Sized> SyscallArg for Option<Out<T>> {
-    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
-        match raw {
-            0 => Ok(None),
-            raw => Out::parse(raw, error).map(Some),
-        }
-    }
-}
-
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_test::kernel_test;

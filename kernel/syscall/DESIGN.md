@@ -70,10 +70,12 @@ PID, a pending nonblocking wait returns zero, and absence of a matching child re
 Process-group selectors, stopped or continued states, and resource usage remain unsupported and
 must use the centralized diagnostic path.
 
-`sigprocmask` and `sigaction` have stable syscall numbers for the mlibc ABI, but signal state and
-delivery are not implemented. Their handlers do not dereference signal-structure pointers; each
-emits the centralized `UNSUPPORTED` diagnostic with the requested mask operation or signal number
-and returns `ENOSYS`.
+`sigprocmask` decodes the Roxy `sigset_t` ABI and atomically blocks, unblocks, or replaces the
+current process's signal mask. A null input set queries without changing the mask, and a non-null
+old-set output receives the mask active before the operation. The output range is validated before
+state changes. The process subsystem removes `SIGKILL` and `SIGSTOP` from every installed mask.
+`sigaction` retains a stable syscall number but signal handlers are not implemented; it emits the
+centralized `UNSUPPORTED` diagnostic and returns `ENOSYS`.
 
 `send_signal` is the Roxy ABI operation backing mlibc's `kill`. It accepts a positive process ID
 and a Linux-compatible signal number, translates both into ABI-neutral process and signal types,

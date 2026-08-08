@@ -111,8 +111,8 @@ at the syscall boundary; process reports whether a matching child is pending or 
 The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
 survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
 multi-threaded exec cleanup, credentials, signal handlers, asynchronous interrupt-return delivery,
-process groups, and PID 1 reparenting are not. Process-owned signal-mask storage and pending
-delivery filtering are implemented, but the userspace `sigprocmask` ABI is not. Consequently, a
+process groups, and PID 1 reparenting are not. Process-owned signal-mask storage, atomic
+block/unblock/replace operations, and pending delivery filtering are implemented. Consequently, a
 process that never enters a syscall does not yet observe a pending terminating signal. Signal queues currently preserve
 duplicate deliveries; it delivers the most recently queued signal first. POSIX standard-signal
 coalescing is not implemented.

@@ -26,7 +26,8 @@ pub use memory::{
     unmap_anonymous,
 };
 pub use signal::{
-    SignalError, has_pending_signal, process_latest_signal, replace_masked_signals, send_signal,
+    SignalError, block_signals, currently_blocked_signals, has_pending_signal,
+    process_latest_signal, replace_masked_signals, send_signal, unblock_signals,
 };
 pub use table::{current_parent_process_id, current_process_id};
 pub use wait::{WaitError, WaitResult, WaitTarget, wait_current};

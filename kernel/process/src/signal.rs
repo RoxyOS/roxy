@@ -64,6 +64,52 @@ pub fn replace_masked_signals(signals: Vec<Signal>) -> Vec<Signal> {
     process.replace_masked_signals(signals)
 }
 
+/// Returns the signals currently blocked by the current process.
+#[must_use]
+pub fn currently_blocked_signals() -> Vec<Signal> {
+    let mut table = PROCESS_TABLE.lock();
+    let process = table
+        .current_process()
+        .expect("current thread has no process");
+
+    process.masked_signals.clone()
+}
+
+/// Adds signals to the current process's signal mask and returns the previous mask.
+pub fn block_signals(signals: Vec<Signal>) -> Vec<Signal> {
+    update_masked_signals(|masked| {
+        for signal in signals {
+            if !masked.contains(&signal) {
+                masked.push(signal);
+            }
+        }
+    })
+}
+
+/// Removes signals from the current process's signal mask and returns the previous mask.
+pub fn unblock_signals(signals: Vec<Signal>) -> Vec<Signal> {
+    update_masked_signals(|masked| masked.retain(|signal| !signals.contains(signal)))
+}
+
+/// Updates the current process's mask while holding the process-table lock.
+///
+/// `update` receives the current mask and mutates it in place. The returned vector is the mask
+/// that was active before `update` ran; unmaskable signals are removed before the new mask is
+/// published.
+fn update_masked_signals(update: impl FnOnce(&mut Vec<Signal>)) -> Vec<Signal> {
+    let mut table = PROCESS_TABLE.lock();
+    let process = table
+        .current_process()
+        .expect("current thread has no process");
+    let old_mask = process.masked_signals.clone();
+
+    update(&mut process.masked_signals);
+    process.masked_signals =
+        filter_unmaskable_signals(core::mem::take(&mut process.masked_signals));
+
+    old_mask
+}
+
 #[must_use]
 fn filter_unmaskable_signals(mut signals: Vec<Signal>) -> Vec<Signal> {
     signals.retain(|signal| !matches!(signal, Signal::Kill | Signal::Stop));
