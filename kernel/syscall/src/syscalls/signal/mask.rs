@@ -110,9 +110,9 @@ impl SyscallArg for SignalMask {
     }
 }
 
-syscall!(SyscallNumber::Sigprocmask, handle(how: SignalMaskHow => Invalid));
+syscall!(SyscallNumber::Sigprocmask, handle(how: SignalMaskHow => Invalid, mask: SignalMask => Fault));
 
-fn handle(how: SignalMaskHow) -> SyscallResult {
+fn handle(how: SignalMaskHow, _mask: SignalMask) -> SyscallResult {
     Err(unsupported_argument(
         "sigprocmask",
         how.number(),
