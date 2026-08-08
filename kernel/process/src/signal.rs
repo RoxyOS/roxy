@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use roxy_signal::{Signal, SignalAction};
+use roxy_signal::{DefaultAction, Signal};
 use roxy_thread::scheduler;
 
 use crate::{ExitStatus, Process, ProcessId, ProcessState, table::PROCESS_TABLE};
@@ -16,7 +16,7 @@ pub enum SignalError {
 /// The target consumes the queued signal at a userspace return boundary. Sending never exits the
 /// target directly because its thread may still be executing on its own kernel stack.
 pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalError> {
-    if matches!(signal.default_action(), SignalAction::Unsupported) {
+    if matches!(signal.default_action(), DefaultAction::Unsupported) {
         return Err(SignalError::UnsupportedAction);
     }
 
@@ -137,9 +137,11 @@ fn take_latest_signal() -> Option<Signal> {
 
 fn process_signal(signal: Signal) {
     match signal.default_action() {
-        SignalAction::Terminate => crate::exit_current(ExitStatus::signaled(signal)),
-        SignalAction::Ignore => {}
-        SignalAction::Unsupported => unreachable!("unsupported signal actions cannot be queued"),
+        DefaultAction::Terminate => crate::exit_current(ExitStatus::signaled(signal)),
+        DefaultAction::Ignore => {}
+        DefaultAction::Unsupported => {
+            unreachable!("unsupported signal actions cannot be queued")
+        }
     }
 }
 

@@ -2,7 +2,7 @@
 
 mod action;
 
-pub use action::SignalAction;
+pub use action::DefaultAction;
 use strum::EnumIter;
 
 /// A process-directed signal supported by the current kernel.
@@ -34,7 +34,7 @@ pub enum Signal {
 
 impl Signal {
     #[must_use]
-    pub const fn default_action(self) -> SignalAction {
+    pub const fn default_action(self) -> DefaultAction {
         match self {
             Self::Hangup
             | Self::Interrupt
@@ -43,8 +43,8 @@ impl Signal {
             | Self::User2
             | Self::BrokenPipe
             | Self::Alarm
-            | Self::Terminate => SignalAction::Terminate,
-            Self::Child | Self::WindowChanged => SignalAction::Ignore,
+            | Self::Terminate => DefaultAction::Terminate,
+            Self::Child | Self::WindowChanged => DefaultAction::Ignore,
             Self::Quit
             | Self::IllegalInstruction
             | Self::BusError
@@ -55,7 +55,7 @@ impl Signal {
             | Self::Stop
             | Self::TerminalStop
             | Self::TerminalInput
-            | Self::TerminalOutput => SignalAction::Unsupported,
+            | Self::TerminalOutput => DefaultAction::Unsupported,
         }
     }
 
@@ -69,7 +69,7 @@ impl Signal {
 mod tests {
     use roxy_test::kernel_test;
 
-    use super::{Signal, SignalAction};
+    use super::{DefaultAction, Signal};
 
     kernel_test!("roxy-signal::default-actions", default_actions, {
         assert_actions(
@@ -83,11 +83,11 @@ mod tests {
                 Signal::Alarm,
                 Signal::Terminate,
             ],
-            SignalAction::Terminate,
+            DefaultAction::Terminate,
         );
         assert_actions(
             &[Signal::Child, Signal::WindowChanged],
-            SignalAction::Ignore,
+            DefaultAction::Ignore,
         );
         assert_actions(
             &[
@@ -103,11 +103,11 @@ mod tests {
                 Signal::TerminalInput,
                 Signal::TerminalOutput,
             ],
-            SignalAction::Unsupported,
+            DefaultAction::Unsupported,
         );
     });
 
-    fn assert_actions(signals: &[Signal], action: SignalAction) {
+    fn assert_actions(signals: &[Signal], action: DefaultAction) {
         for signal in signals {
             assert_eq!(signal.default_action(), action);
         }
