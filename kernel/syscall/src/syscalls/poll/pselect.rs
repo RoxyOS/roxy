@@ -5,7 +5,7 @@ use roxy_memory::UserAddress;
 
 use crate::{
     SyscallResult,
-    args::{Nullable, SignalMask, SyscallArg, Timespec, user_memory},
+    args::{Nullable, SignalSet, SyscallArg, Timespec, user_memory},
     errno::Errno,
     numbers::SyscallNumber,
     syscall,
@@ -16,7 +16,7 @@ use super::{PollEventFlags, PollFdAbi, poll_until_ready};
 const FD_SET_WORDS: usize = 16;
 const FD_SET_SIZE: usize = FD_SET_WORDS * 64;
 
-syscall!(SyscallNumber::Pselect, handle(count: FdCount => Invalid, read: Nullable<FdSet> => Fault, write: Nullable<FdSet> => Fault, exception: Nullable<FdSet> => Fault, timeout: Nullable<Timespec> => Fault, signal_mask: Nullable<SignalMask> => Fault));
+syscall!(SyscallNumber::Pselect, handle(count: FdCount => Invalid, read: Nullable<FdSet> => Fault, write: Nullable<FdSet> => Fault, exception: Nullable<FdSet> => Fault, timeout: Nullable<Timespec> => Fault, signal_mask: Nullable<SignalSet> => Fault));
 
 fn handle(
     count: FdCount,
@@ -24,7 +24,7 @@ fn handle(
     write: Nullable<FdSet>,
     exception: Nullable<FdSet>,
     timeout: Nullable<Timespec>,
-    signal_mask: Nullable<SignalMask>,
+    signal_mask: Nullable<SignalSet>,
 ) -> SyscallResult {
     let timeout = match timeout {
         Nullable::Null => None,

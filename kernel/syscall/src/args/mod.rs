@@ -12,7 +12,7 @@ mod slice;
 mod timespec;
 pub(crate) mod user_memory;
 
-pub(crate) use crate::syscalls::signal::SignalMask;
+pub(crate) use crate::syscalls::signal::SignalSet;
 pub(crate) use c_string::CString;
 pub(crate) use c_string_array::CStringArray;
 pub(crate) use nullable::Nullable;

@@ -1,6 +1,6 @@
 use crate::{
     SyscallResult,
-    args::{Nullable, SignalMask, Timespec},
+    args::{Nullable, SignalSet, Timespec},
     errno::Errno,
     numbers::SyscallNumber,
     syscall,
@@ -8,13 +8,13 @@ use crate::{
 
 use super::{PollEntriesAddress, poll};
 
-syscall!(SyscallNumber::Ppoll, handle(entries: PollEntriesAddress => Fault, count: usize => Invalid, timeout: Nullable<Timespec> => Fault, signal_mask: Nullable<SignalMask> => Fault));
+syscall!(SyscallNumber::Ppoll, handle(entries: PollEntriesAddress => Fault, count: usize => Invalid, timeout: Nullable<Timespec> => Fault, signal_mask: Nullable<SignalSet> => Fault));
 
 fn handle(
     entries: PollEntriesAddress,
     count: usize,
     timeout: Nullable<Timespec>,
-    signal_mask: Nullable<SignalMask>,
+    signal_mask: Nullable<SignalSet>,
 ) -> SyscallResult {
     let timeout = match timeout {
         Nullable::Null => None,
