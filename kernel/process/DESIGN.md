@@ -32,8 +32,8 @@ published.
 ## Signals
 
 Each running process owns `Vec<Signal>` collections for pending process-directed signals and its
-signal mask, plus a sparse `HashMap<Signal, SignalAction>` of non-default dispositions. These are
-empty when a process is constructed. Absence from the action map means `Default`; installing
+signal mask, plus a `HashMap<Signal, SignalAction>` of configured dispositions. These are empty
+when a process is constructed. Absence from the action map means `Default`; installing
 `Ignore` removes already-pending instances of that signal. Sending an ignored signal succeeds
 without queuing or waking the target. Otherwise sending appends the signal while holding the
 process-table lock and wakes the target's main thread after the lock is released. The sender never

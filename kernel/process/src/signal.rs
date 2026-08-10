@@ -211,15 +211,13 @@ impl Process {
     }
 
     fn replace_signal_action(&mut self, signal: Signal, action: SignalAction) -> SignalAction {
-        let old_action = self.signal_action_of(signal);
-        match action {
-            SignalAction::Default => {
-                self.signal_actions.remove(&signal);
-            }
-            SignalAction::Ignore => {
-                self.signal_actions.insert(signal, action);
-                self.pending_signals.retain(|pending| *pending != signal);
-            }
+        let old_action = self
+            .signal_actions
+            .insert(signal, action)
+            .unwrap_or(SignalAction::Default);
+
+        if matches!(action, SignalAction::Ignore) {
+            self.pending_signals.retain(|pending| *pending != signal);
         }
 
         old_action
@@ -289,7 +287,10 @@ mod tests {
                 process.replace_signal_action(Signal::Interrupt, SignalAction::Default),
                 SignalAction::Ignore
             );
-            assert!(process.signal_actions.is_empty());
+            assert_eq!(
+                process.signal_actions.get(&Signal::Interrupt),
+                Some(&SignalAction::Default)
+            );
             drop(process);
             drop(thread);
             drop(address_space);
