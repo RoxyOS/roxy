@@ -43,9 +43,10 @@ A masked signal remains pending until the mask is replaced; `SIGKILL` and `SIGST
 masked or ignored.
 
 At a syscall return boundary, `process_latest_signal` removes the most recently queued signal of the
-current process together with its current disposition and calls `process_signal`. `Ignore` discards
-it; `Default` maps it through `Signal::default_action`. The terminating action exits the current
-thread with a signal-derived `ExitStatus`; normal
+current process, resolves its disposition, and calls `process_signal`. Only `Default` may reach
+delivery because ignored signals are discarded before queuing and installing `Ignore` clears
+existing pending instances. The default disposition maps through `Signal::default_action`. A
+terminating action exits the current thread with a signal-derived `ExitStatus`; normal
 `waitpid` reaping then observes the corresponding low-byte signal status. This applies at most one
 action because termination does not return.
 

@@ -187,7 +187,7 @@ fn take_latest_signal() -> Option<Signal> {
 
 fn process_signal(signal: Signal, action: SignalAction) {
     match action {
-        SignalAction::Ignore => {}
+        SignalAction::Ignore => unreachable!("ignored signals cannot reach delivery"),
         SignalAction::Default => do_default_action(signal, signal.default_action()),
     }
 }
