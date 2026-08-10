@@ -7,7 +7,7 @@ use strum::EnumIter;
 
 /// A process-directed signal supported by the current kernel.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, EnumIter, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
 pub enum Signal {
     Hangup = 1,
     Interrupt = 2,

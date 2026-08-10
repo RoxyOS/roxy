@@ -1,15 +1,122 @@
+use core::mem;
+
+use roxy_process::SignalAction;
 use roxy_signal::Signal;
 
 use crate::{
-    SyscallResult, errno::Errno, numbers::SyscallNumber, syscall, unsupported::unsupported_argument,
+    SyscallResult,
+    args::{Nullable, Out, SyscallArg, user_memory},
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
+    unsupported::unsupported_argument,
 };
 
-syscall!(SyscallNumber::Sigaction, handle(signal: Signal => Invalid));
+use super::SignalSetAbi;
 
-fn handle(signal: Signal) -> SyscallResult {
-    Err(unsupported_argument(
-        "sigaction",
-        signal.number(),
-        Errno::NoSys,
-    ))
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct SigactionAbi {
+    handler: u64,
+    flags: u64,
+    restorer: u64,
+    mask: SignalSetAbi,
+}
+
+const _: () = assert!(mem::size_of::<SigactionAbi>() == 152);
+const _: () = assert!(mem::offset_of!(SigactionAbi, handler) == 0);
+const _: () = assert!(mem::offset_of!(SigactionAbi, flags) == 8);
+const _: () = assert!(mem::offset_of!(SigactionAbi, restorer) == 16);
+const _: () = assert!(mem::offset_of!(SigactionAbi, mask) == 24);
+
+impl SyscallArg for SigactionAbi {
+    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        let address = roxy_memory::UserAddress::parse(raw, error)?;
+        let mut value = Self {
+            handler: 0,
+            flags: 0,
+            restorer: 0,
+            mask: SignalSetAbi { bits: [0; 16] },
+        };
+
+        // SAFETY: SigactionAbi has a checked C layout and is fully initialized before the copy.
+        unsafe { user_memory::read(address, &mut value) }?;
+
+        Ok(value)
+    }
+}
+
+syscall!(
+    SyscallNumber::Sigaction,
+    handle(
+        signal: Signal => Invalid,
+        newact: Nullable<SigactionAbi> => Fault,
+        oldact: Nullable<Out<SigactionAbi>> => Fault
+    )
+);
+
+fn handle(
+    signal: Signal,
+    newact: Nullable<SigactionAbi>,
+    oldact: Nullable<Out<SigactionAbi>>,
+) -> SyscallResult {
+    let oldact = oldact.into_option();
+    if let Some(output) = oldact {
+        output.validate()?;
+    }
+
+    let new_action = match newact.into_option() {
+        Some(value) => Some(decode(value, signal)?),
+        None => None,
+    };
+
+    let old_action = roxy_process::signal_action_of(signal);
+
+    if let Some(new_action) = new_action {
+        roxy_process::replace_signal_action(signal, new_action).map_err(|_| {
+            unsupported_argument("sigaction.action", signal.number(), Errno::NotSupported)
+        })?;
+    }
+
+    if let Some(output) = oldact {
+        let value = encode(old_action);
+        // SAFETY: SigactionAbi has a checked C layout and every field is initialized.
+        unsafe { output.write(&value) }?;
+    }
+
+    Ok(0)
+}
+
+fn decode(value: SigactionAbi, signal: Signal) -> Result<SignalAction, Errno> {
+    if value.flags != 0 || value.restorer != 0 || value.mask.bits.iter().any(|bits| *bits != 0) {
+        return Err(unsupported_argument(
+            "sigaction.features",
+            signal.number(),
+            Errno::NotSupported,
+        ));
+    }
+
+    Ok(match value.handler {
+        0 => SignalAction::Default,
+        1 => SignalAction::Ignore,
+        handler => {
+            return Err(unsupported_argument(
+                "sigaction.handler",
+                handler,
+                Errno::NoSys,
+            ));
+        }
+    })
+}
+
+fn encode(action: SignalAction) -> SigactionAbi {
+    SigactionAbi {
+        handler: match action {
+            SignalAction::Default => 0,
+            SignalAction::Ignore => 1,
+        },
+        flags: 0,
+        restorer: 0,
+        mask: SignalSetAbi { bits: [0; 16] },
+    }
 }

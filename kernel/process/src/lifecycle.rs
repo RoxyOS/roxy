@@ -85,6 +85,7 @@ mod tests {
             child_addrspace.clone(),
             child_working_directory,
             roxy_fd::FdTable::new(),
+            hashbrown::HashMap::new(),
         );
         let child_process_id = child_process.id;
         assert_eq!(child_process.parent_process_id, Some(process_id));

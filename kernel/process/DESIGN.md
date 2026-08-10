@@ -32,18 +32,26 @@ published.
 ## Signals
 
 Each running process owns `Vec<Signal>` collections for pending process-directed signals and its
-signal mask. Both are empty when a process is constructed. Sending a signal appends it while
-holding the process-table lock and wakes the target's main thread after the lock is released. The
-sender never tears down the target directly: that target may still execute on its own kernel
-stack. Signals whose default action is currently unsupported are rejected before they enter this
-queue. A masked signal remains pending until the mask is replaced; `SIGKILL` and `SIGSTOP` cannot
-be masked.
+signal mask, plus a sparse `HashMap<Signal, SignalAction>` of non-default dispositions. These are
+empty when a process is constructed. Absence from the action map means `Default`; installing
+`Ignore` removes already-pending instances of that signal. Sending an ignored signal succeeds
+without queuing or waking the target. Otherwise sending appends the signal while holding the
+process-table lock and wakes the target's main thread after the lock is released. The sender never
+tears down the target directly: that target may still execute on its own kernel stack. Signals
+whose effective default action is currently unsupported are rejected before they enter this queue.
+A masked signal remains pending until the mask is replaced; `SIGKILL` and `SIGSTOP` cannot be
+masked or ignored.
 
-At a syscall return boundary, `process_latest_signal` removes the most recently queued signal of the current
-process and calls `process_signal`, which maps it through `Signal::default_action`. The
-initial terminating action exits the current thread with a signal-derived `ExitStatus`; normal
+At a syscall return boundary, `process_latest_signal` removes the most recently queued signal of the
+current process together with its current disposition and calls `process_signal`. `Ignore` discards
+it; `Default` maps it through `Signal::default_action`. The terminating action exits the current
+thread with a signal-derived `ExitStatus`; normal
 `waitpid` reaping then observes the corresponding low-byte signal status. This applies at most one
 action because termination does not return.
+
+Fork clones the parent's dispositions while starting with no pending signals. `execve` preserves
+ignored dispositions. Future userspace-handler dispositions must instead reset to default during
+successful image replacement.
 
 ## Initial descriptor injection
 
@@ -110,7 +118,7 @@ at the syscall boundary; process reports whether a matching child is pending or 
 
 The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
 survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
-multi-threaded exec cleanup, credentials, signal handlers, asynchronous interrupt-return delivery,
+multi-threaded exec cleanup, credentials, userspace signal handlers, asynchronous interrupt-return delivery,
 process groups, and PID 1 reparenting are not. Process-owned signal-mask storage, atomic
 block/unblock/replace operations, and pending delivery filtering are implemented. Consequently, a
 process that never enters a syscall does not yet observe a pending terminating signal. Signal queues currently preserve

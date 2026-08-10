@@ -1,5 +1,7 @@
+use hashbrown::HashMap;
 use roxy_arch::UserContext;
 use roxy_fd::FdTable;
+use roxy_signal::Signal;
 use roxy_thread::{Thread, ThreadCreateError, scheduler};
 use roxy_vfs::ResolvedPath;
 use roxy_vm::VmError;
@@ -18,6 +20,7 @@ struct ForkInfo {
     addrspace: roxy_vm::AddrSpaceHandle,
     fds: FdTable,
     working_directory: ResolvedPath,
+    signal_actions: HashMap<Signal, crate::SignalAction>,
 }
 
 /// Creates a child process from the current process and schedules its saved user context.
@@ -44,6 +47,7 @@ pub fn fork_current(context: UserContext) -> Result<ProcessId, ForkError> {
                 .expect("running process has no address space"),
             fds: process.fds.clone(),
             working_directory: process.working_directory.clone(),
+            signal_actions: process.signal_actions.clone(),
         }
     };
 
@@ -55,6 +59,7 @@ pub fn fork_current(context: UserContext) -> Result<ProcessId, ForkError> {
         child_addrspace,
         snapshot.working_directory,
         snapshot.fds,
+        snapshot.signal_actions,
     );
     let child_id = child_process.id;
 

@@ -16,6 +16,7 @@ kernel-test = [
 ]
 
 [dependencies]
+hashbrown.workspace = true
 linkme = { workspace = true, optional = true }
 spin.workspace = true
 

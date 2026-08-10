@@ -26,14 +26,16 @@ pub use memory::{
     unmap_anonymous,
 };
 pub use signal::{
-    SignalError, block_signals, currently_blocked_signals, has_pending_signal,
-    process_latest_signal, replace_masked_signals, send_signal, unblock_signals,
+    SignalAction, SignalError, block_signals, currently_blocked_signals, has_pending_signal,
+    process_latest_signal, replace_masked_signals, replace_signal_action, send_signal,
+    signal_action_of, unblock_signals,
 };
 pub use table::{current_parent_process_id, current_process_id};
 pub use wait::{WaitError, WaitResult, WaitTarget, wait_current};
 
 use alloc::{sync::Arc, vec::Vec};
 
+use hashbrown::HashMap;
 use roxy_fd::{Fd, FdTable, OpenFile};
 use roxy_signal::Signal;
 use roxy_thread::ThreadId;
@@ -53,6 +55,7 @@ struct Process {
     fds: FdTable,
     pending_signals: Vec<Signal>,
     masked_signals: Vec<Signal>,
+    signal_actions: HashMap<Signal, SignalAction>,
     state: ProcessState,
 }
 

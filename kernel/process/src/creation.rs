@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
 
+use hashbrown::HashMap;
 use roxy_thread::{Thread, ThreadCreateError, ThreadId, scheduler};
 use roxy_vfs::ResolvedPath;
 use roxy_vm::AddrSpaceHandle;
@@ -51,6 +52,7 @@ impl Process {
             fds,
             pending_signals: Vec::new(),
             masked_signals: Vec::new(),
+            signal_actions: HashMap::new(),
             state: ProcessState::Running,
         }
     }
@@ -61,6 +63,7 @@ impl Process {
         addrspace: AddrSpaceHandle,
         working_directory: ResolvedPath,
         fds: roxy_fd::FdTable,
+        signal_actions: HashMap<roxy_signal::Signal, crate::SignalAction>,
     ) -> Self {
         Self {
             id: ProcessId(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed)),
@@ -71,6 +74,7 @@ impl Process {
             fds,
             pending_signals: Vec::new(),
             masked_signals: Vec::new(),
+            signal_actions,
             state: ProcessState::Running,
         }
     }

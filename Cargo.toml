@@ -17,6 +17,7 @@ embedded-bitmap-fonts = { version = "0.1", default-features = false, features = 
 embedded-graphics = "0.8"
 ext4plus = { version = "0.1.0-rc.2", default-features = false, features = ["multi-threaded", "sync"] }
 heapless = "0.9"
+hashbrown = "0.16"
 limine = "0.6"
 linkme = "0.3"
 object = { version = "0.39", default-features = false, features = ["elf", "read_core"] }

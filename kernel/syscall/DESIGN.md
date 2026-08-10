@@ -74,8 +74,11 @@ must use the centralized diagnostic path.
 current process's signal mask. A null input set queries without changing the mask, and a non-null
 old-set output receives the mask active before the operation. The output range is validated before
 state changes. The process subsystem removes `SIGKILL` and `SIGSTOP` from every installed mask.
-`sigaction` retains a stable syscall number but signal handlers are not implemented; it emits the
-centralized `UNSUPPORTED` diagnostic and returns `ENOSYS`.
+`sigaction` supports querying and installing `SIG_DFL` and `SIG_IGN` dispositions through the Roxy
+x86_64 ABI record. Null action and old-action pointers independently select query and output
+behavior. The syscall validates its input and output before changing process state. Userspace
+handlers, nonzero flags or restorers, and nonempty per-handler masks remain unsupported and use the
+centralized diagnostic path. `SIGKILL` and `SIGSTOP` cannot be ignored.
 
 `send_signal` is the Roxy ABI operation backing mlibc's `kill`. It accepts a positive process ID
 and a Linux-compatible signal number, translates both into ABI-neutral process and signal types,

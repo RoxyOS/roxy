@@ -245,6 +245,7 @@ mod tests {
             AddrSpace::new().unwrap().into_handle(),
             ResolvedPath::root(),
             roxy_fd::FdTable::new(),
+            hashbrown::HashMap::new(),
         );
         process.state = state;
 
