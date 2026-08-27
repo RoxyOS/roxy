@@ -9,5 +9,7 @@ Use when a recipe's sources need a change.
 2. `jinx regen <name>` — regenerates `patches/jinx-working-patch.patch` from your workdir edits
 3. `jinx rebuild <name>` — clean rebuild to verify the patched sources actually build.
 
-The resulting `jinx-working-patch.patch` goes into `distro/recipes/<name>/`
-patches/ dir; rename/commit it as the newest `NNNN-*.patch` when you're satisfied.
+`jinx-working-patch.patch` is a temporary iteration patch, applied after the ordinary patches.
+When satisfied: rename it to an ordered, descriptive name like `0001-fix-thing.patch` (lexical
+order = apply order, `patch -p1`), delete the working copy, and bump the recipe's `revision`
+(input changed without a version bump).
