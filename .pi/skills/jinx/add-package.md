@@ -20,6 +20,8 @@ Roxy OS recipes use one of three source forms. Pick from the current `distro/rec
   `shallow=no` when history is needed. This is the Roxy default for own/dependent repos.
 - **Local dir** (`source_dir`): build code living inside the repo. Files must stay inside the dir.
 
+**Recipe naming**: the recipe name **must** use the exact name of the upstream project's real name. Do not rename the package name to a name easier to understand, but isn't actually the package's real name — e.g. do not rename `xf86-input-mouse` to `xorg-driver-ps2` because it's easier to understand.
+
 ## Recipe template
 
 ```bash
