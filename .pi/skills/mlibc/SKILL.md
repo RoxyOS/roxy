@@ -80,6 +80,20 @@ number, same order. A mismatch silently breaks that syscall.
 7. **ABI headers**: if a new public header is needed, add it to the `install_headers` list in
    `meson.build` (headers live under `include/abi-bits/` or `include/sys/`).
 
+### Making changes
+
+The mlibc recipe pins a commit and has `clean_workdirs=no` — the local clone lives at
+`distro/sources/mlibc` (workdir: `distro/sources/mlibc-workdir`, the tree you edit).
+
+1. Edit the workdir (`distro/sources/mlibc-workdir`).
+2. Commit and push to the fork, then update the recipe: bump `commit` to the new SHA and `version`
+   per the convention below (see Publishing for the exact rules).
+3. Incremental build to test your changes: `jinx build mlibc`. Use `jinx rebuild mlibc` (fresh `configure()`) only
+   when incremental state is invalid or the Meson configuration must be recreated — e.g. after
+   changing the recipe pin or `meson.build`.
+4. mlibc is **dynamically linked** (`libc.so`, `ld.so`, ...) — consumers pick up the new libc at
+   runtime, so no `revbump` of dependents is needed.
+
 ### Publishing a commit and updating the recipe pin
 
 1. Commit in `distro/sources/mlibc-workdir` as one cohesive change per commit, subject form
