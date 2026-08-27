@@ -16,7 +16,7 @@ Roxy OS recipes use one of three source forms. Pick from the current `distro/rec
 
 - **Tarball** (most common, e.g. `meson`, `vim`): set `tarball_url` + `tarball_sha256`.
   Set `tarball_sha256="?"` and let a first build auto-fill the checksum, then pin it.
-- **Git clone** (e.g. `mlibc`): set `git_url` + `commit` (full 40-hex, no branches/tags) +
+- **Git clone**: set `git_url` + `commit` (full 40-hex, no branches/tags) +
   `shallow=no` when history is needed. This is the Roxy default for own/dependent repos.
 - **Local dir** (`source_dir`): build code living inside the repo. Files must stay inside the dir.
 
