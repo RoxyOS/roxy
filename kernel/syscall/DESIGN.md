@@ -20,6 +20,11 @@ filesystem, scheduler, and other domain APIs must never accept or return a perso
 record. Adding an ABI personality therefore adds adapters here rather than conditional layouts or
 compatibility branches throughout the kernel.
 
+The ioctl family follows the same rule: request numbers such as `FBIOGET_VSCREENINFO` and the
+`fb_var_screeninfo`/`fb_fix_screeninfo` records are private to this subsystem, whose adapter decodes
+them into the fd layer's layout-neutral `FbVarInfo`/`FbFixedInfo` before dispatch and encodes them
+back at the userspace copy boundary. Size and offset assertions pin the checked `x86_64` layouts.
+
 ## Registry and dispatch
 
 The static syscall table is validated for duplicate numbers before the architecture entry is

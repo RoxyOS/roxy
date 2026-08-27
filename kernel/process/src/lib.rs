@@ -22,8 +22,8 @@ pub use fork::{ForkError, fork_current};
 pub use initial_fds::InitialFdInjector;
 pub use lifecycle::{exit_current, initialize};
 pub use memory::{
-    MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, protect_memory,
-    unmap_anonymous,
+    MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, map_physical,
+    protect_memory, unmap_anonymous, unmap_memory,
 };
 pub use signal::{
     SignalAction, SignalError, block_signals, currently_blocked_signals, has_pending_signal,

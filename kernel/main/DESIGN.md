@@ -46,6 +46,13 @@ harness serial channel. The composition root passes the selected endpoint to `ro
 which owns its lifetime and ordinary formatted kernel output without owning this backend-selection
 policy.
 
+The root filesystem setup mounts the ext4 root, then mounts a `roxy-devfs` device filesystem at
+`/dev` and publishes its shared `DeviceRegistry`. Immediately after the root filesystem is
+initialized, the composition root asks `roxy-fbdev` to register the boot framebuffer; the device
+appears only when `fbterm` published a validated layout, so serial-only boots expose no `fb0`.
+This ordering keeps device registration before any userspace process can open `/dev` nodes while
+leaving hardware and driver ownership in their subsystems.
+
 Process initialization also receives the composition root's initial-FD injector. The current
 injector creates three independent TTY open files at descriptors 0, 1, and 2 for every directly
 spawned process. All three share the PS/2 input device, selected kernel output endpoint, and

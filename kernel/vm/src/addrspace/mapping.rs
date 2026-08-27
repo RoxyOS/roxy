@@ -63,13 +63,13 @@ impl AddrSpace {
             .ok_or(VmError::AddressInUse)
     }
 
-    fn ensure_available(&self, region: UserRegion) -> Result<(), VmError> {
+    pub(super) fn ensure_available(&self, region: UserRegion) -> Result<(), VmError> {
         region
             .pages()
             .try_for_each(|page| self.ensure_page_available(page))
     }
 
-    fn rollback(&mut self, region: UserRegion, mapped: usize) {
+    pub(super) fn rollback(&mut self, region: UserRegion, mapped: usize) {
         for page in region.pages().take(mapped) {
             self.page_table.unmap_user_page(page).unwrap();
             self.pages.remove(&page).unwrap();

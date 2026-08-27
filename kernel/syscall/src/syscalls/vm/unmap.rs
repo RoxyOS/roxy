@@ -16,8 +16,7 @@ impl VmUnmapRequest {
             return Err(Errno::Invalid);
         }
 
-        // Only have anon mappings for now
-        roxy_process::unmap_anonymous(self.address, self.size)
+        roxy_process::unmap_memory(self.address, self.size)
             .map_err(|error| map_memory_error(self.address, error))
     }
 }

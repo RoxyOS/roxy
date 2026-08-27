@@ -1,7 +1,7 @@
 use roxy_fd::{
     File as FdFile, FileError as FdFileError, FileMetadata as FdFileMetadata,
-    FileType as FdFileType, PollEvents, SeekError as FdSeekError, SeekFrom as FdSeekFrom,
-    TruncateError as FdTruncateError,
+    FileType as FdFileType, IoctlError, IoctlRequest, MmapError, MmapTarget, PollEvents,
+    SeekError as FdSeekError, SeekFrom as FdSeekFrom, TruncateError as FdTruncateError,
 };
 
 use crate::{SeekFrom as VfsSeekFrom, VfsError, VfsFile};
@@ -73,6 +73,14 @@ impl FdFile for VfsFile {
             FdSeekFrom::End(offset) => VfsSeekFrom::End(offset),
         })
         .map_err(map_seek_error)
+    }
+
+    fn ioctl(&mut self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
+        self.ioctl(request)
+    }
+
+    fn mmap(&mut self, size: usize, offset: u64) -> Result<MmapTarget, MmapError> {
+        self.mmap(size, offset)
     }
 }
 

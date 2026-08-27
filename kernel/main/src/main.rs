@@ -33,7 +33,8 @@ pub extern "C" fn _start() -> ! {
     roxy_memory::initialize(&boot_info);
     select_kernel_terminal(&boot_info);
     roxy_time::initialize(boot_info.unix_seconds_at_boot);
-    rootfs::initialize(&boot_info).expect("initialize root filesystem");
+    let device_registry = rootfs::initialize(&boot_info).expect("initialize root filesystem");
+    roxy_fbdev::register(&device_registry);
     let rsdp_address = boot_info
         .rsdp_address
         .checked_sub(boot_info.hhdm_offset)

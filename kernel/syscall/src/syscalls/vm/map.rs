@@ -1,5 +1,6 @@
 use bitflags::bitflags;
-use roxy_memory::UserAddress;
+use roxy_fd::{Fd, MmapError};
+use roxy_memory::{PhysicalAddress, UserAddress};
 use roxy_process::MemoryError;
 
 use super::MemoryProtection;
@@ -19,8 +20,15 @@ enum MapPlacement {
     Fixed(UserAddress),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MapSource {
+    Anonymous,
+    File { fd: Fd, offset: u64 },
+}
+
 struct VmMapRequest {
     placement: MapPlacement,
+    source: MapSource,
     size: usize,
 }
 
@@ -44,12 +52,34 @@ fn handle(
 
 impl VmMapRequest {
     fn execute(self) -> Result<UserAddress, Errno> {
-        match self.placement {
-            MapPlacement::Anywhere => roxy_process::allocate_anonymous(self.size)
-                .map_err(|error| map_memory_error(error, 0)),
-            MapPlacement::Fixed(address) => roxy_process::allocate_anonymous_at(address, self.size)
-                .map_err(|error| map_memory_error(error, address.as_u64())),
+        match (self.placement, self.source) {
+            (MapPlacement::Anywhere, MapSource::Anonymous) => {
+                roxy_process::allocate_anonymous(self.size)
+                    .map_err(|error| map_memory_error(error, 0))
+            }
+            (MapPlacement::Fixed(address), MapSource::Anonymous) => {
+                roxy_process::allocate_anonymous_at(address, self.size)
+                    .map_err(|error| map_memory_error(error, address.as_u64()))
+            }
+            (placement, MapSource::File { fd, offset }) => self.map_file(placement, fd, offset),
         }
+    }
+
+    fn map_file(&self, placement: MapPlacement, fd: Fd, offset: u64) -> Result<UserAddress, Errno> {
+        let file = roxy_process::current_open_file(fd).map_err(|_| Errno::BadFd)?;
+        let target = file.mmap(self.size, offset).map_err(map_mmap_error)?;
+        let physical = PhysicalAddress::new(target.physical_address).ok_or(Errno::Invalid)?;
+        let permissions = roxy_vm::Permissions::ReadWrite;
+        let result = match placement {
+            MapPlacement::Anywhere => {
+                roxy_process::map_physical(None, self.size, physical, permissions)
+            }
+            MapPlacement::Fixed(address) => {
+                roxy_process::map_physical(Some(address), self.size, physical, permissions)
+            }
+        };
+
+        result.map_err(|error| map_memory_error(error, 0))
     }
 }
 
@@ -73,8 +103,6 @@ bitflags! {
 }
 
 const ANONYMOUS_FD: u64 = u64::MAX;
-const REQUIRED_FLAGS: MapFlags = MapFlags::PRIVATE.union(MapFlags::ANONYMOUS);
-const SUPPORTED_FLAGS: MapFlags = REQUIRED_FLAGS.union(MapFlags::FIXED);
 
 impl VmMapArguments {
     fn parse(
@@ -103,12 +131,12 @@ impl VmMapArguments {
         MemoryProtection::validate_mapping(self.protection)?;
         let flags = MapFlags::parse(self.flags, Errno::Invalid)?;
 
-        validate_anonymous_source(self.file_descriptor, self.offset)?;
-
         let placement = parse_placement(self.address, flags)?;
+        let source = parse_source(self.file_descriptor, self.offset, flags)?;
 
         Ok(VmMapRequest {
             placement,
+            source,
             size: self.size,
         })
     }
@@ -123,7 +151,14 @@ impl SyscallArg for MapFlags {
             return Err(unsupported("vm_map.flags.unknown", unknown));
         }
 
-        if flags != REQUIRED_FLAGS && flags != SUPPORTED_FLAGS {
+        let anonymous = flags.contains(MapFlags::ANONYMOUS);
+        let valid = if anonymous {
+            flags.contains(MapFlags::PRIVATE) && !flags.contains(MapFlags::SHARED)
+        } else {
+            flags.contains(MapFlags::SHARED) && !flags.contains(MapFlags::PRIVATE)
+        };
+
+        if !valid {
             return Err(unsupported("vm_map.flags", flags.bits()));
         }
 
@@ -139,12 +174,35 @@ fn parse_placement(address: Option<UserAddress>, flags: MapFlags) -> Result<MapP
     }
 }
 
-fn validate_anonymous_source(file_descriptor: u64, offset: u64) -> Result<(), Errno> {
-    if file_descriptor != ANONYMOUS_FD || offset != 0 {
+fn parse_source(file_descriptor: u64, offset: u64, flags: MapFlags) -> Result<MapSource, Errno> {
+    if flags.contains(MapFlags::ANONYMOUS) {
+        if file_descriptor != ANONYMOUS_FD || offset != 0 {
+            return Err(unsupported("vm_map.file", file_descriptor));
+        }
+
+        return Ok(MapSource::Anonymous);
+    }
+
+    if file_descriptor == ANONYMOUS_FD {
         return Err(unsupported("vm_map.file", file_descriptor));
     }
 
-    Ok(())
+    let fd = u32::try_from(file_descriptor)
+        .map(Fd::new)
+        .map_err(|_| Errno::BadFd)?;
+
+    Ok(MapSource::File { fd, offset })
+}
+
+fn map_mmap_error(error: MmapError) -> Errno {
+    match error {
+        MmapError::Unsupported => crate::unsupported::unsupported_argument(
+            "vm_map.file.unsupported",
+            0,
+            Errno::NotSupported,
+        ),
+        MmapError::InvalidArgument => Errno::Invalid,
+    }
 }
 
 fn map_memory_error(error: MemoryError, address: u64) -> Errno {
@@ -162,10 +220,11 @@ fn unsupported(operation: &str, argument: u64) -> Errno {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
+    use roxy_fd::Fd;
     use roxy_memory::UserAddress;
     use roxy_test::kernel_test;
 
-    use super::{MapPlacement, VmMapArguments};
+    use super::{MapPlacement, MapSource, VmMapArguments};
 
     kernel_test!("roxy-syscall::vm-map-requests", requests, {
         let fixed = VmMapArguments::parse(0x41_0000, 4096, 0x3, 0x32, u64::MAX, 0)
@@ -176,11 +235,23 @@ mod tests {
             .unwrap()
             .validate()
             .unwrap();
+        let file = VmMapArguments::parse(0, 4096, 0x3, 0x1, 3, 0)
+            .unwrap()
+            .validate()
+            .unwrap();
 
         assert_eq!(
             fixed.placement,
             MapPlacement::Fixed(UserAddress::new(0x41_0000).unwrap())
         );
         assert_eq!(anywhere.placement, MapPlacement::Anywhere);
+        assert_eq!(fixed.source, MapSource::Anonymous);
+        assert_eq!(
+            file.source,
+            MapSource::File {
+                fd: Fd::new(3),
+                offset: 0
+            }
+        );
     });
 }

@@ -1,4 +1,4 @@
-use roxy_memory::UserAddress;
+use roxy_memory::{PhysicalAddress, UserAddress};
 use roxy_vm::VmError;
 
 use crate::current_addrspace;
@@ -77,6 +77,38 @@ pub fn unmap_anonymous(address: UserAddress, size: usize) -> Result<(), MemoryEr
         .map_err(|_| MemoryError::Fault)?
         .unmap_anonymous(address, size)
         .map_err(map_vm_error)
+}
+
+/// Unmaps one complete page-rounded anonymous allocation or physical mapping.
+///
+/// # Errors
+///
+/// Returns an error for invalid ranges, partial anonymous overlaps, or mapping failures.
+pub fn unmap_memory(address: UserAddress, size: usize) -> Result<(), MemoryError> {
+    current_addrspace()
+        .map_err(|_| MemoryError::Fault)?
+        .unmap(address, size)
+        .map_err(map_vm_error)
+}
+
+/// Maps caller-owned physical memory into the current process.
+///
+/// # Errors
+///
+/// Returns an error for invalid sizes, unaligned physical addresses, or mapping failures.
+pub fn map_physical(
+    address: Option<UserAddress>,
+    size: usize,
+    physical: PhysicalAddress,
+    permissions: roxy_vm::Permissions,
+) -> Result<UserAddress, MemoryError> {
+    let addrspace = current_addrspace().map_err(|_| MemoryError::Fault)?;
+    let result = match address {
+        Some(address) => addrspace.map_physical_at(address, size, physical, permissions),
+        None => addrspace.map_physical(size, physical, permissions),
+    };
+
+    result.map_err(map_vm_error)
 }
 
 fn map_vm_error(error: VmError) -> MemoryError {

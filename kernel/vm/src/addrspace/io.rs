@@ -49,7 +49,11 @@ impl AddrSpace {
     pub fn validate_writable(&self, address: UserAddress, length: usize) -> Result<(), VmError> {
         self.preflight(address, length)?;
         visit_chunks(address, length, |page, _, _| {
-            let Some(PageState::Mapped { permissions, .. }) = self.pages.get(&page) else {
+            let Some(
+                PageState::Mapped { permissions, .. }
+                | PageState::MappedPhysical { permissions, .. },
+            ) = self.pages.get(&page)
+            else {
                 return Err(VmError::NotMapped);
             };
 
@@ -71,9 +75,12 @@ impl AddrSpace {
             .ok_or(VmError::InvalidRange)?;
 
         visit_chunks(address, length, |page, _, _| {
-            matches!(self.pages.get(&page), Some(PageState::Mapped { .. }))
-                .then_some(())
-                .ok_or(VmError::NotMapped)
+            matches!(
+                self.pages.get(&page),
+                Some(PageState::Mapped { .. } | PageState::MappedPhysical { .. })
+            )
+            .then_some(())
+            .ok_or(VmError::NotMapped)
         })
     }
 }

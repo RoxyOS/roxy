@@ -1,6 +1,7 @@
 mod anonymous;
 mod io;
 mod mapping;
+mod physical;
 mod protection;
 mod stack;
 mod types;
@@ -62,7 +63,10 @@ impl AddrSpace {
 
     #[must_use]
     pub fn is_mapped(&self, page: UserPage) -> bool {
-        matches!(self.pages.get(&page), Some(PageState::Mapped { .. }))
+        matches!(
+            self.pages.get(&page),
+            Some(PageState::Mapped { .. } | PageState::MappedPhysical { .. })
+        )
     }
 
     /// Activates this address space until the returned guard is dropped.
@@ -78,7 +82,9 @@ impl AddrSpace {
 
     #[must_use]
     pub fn permissions(&self, page: UserPage) -> Option<Permissions> {
-        let PageState::Mapped { permissions, .. } = self.pages.get(&page)? else {
+        let (PageState::Mapped { permissions, .. } | PageState::MappedPhysical { permissions, .. }) =
+            self.pages.get(&page)?
+        else {
             return None;
         };
 
@@ -107,6 +113,10 @@ impl AddrSpaceHandle {
                 PageState::Mapped { frame, permissions } => {
                     destination.map_copied_page(*page, frame, *permissions)?;
                 }
+                PageState::MappedPhysical {
+                    address,
+                    permissions,
+                } => destination.map_physical_page(*page, *address, *permissions)?,
                 PageState::Guard => {
                     destination.pages.insert(*page, PageState::Guard);
                 }
@@ -197,6 +207,48 @@ impl AddrSpaceHandle {
         self.0.lock().unmap_anonymous(address, size)
     }
 
+    /// Creates a physical mapping at an available anonymous-region address.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid sizes, unaligned physical addresses, or mapping failures.
+    pub fn map_physical(
+        &self,
+        size: usize,
+        physical: roxy_memory::PhysicalAddress,
+        permissions: Permissions,
+    ) -> Result<roxy_memory::UserAddress, VmError> {
+        self.0
+            .lock()
+            .map_physical_anywhere(size, physical, permissions)
+    }
+
+    /// Creates a physical mapping at an exact page-aligned address.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid or occupied ranges and mapping failures.
+    pub fn map_physical_at(
+        &self,
+        address: roxy_memory::UserAddress,
+        size: usize,
+        physical: roxy_memory::PhysicalAddress,
+        permissions: Permissions,
+    ) -> Result<roxy_memory::UserAddress, VmError> {
+        self.0
+            .lock()
+            .map_physical_at(address, size, physical, permissions)
+    }
+
+    /// Unmaps a page-rounded anonymous or physical mapping.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid ranges or requests that only partially overlap a mapping.
+    pub fn unmap(&self, address: roxy_memory::UserAddress, size: usize) -> Result<(), VmError> {
+        self.0.lock().unmap(address, size)
+    }
+
     /// Makes this address space active until another page table is selected.
     pub fn activate(&self) {
         // SAFETY: this strong handle keeps the complete page-table hierarchy alive while selected.
@@ -247,7 +299,10 @@ impl Drop for AddrSpaceGuard<'_> {
 impl Drop for AddrSpace {
     fn drop(&mut self) {
         for (page, state) in &self.pages {
-            if matches!(state, PageState::Mapped { .. }) {
+            if matches!(
+                state,
+                PageState::Mapped { .. } | PageState::MappedPhysical { .. }
+            ) {
                 self.page_table.unmap_user_page(*page).unwrap();
             }
         }
@@ -257,6 +312,10 @@ impl Drop for AddrSpace {
 pub(super) enum PageState {
     Mapped {
         frame: PageRef,
+        permissions: Permissions,
+    },
+    MappedPhysical {
+        address: PhysicalAddress,
         permissions: Permissions,
     },
     Guard,

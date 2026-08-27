@@ -11,7 +11,7 @@ const ANONYMOUS_END: u64 = 0x0000_7fff_fffe_e000;
 impl AddrSpace {
     pub(super) fn allocate_anonymous(&mut self, size: usize) -> Result<UserAddress, VmError> {
         let page_count = page_count(size)?;
-        let region = self.find_anonymous_region(page_count)?;
+        let region = self.find_free_region(page_count)?;
 
         self.map_zeroed(region, Permissions::ReadWrite)?;
         self.anonymous.insert(
@@ -108,7 +108,7 @@ impl AddrSpace {
         Ok(())
     }
 
-    fn find_anonymous_region(&self, page_count: NonZeroUsize) -> Result<UserRegion, VmError> {
+    pub(super) fn find_free_region(&self, page_count: NonZeroUsize) -> Result<UserRegion, VmError> {
         let bytes = u64::try_from(page_count.get())
             .ok()
             .and_then(|pages| pages.checked_mul(PAGE_SIZE))

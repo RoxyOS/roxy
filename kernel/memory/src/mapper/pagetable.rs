@@ -123,6 +123,24 @@ impl AddrSpacePageTable {
         self.0.map_user_page(page, frame, permissions)
     }
 
+    /// Maps a user page directly to caller-owned physical memory.
+    ///
+    /// The physical address must be page-aligned and must remain valid for the mapping's
+    /// lifetime; the page table does not own or release the frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error on allocation failure, duplicate mapping, or an invalid hierarchy.
+    pub fn map_user_physical_page(
+        &mut self,
+        page: UserPage,
+        physical_address: PhysicalAddress,
+        permissions: PagePermissions,
+    ) -> Result<(), MappingError> {
+        self.0
+            .map_user_physical_page(page, physical_address, permissions)
+    }
+
     /// Removes an existing user page mapping.
     ///
     /// # Errors
@@ -179,6 +197,13 @@ pub(crate) trait AddrSpacePageTableBackend: sealed::Sealed {
         &mut self,
         page: UserPage,
         frame: &PageRef,
+        permissions: PagePermissions,
+    ) -> Result<(), MappingError>;
+
+    fn map_user_physical_page(
+        &mut self,
+        page: UserPage,
+        physical_address: PhysicalAddress,
         permissions: PagePermissions,
     ) -> Result<(), MappingError>;
 

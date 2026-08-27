@@ -16,6 +16,29 @@ struct PixelFormat {
     blue_shift: u8,
 }
 
+/// Describes one color channel's bit placement inside a packed pixel.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ColorChannelLayout {
+    pub size: u8,
+    pub shift: u8,
+}
+
+/// Kernel-side description of the validated framebuffer layout.
+///
+/// This is the neutral contract between `roxy-fbterm` (the layout owner) and device drivers such
+/// as `roxy-fbdev` that expose the framebuffer to userspace.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FramebufferLayout {
+    pub address: u64,
+    pub width: u32,
+    pub height: u32,
+    pub pitch: u32,
+    pub bits_per_pixel: u32,
+    pub red: ColorChannelLayout,
+    pub green: ColorChannelLayout,
+    pub blue: ColorChannelLayout,
+}
+
 pub(crate) struct Framebuffer {
     address: *mut u32,
     width: usize,
@@ -58,6 +81,28 @@ impl Framebuffer {
 
     pub(crate) fn height(&self) -> usize {
         self.height
+    }
+
+    pub(crate) fn layout(&self) -> FramebufferLayout {
+        FramebufferLayout {
+            address: self.address as u64,
+            width: u32::try_from(self.width).expect("validated width fits u32"),
+            height: u32::try_from(self.height).expect("validated height fits u32"),
+            pitch: u32::try_from(self.pitch).expect("validated pitch fits u32"),
+            bits_per_pixel: u32::try_from(BYTES_PER_PIXEL * 8).expect("bpp fits u32"),
+            red: ColorChannelLayout {
+                size: self.format.red_size,
+                shift: self.format.red_shift,
+            },
+            green: ColorChannelLayout {
+                size: self.format.green_size,
+                shift: self.format.green_shift,
+            },
+            blue: ColorChannelLayout {
+                size: self.format.blue_size,
+                shift: self.format.blue_shift,
+            },
+        }
     }
 
     pub(crate) fn pack_rgb(&self, color: RgbColor) -> u32 {

@@ -22,7 +22,10 @@ pub enum InitError {
     InvalidLayout,
 }
 
+pub use framebuffer::{ColorChannelLayout, FramebufferLayout};
+
 static TERMINAL: Once<Arc<adapter::FbTerminal>> = Once::new();
+static LAYOUT: Once<FramebufferLayout> = Once::new();
 
 /// Initializes the framebuffer terminal once.
 ///
@@ -40,8 +43,10 @@ pub fn initialize(boot_info: &BootInfo) -> Result<(), InitError> {
     );
 
     let terminal = adapter::FbTerminal::new(&boot_info.framebuffers)?;
+    let layout = terminal.layout();
 
     TERMINAL.call_once(|| Arc::new(terminal));
+    LAYOUT.call_once(|| layout);
 
     Ok(())
 }
@@ -52,4 +57,10 @@ pub fn terminal() -> Option<Arc<dyn TerminalOutput>> {
     TERMINAL
         .get()
         .map(|terminal| terminal.clone() as Arc<dyn TerminalOutput>)
+}
+
+/// Returns the validated framebuffer layout, when the framebuffer terminal initialized it.
+#[must_use]
+pub fn framebuffer_layout() -> Option<&'static FramebufferLayout> {
+    LAYOUT.get()
 }

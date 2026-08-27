@@ -372,8 +372,10 @@ dependencies = [
  "roxy-block",
  "roxy-boot",
  "roxy-cpu",
+ "roxy-devfs",
  "roxy-elf",
  "roxy-ext4",
+ "roxy-fbdev",
  "roxy-fbterm",
  "roxy-fd",
  "roxy-futex",
@@ -579,6 +581,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-devfs"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-fd",
+ "roxy-test",
+ "roxy-utils",
+ "roxy-vfs",
+]
+
+[[package]]
 name = "roxy-elf"
 version = "0.1.0"
 dependencies = [
@@ -603,6 +616,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-fb-types"
+version = "0.1.0"
+
+[[package]]
+name = "roxy-fbdev"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-devfs",
+ "roxy-fb-types",
+ "roxy-fbterm",
+ "roxy-fd",
+ "roxy-memory",
+ "roxy-test",
+ "spin 0.12.2",
+]
+
+[[package]]
 name = "roxy-fbterm"
 version = "0.1.0"
 dependencies = [
@@ -622,6 +653,7 @@ name = "roxy-fd"
 version = "0.1.0"
 dependencies = [
  "linkme",
+ "roxy-fb-types",
  "roxy-poll",
  "roxy-test",
  "roxy-tty-types",
@@ -758,6 +790,7 @@ dependencies = [
  "bitflags 2.13.1",
  "linkme",
  "roxy-arch",
+ "roxy-fb-types",
  "roxy-fd",
  "roxy-futex",
  "roxy-memory",

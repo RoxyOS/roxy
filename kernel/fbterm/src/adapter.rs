@@ -4,21 +4,33 @@ use roxy_boot::FramebufferInfo;
 use roxy_terminal::{OutputError, TerminalOutput};
 use roxy_tty_types::WindowSize;
 
-use crate::{InitError, console::Console, framebuffer::Framebuffer, renderer::TextRenderer};
+use crate::{
+    InitError,
+    console::Console,
+    framebuffer::{Framebuffer, FramebufferLayout},
+    renderer::TextRenderer,
+};
 
 pub(crate) struct FbTerminal {
     console: Mutex<Console>,
+    layout: FramebufferLayout,
 }
 
 impl FbTerminal {
     pub(crate) fn new(framebuffers: &[FramebufferInfo]) -> Result<Self, InitError> {
         let framebuffer = framebuffers.first().ok_or(InitError::NoFramebuffer)?;
         let framebuffer = Framebuffer::from_info(framebuffer)?;
+        let layout = framebuffer.layout();
         let renderer = TextRenderer::new(framebuffer)?;
 
         Ok(Self {
             console: Mutex::new(Console::new(renderer)),
+            layout,
         })
+    }
+
+    pub(crate) fn layout(&self) -> FramebufferLayout {
+        self.layout
     }
 }
 

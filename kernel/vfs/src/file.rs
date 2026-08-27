@@ -1,5 +1,6 @@
 use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
 
+use roxy_fd::{IoctlError, IoctlRequest, MmapError, MmapTarget};
 use roxy_utils::Lock;
 
 use crate::{FileHandle, FilePermissions, Metadata, ResolvedPath, Vfs, VfsError};
@@ -163,6 +164,14 @@ impl VfsFile {
 
     pub fn sync(&mut self) -> Result<(), VfsError> {
         self.handle.sync()
+    }
+
+    pub fn ioctl(&mut self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
+        self.handle.ioctl(request)
+    }
+
+    pub fn mmap(&mut self, size: usize, offset: u64) -> Result<MmapTarget, MmapError> {
+        self.handle.mmap(size, offset)
     }
 }
 

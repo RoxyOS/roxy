@@ -1,4 +1,6 @@
 mod execute;
+mod framebuffer;
+mod framebuffer_abi;
 mod terminal;
 mod terminal_abi;
 

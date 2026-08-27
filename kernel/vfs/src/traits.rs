@@ -1,5 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 
+use roxy_fd::{IoctlError, IoctlRequest, MmapError, MmapTarget};
+
 use crate::{DirEntry, FilePermissions, Metadata, OpenOptions, ResolvedPath, SeekFrom, VfsError};
 
 pub trait FileHandle: Send {
@@ -9,6 +11,24 @@ pub trait FileHandle: Send {
     fn truncate(&mut self, size: u64) -> Result<(), VfsError>;
     fn metadata(&self) -> Result<Metadata, VfsError>;
     fn sync(&mut self) -> Result<(), VfsError>;
+
+    /// Performs a typed ioctl operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an operation-specific ioctl error.
+    fn ioctl(&mut self, _request: IoctlRequest<'_>) -> Result<(), IoctlError> {
+        Err(IoctlError::NotTty)
+    }
+
+    /// Describes the physical memory backing a file-backed `mmap`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the object does not support device mapping.
+    fn mmap(&mut self, _size: usize, _offset: u64) -> Result<MmapTarget, MmapError> {
+        Err(MmapError::Unsupported)
+    }
 }
 
 pub trait FileSystem: Send + Sync {

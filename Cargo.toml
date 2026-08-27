@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/block", "kernel/boot", "kernel/cpu", "kernel/elf", "kernel/ext4", "kernel/fbterm", "kernel/fd", "kernel/futex", "kernel/input", "kernel/interrupt", "kernel/line-discipline", "kernel/main", "kernel/memory", "kernel/poll", "kernel/process", "kernel/ps2", "kernel/serial", "kernel/signal", "kernel/syscall", "kernel/terminal", "kernel/test", "kernel/thread", "kernel/time", "kernel/timer-wait", "kernel/tty", "kernel/tty-types", "kernel/utils", "kernel/vfs", "kernel/vm"]
+members = ["xtask", "kernel/arch", "kernel/block", "kernel/boot", "kernel/cpu", "kernel/devfs", "kernel/elf", "kernel/ext4", "kernel/fb-types", "kernel/fbdev", "kernel/fbterm", "kernel/fd", "kernel/futex", "kernel/input", "kernel/interrupt", "kernel/line-discipline", "kernel/main", "kernel/memory", "kernel/poll", "kernel/process", "kernel/ps2", "kernel/serial", "kernel/signal", "kernel/syscall", "kernel/terminal", "kernel/test", "kernel/thread", "kernel/time", "kernel/timer-wait", "kernel/tty", "kernel/tty-types", "kernel/utils", "kernel/vfs", "kernel/vm"]
 
 [workspace.package]
 edition = "2024"
@@ -36,8 +36,11 @@ roxy-arch.path = "kernel/arch"
 roxy-block.path = "kernel/block"
 roxy-boot.path = "kernel/boot"
 roxy-cpu.path = "kernel/cpu"
+roxy-devfs.path = "kernel/devfs"
 roxy-elf.path = "kernel/elf"
 roxy-ext4.path = "kernel/ext4"
+roxy-fb-types.path = "kernel/fb-types"
+roxy-fbdev.path = "kernel/fbdev"
 roxy-fbterm.path = "kernel/fbterm"
 roxy-fd.path = "kernel/fd"
 roxy-futex.path = "kernel/futex"

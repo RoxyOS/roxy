@@ -10,6 +10,9 @@ use x86_64::{
     },
 };
 
+use super::kernel::copy_kernel_entries;
+#[cfg(feature = "kernel-test")]
+use super::kernel::kernel_entries_match;
 use crate::{
     OwnedFrame, PageRef, PhysicalAddress, UserPage, frame,
     frame::{hhdm_offset, physical_pointer},
@@ -18,10 +21,6 @@ use crate::{
         pagetable::{AddrSpacePageTableBackend, sealed},
     },
 };
-
-use super::kernel::copy_kernel_entries;
-#[cfg(feature = "kernel-test")]
-use super::kernel::kernel_entries_match;
 
 pub(crate) struct X86_64AddrSpacePageTable {
     mapper: OffsetPageTable<'static>,
@@ -110,6 +109,30 @@ impl AddrSpacePageTableBackend for X86_64AddrSpacePageTable {
         };
 
         // SAFETY: the leaf frame remains owned by PageRef and flags enforce user W^X mappings.
+        let flush = unsafe {
+            self.mapper
+                .map_to(page, physical, user_page_flags(permissions), &mut allocator)
+        }
+        .map_err(|error| map_error(&error))?;
+        flush.ignore();
+
+        Ok(())
+    }
+
+    fn map_user_physical_page(
+        &mut self,
+        page: UserPage,
+        physical_address: PhysicalAddress,
+        permissions: PagePermissions,
+    ) -> Result<(), MappingError> {
+        let page = page_from(page);
+        let physical = PhysFrame::containing_address(PhysAddr::new(physical_address.as_u64()));
+        let mut allocator = TableFrameAllocator {
+            frames: &mut self.table_frames,
+        };
+
+        // SAFETY: the leaf frame is caller-owned device or physical memory that outlives the
+        // mapping, and flags enforce user W^X access.
         let flush = unsafe {
             self.mapper
                 .map_to(page, physical, user_page_flags(permissions), &mut allocator)

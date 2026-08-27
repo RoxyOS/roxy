@@ -61,7 +61,7 @@ fn update_mask(how: SignalMaskHow, set: SignalSet) -> Vec<roxy_signal::Signal> {
 
     match how {
         SignalMaskHow::Block => roxy_process::block_signals(signals),
-        SignalMaskHow::Unblock => roxy_process::unblock_signals(signals),
+        SignalMaskHow::Unblock => roxy_process::unblock_signals(&signals),
         SignalMaskHow::SetMask => roxy_process::replace_masked_signals(signals),
     }
 }

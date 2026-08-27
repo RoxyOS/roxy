@@ -36,7 +36,10 @@ impl AddrSpace {
         region
             .pages()
             .map(|page| match self.pages.get(&page) {
-                Some(PageState::Mapped { permissions, .. }) => Ok(*permissions),
+                Some(
+                    PageState::Mapped { permissions, .. }
+                    | PageState::MappedPhysical { permissions, .. },
+                ) => Ok(*permissions),
                 _ => Err(VmError::NotMapped),
             })
             .collect()
@@ -47,10 +50,16 @@ impl AddrSpace {
             .protect_user_page(page, permissions.into())
             .map_err(super::mapping::mapping_error)?;
 
-        let Some(PageState::Mapped {
-            permissions: current,
-            ..
-        }) = self.pages.get_mut(&page)
+        let Some(
+            PageState::Mapped {
+                permissions: current,
+                ..
+            }
+            | PageState::MappedPhysical {
+                permissions: current,
+                ..
+            },
+        ) = self.pages.get_mut(&page)
         else {
             return Err(VmError::NotMapped);
         };

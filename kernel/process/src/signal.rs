@@ -126,6 +126,7 @@ pub fn currently_blocked_signals() -> Vec<Signal> {
 }
 
 /// Adds signals to the current process's signal mask and returns the previous mask.
+#[must_use]
 pub fn block_signals(signals: Vec<Signal>) -> Vec<Signal> {
     update_masked_signals(|masked| {
         for signal in signals {
@@ -137,7 +138,8 @@ pub fn block_signals(signals: Vec<Signal>) -> Vec<Signal> {
 }
 
 /// Removes signals from the current process's signal mask and returns the previous mask.
-pub fn unblock_signals(signals: Vec<Signal>) -> Vec<Signal> {
+#[must_use]
+pub fn unblock_signals(signals: &[Signal]) -> Vec<Signal> {
     update_masked_signals(|masked| masked.retain(|signal| !signals.contains(signal)))
 }
 

@@ -1,4 +1,4 @@
-use crate::{IoctlError, IoctlRequest};
+use crate::{IoctlError, IoctlRequest, MmapError, MmapTarget};
 use alloc::{sync::Arc, vec::Vec};
 use roxy_poll::{PollListener, PollRegistration};
 
@@ -90,6 +90,15 @@ pub trait File: Send {
     /// Returns an operation-specific ioctl error.
     fn ioctl(&mut self, _request: IoctlRequest<'_>) -> Result<(), IoctlError> {
         Err(IoctlError::NotTty)
+    }
+
+    /// Describes the physical memory backing a file-backed `mmap`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the object does not support device mapping.
+    fn mmap(&mut self, _size: usize, _offset: u64) -> Result<MmapTarget, MmapError> {
+        Err(MmapError::Unsupported)
     }
 
     /// Returns this object's directory capability when it supports directory iteration.

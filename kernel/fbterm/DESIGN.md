@@ -17,6 +17,12 @@ publishes the output `Arc` exactly once; a
 mode-validation failure leaves the global endpoint uninitialized, while a second successful
 initialization attempt violates the core startup contract and panics.
 
+Initialization also publishes a `FramebufferLayout` once: the physical address, dimensions, pitch,
+bits per pixel, and RGB channel placement of the validated framebuffer. This neutral description is
+the contract between `fbterm` (the layout owner) and device drivers such as `roxy-fbdev` that expose
+the framebuffer to userspace. The layout is captured before the `Framebuffer` moves into the
+renderer and lives for the kernel lifetime; terminal-only builds never publish it.
+
 ## Terminal behavior
 
 The endpoint renders printable ASCII with the regular Terminus 8x16 bitmap font from

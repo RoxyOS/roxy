@@ -29,10 +29,12 @@ without changing the shared open-file offset. The `File` trait's default impleme
 `IoctlError::NotTty`; file kinds override it only for supported requests.
 
 Terminal-specific ioctl payload types belong to `roxy-tty-types`, which both this crate and
-`roxy-tty` depend on. `File::ioctl` embeds those layout-neutral domain values in one typed
-dispatch surface without making the descriptor layer depend on a concrete TTY implementation.
-Userspace ABI layouts, request numbers, errno policy, and raw userspace pointers remain exclusive
-to `roxy-syscall`.
+`roxy-tty` depend on. Framebuffer-specific payload types belong to `roxy-fb-types`, a
+layout-neutral type crate with no device implementation, which `roxy-fbdev` and `roxy-syscall`
+depend on directly. Both crates keep the descriptor layer free of device implementations.
+`File::ioctl` embeds those layout-neutral domain values in one typed dispatch surface without
+making the descriptor layer depend on a concrete device implementation. Userspace ABI layouts,
+request numbers, errno policy, and raw userspace pointers remain exclusive to `roxy-syscall`.
 
 ## Invariants
 
@@ -65,5 +67,7 @@ and directories report immediate read/write readiness, while devices such as the
 from their state and register their listeners with a shared device queue. Duplication syscalls and
 per-descriptor flags remain unsupported.
 
-The typed request set covers terminal attribute get/set operations with their application timing
-and terminal window-size get/set operations. Other ioctl families have no typed request variant.
+The typed request set covers terminal attribute get/set operations with their application timing,
+terminal window-size get/set operations, and framebuffer screen-information get operations.
+`File::mmap` describes device physical memory for a file-backed `mmap`; only device-backed files
+implement it, and the descriptor layer never installs or owns the mapping itself.

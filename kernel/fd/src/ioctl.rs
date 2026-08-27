@@ -1,5 +1,6 @@
 use crate::OpenFile;
 
+pub use roxy_fb_types::{FbBitfield, FbFixedInfo, FbVarInfo};
 pub use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
 
 #[derive(Debug)]
@@ -8,6 +9,8 @@ pub enum IoctlRequest<'a> {
     SetTermios { when: ApplyWhen, termios: Termios },
     GetWindowSize(&'a mut WindowSize),
     SetWindowSize(WindowSize),
+    FbGetVarInfo(&'a mut FbVarInfo),
+    FbGetFixedInfo(&'a mut FbFixedInfo),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -17,6 +20,19 @@ pub enum IoctlError {
         operation: &'static str,
         argument: u64,
     },
+}
+
+/// Describes the physical memory backing a file-backed `mmap`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MmapTarget {
+    pub physical_address: u64,
+    pub length: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MmapError {
+    Unsupported,
+    InvalidArgument,
 }
 
 impl OpenFile {
@@ -29,5 +45,16 @@ impl OpenFile {
         let mut state = self.state.lock();
 
         state.object.ioctl(request)
+    }
+
+    /// Maps a file object's physical memory for a file-backed `mmap`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying object's mapping error.
+    pub fn mmap(&self, size: usize, offset: u64) -> Result<MmapTarget, MmapError> {
+        let mut state = self.state.lock();
+
+        state.object.mmap(size, offset)
     }
 }
