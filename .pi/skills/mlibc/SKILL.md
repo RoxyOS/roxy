@@ -71,11 +71,13 @@ number, same order. A mismatch silently breaks that syscall.
    the enum value exactly.
 3. **Implement the operation**: add `Sysdeps<Operation>::operator()` in `sysdeps.cpp` (or the
    matching per-domain file), calling `roxy_syscallN` with the correct arg count.
-4. **Register the file**: if you put code in a new `.cpp`, add it to `libc_sources` (or
+4. **Register the tag**: add the operation's tag to `struct RoxySysdepTags` in
+   `sysdeps/roxy/include/mlibc/sysdeps.hpp` — a compiled but undiscoverable sysdep is incomplete.
+5. **Register the file**: if you put code in a new `.cpp`, add it to `libc_sources` (or
    `rtld_sources` for loader bits) in `sysdeps/roxy/meson.build`.
-5. **Result structs**: if the syscall returns a struct, define it in `syscall.h` **with
+6. **Result structs**: if the syscall returns a struct, define it in `syscall.h` **with
    static_asserts** on size/alignment/offsets — the kernel ABI depends on this layout.
-6. **ABI headers**: if a new public header is needed, add it to the `install_headers` list in
+7. **ABI headers**: if a new public header is needed, add it to the `install_headers` list in
    `meson.build` (headers live under `include/abi-bits/` or `include/sys/`).
 
 ### Publishing a commit and updating the recipe pin
