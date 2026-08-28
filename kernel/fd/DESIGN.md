@@ -18,7 +18,10 @@ interpret the shared offset as an entry index, so forked descriptors share direc
 The `File` and `Directory` traits define object capabilities without implementing any concrete file
 kind in this crate. Owning subsystems such as VFS and terminal implement those traits for their
 objects. `File::as_directory` exposes optional directory iteration without concrete-type
-downcasting; the FD layer does not identify objects by descriptor number or concrete backend type.
+downcasting, and `File::as_socket` exposes the same pattern for the socket-specific operations in
+`SocketOps`; the FD layer does not identify objects by descriptor number or concrete backend type.
+Socket operations run through `OpenFile::socket_ops` under the open-file lock, so blocking socket
+operations hold that lock while waiting, matching blocking reads and writes.
 
 The syscall boundary decodes personality-specific request numbers and layouts, copies pointer-based
 ABI payloads, and constructs an `IoctlRequest` containing only layout-neutral kernel values or a
@@ -50,8 +53,8 @@ request numbers, errno policy, and raw userspace pointers remain exclusive to `r
   semantics.
 - Removing a descriptor drops one reference; the underlying object remains alive while other
   references or active VFS handles exist.
-- Errors distinguish bad descriptors, unsupported operations, seekability, and underlying I/O
-  failures at their owning layer.
+- Errors distinguish bad descriptors, unsupported operations, seekability, unconnected sockets,
+  and underlying I/O failures at their owning layer.
 - Stream-specific broken-pipe errors remain ABI-neutral until the syscall layer translates them
   into errno and signal behavior.
 

@@ -301,6 +301,36 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::Socketpair)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Socket)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Bind)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Listen)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Accept)
+        );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Connect)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {

@@ -2,22 +2,32 @@ use alloc::{boxed::Box, sync::Arc};
 
 use roxy_fd::OpenFile;
 
+mod bound;
 mod buffer;
+mod connected;
 mod connection;
-mod endpoint;
+mod registry;
 mod side;
+mod socket;
 
 use connection::Connection;
-use endpoint::Endpoint;
 use side::Side;
 
-/// Creates two connected, bidirectional Unix stream endpoints.
+pub use socket::Socket;
+
+/// Creates two connected, bidirectional Unix stream sockets.
 #[must_use]
 pub fn pair() -> (Arc<OpenFile>, Arc<OpenFile>) {
     let connection = Arc::new(Connection::new());
 
     (
-        OpenFile::new(Box::new(Endpoint::new(connection.clone(), Side::First))),
-        OpenFile::new(Box::new(Endpoint::new(connection, Side::Second))),
+        OpenFile::new(Box::new(Socket::connected(connection.clone(), Side::First))),
+        OpenFile::new(Box::new(Socket::connected(connection, Side::Second))),
     )
+}
+
+/// Creates one unconnected Unix stream socket.
+#[must_use]
+pub fn socket() -> Arc<OpenFile> {
+    OpenFile::new(Box::new(Socket::new()))
 }

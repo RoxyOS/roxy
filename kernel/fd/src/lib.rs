@@ -6,6 +6,7 @@ mod fd;
 mod file;
 mod ioctl;
 mod open;
+mod socket;
 mod table;
 mod truncate;
 
@@ -19,4 +20,5 @@ pub use ioctl::{
     MmapTarget, Termios, WindowSize,
 };
 pub use open::OpenFile;
+pub use socket::{SocketError, SocketOps};
 pub use table::FdTable;

@@ -85,6 +85,7 @@ fn map_file_error(error: FileError) -> Errno {
     match error {
         FileError::BadOperation => Errno::NotDirectory,
         FileError::BrokenPipe => Errno::Pipe,
+        FileError::NotConnected => Errno::NotConnected,
         FileError::Io => Errno::Io,
     }
 }

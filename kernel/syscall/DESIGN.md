@@ -203,6 +203,21 @@ unsupported.
 
 `socketpair` is syscall 48 and accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero. It asks
 `roxy-unix-socket` to create the connected files, then owns descriptor insertion and the checked
-copy of the descriptor pair to userspace. The socket subsystem owns buffering, blocking,
-readiness, and close state. Other families, types, protocols, and socket operations emit the
-centralized unsupported diagnostic when they reach this ABI boundary.
+copy of the descriptor pair to userspace.
+
+The addressed socket family adds syscalls 49-53: `socket`, `bind`, `listen`, `accept`, and
+`connect`. `socket` accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero; `SOCK_CLOEXEC` and
+`SOCK_NONBLOCK` and all other types, domains, and protocols emit the centralized unsupported
+diagnostic. Callers that tolerate rejection, such as libxcb's `SOCK_CLOEXEC` fallback, receive
+`EINVAL`. `bind` and `connect` decode the personality-private `sockaddr_un` record in this
+subsystem, accepting either a length-bounded or NUL-terminated path, rejecting abstract
+addresses, and normalizing the path through the VFS boundary before handing raw bytes to the
+socket object. `bind` additionally refuses addresses occupied by a filesystem entry.
+`accept` inserts the returned connection as a fresh descriptor. Socket-specific failures map to
+`ENOTSOCK`, `EADDRINUSE`, `EISCONN`, `ENOTCONN`, and `ECONNREFUSED`; reads and writes through
+unconnected sockets report `ENOTCONN`. The socket subsystem owns buffering, blocking, readiness,
+and close state. Peer addresses are not reported: mlibc fills the exact unnamed `AF_UNIX` peer
+address that the kernel's refusal of client-side `bind` guarantees.
+
+Other families, types, protocols, and socket operations emit the centralized unsupported
+diagnostic when they reach this ABI boundary.

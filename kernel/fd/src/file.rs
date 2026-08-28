@@ -1,4 +1,4 @@
-use crate::{IoctlError, IoctlRequest, MmapError, MmapTarget};
+use crate::{IoctlError, IoctlRequest, MmapError, MmapTarget, SocketOps};
 use alloc::{sync::Arc, vec::Vec};
 use roxy_poll::{PollListener, PollRegistration};
 
@@ -105,6 +105,11 @@ pub trait File: Send {
     fn as_directory(&mut self) -> Option<&mut dyn Directory> {
         None
     }
+
+    /// Returns this object's socket capability when it supports socket operations.
+    fn as_socket(&mut self) -> Option<&mut dyn SocketOps> {
+        None
+    }
 }
 
 pub trait Directory {
@@ -154,6 +159,7 @@ pub enum FileType {
 pub enum FileError {
     BadOperation,
     BrokenPipe,
+    NotConnected,
     Io,
 }
 

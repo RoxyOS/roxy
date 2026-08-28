@@ -50,6 +50,11 @@ pub(crate) enum SyscallNumber {
     Fsync = 46,
     Ftruncate = 47,
     Socketpair = 48,
+    Socket = 49,
+    Bind = 50,
+    Listen = 51,
+    Accept = 52,
+    Connect = 53,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -106,6 +111,11 @@ impl TryFrom<u64> for SyscallNumber {
             46 => Ok(Self::Fsync),
             47 => Ok(Self::Ftruncate),
             48 => Ok(Self::Socketpair),
+            49 => Ok(Self::Socket),
+            50 => Ok(Self::Bind),
+            51 => Ok(Self::Listen),
+            52 => Ok(Self::Accept),
+            53 => Ok(Self::Connect),
             _ => Err(()),
         }
     }
@@ -166,6 +176,11 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(46), Ok(SyscallNumber::Fsync));
         assert_eq!(SyscallNumber::try_from(47), Ok(SyscallNumber::Ftruncate));
         assert_eq!(SyscallNumber::try_from(48), Ok(SyscallNumber::Socketpair));
-        assert!(SyscallNumber::try_from(49).is_err());
+        assert_eq!(SyscallNumber::try_from(49), Ok(SyscallNumber::Socket));
+        assert_eq!(SyscallNumber::try_from(50), Ok(SyscallNumber::Bind));
+        assert_eq!(SyscallNumber::try_from(51), Ok(SyscallNumber::Listen));
+        assert_eq!(SyscallNumber::try_from(52), Ok(SyscallNumber::Accept));
+        assert_eq!(SyscallNumber::try_from(53), Ok(SyscallNumber::Connect));
+        assert!(SyscallNumber::try_from(54).is_err());
     });
 }

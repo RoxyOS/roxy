@@ -4,7 +4,7 @@ use roxy_poll::{PollListener, PollRegistration};
 use roxy_utils::Lock;
 
 use crate::file::File;
-use crate::{DirectoryEntry, FileError, FileMetadata, PollEvents, SeekError, SeekFrom};
+use crate::{DirectoryEntry, FileError, FileMetadata, PollEvents, SeekError, SeekFrom, SocketOps};
 
 pub(crate) struct OpenFileState {
     pub(crate) object: Box<dyn File>,
@@ -118,6 +118,17 @@ impl OpenFile {
         let directory = object.as_directory().ok_or(FileError::BadOperation)?;
 
         directory.read_entries(position, limit)
+    }
+
+    /// Runs a socket operation through the serialized open-file state.
+    ///
+    /// Returns `None` when the open object does not support socket operations. Blocking socket
+    /// operations hold the open-file lock while waiting, matching blocking reads and writes.
+    pub fn socket_ops<R>(&self, operation: impl FnOnce(&mut dyn SocketOps) -> R) -> Option<R> {
+        let mut state = self.state.lock();
+        let socket = state.object.as_socket()?;
+
+        Some(operation(socket))
     }
 }
 

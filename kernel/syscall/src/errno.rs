@@ -28,7 +28,12 @@ pub(crate) enum Errno {
     NoSys = 38,
     NotEmpty = 39,
     Overflow = 75,
+    NotSocket = 88,
     NotSupported = 95,
+    AddressInUse = 98,
+    AlreadyConnected = 106,
+    NotConnected = 107,
+    ConnectionRefused = 111,
 }
 
 impl Errno {

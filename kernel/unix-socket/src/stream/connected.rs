@@ -1,0 +1,219 @@
+use alloc::sync::Arc;
+
+use roxy_fd::{FileError, PollEvents};
+use roxy_poll::{PollListener, PollRegistration};
+use roxy_thread::scheduler;
+
+use super::{
+    buffer::CAPACITY,
+    connection::{Connection, State},
+    side::Side,
+};
+
+/// The connected payload of a [`Socket`](super::Socket): one side of an established connection.
+///
+/// Owns one direction of the underlying channel. The connection stays alive while either side
+/// exists, and closing this side through `Drop` wakes the peer.
+pub(super) struct Connected {
+    connection: Arc<Connection>,
+    side: Side,
+}
+
+impl Connected {
+    pub(super) fn new(connection: Arc<Connection>, side: Side) -> Self {
+        Self { connection, side }
+    }
+
+    pub(super) fn read(&mut self, output: &mut [u8]) -> Result<usize, FileError> {
+        if output.is_empty() {
+            return Ok(0);
+        }
+
+        loop {
+            let (pending, registration) = {
+                let mut states = self.connection.states.lock();
+                let index = self.side.index();
+                let peer = self.side.other().index();
+
+                let peer_is_open = states[peer].open;
+                let state = &mut states[index];
+
+                if !state.received_data.is_empty() {
+                    // Read first so the mutable borrow ends before the listener sets are cloned.
+                    let count = state.received_data.read_to(output);
+                    let (self_listener, peer_listener) = (
+                        states[index].listeners.clone(),
+                        states[peer].listeners.clone(),
+                    );
+
+                    drop(states);
+                    self_listener.notify();
+                    peer_listener.notify();
+
+                    return Ok(count);
+                }
+
+                if !peer_is_open {
+                    return Ok(0);
+                }
+
+                self.prepare_wait(&states)
+            };
+
+            pending.perform();
+            drop(registration);
+        }
+    }
+
+    pub(super) fn write(&mut self, input: &[u8]) -> Result<usize, FileError> {
+        if input.is_empty() {
+            return Ok(0);
+        }
+
+        loop {
+            let (pending, registration) = {
+                let mut states = self.connection.states.lock();
+                let index = self.side.index();
+                let peer = self.side.other().index();
+
+                if !states[peer].open {
+                    return Err(FileError::BrokenPipe);
+                }
+
+                let available = CAPACITY - states[peer].received_data.len();
+                if available > 0 {
+                    // Write first so the mutable borrow ends before the listener sets are cloned.
+                    let count = states[peer].received_data.write_from(input);
+                    let (self_listener, peer_listener) = (
+                        states[index].listeners.clone(),
+                        states[peer].listeners.clone(),
+                    );
+
+                    drop(states);
+                    self_listener.notify();
+                    peer_listener.notify();
+
+                    return Ok(count);
+                }
+
+                self.prepare_wait(&states)
+            };
+
+            pending.perform();
+            drop(registration);
+        }
+    }
+
+    pub(super) fn poll(&self) -> PollEvents {
+        let states = self.connection.states.lock();
+        let index = self.side.index();
+        let peer = self.side.other().index();
+
+        let state = &states[index];
+        let peer_state = &states[peer];
+
+        PollEvents {
+            readable: !state.received_data.is_empty() || !peer_state.open,
+            writable: peer_state.open && peer_state.received_data.len() < CAPACITY,
+            hangup: !peer_state.open,
+            ..PollEvents::default()
+        }
+    }
+
+    pub(super) fn register_poll_listener(&self, listener: Arc<PollListener>) -> PollRegistration {
+        let states = self.connection.states.lock();
+
+        states[self.side.index()].listeners.register(listener)
+    }
+
+    fn prepare_wait(&self, states: &[State; 2]) -> (scheduler::PendingBlock, PollRegistration) {
+        // Registers a listener for this side's state to be woken on readiness changes, then
+        // prepares the current thread to block on that listener's wait key.
+        let listener = PollListener::current_thread();
+        let registration = states[self.side.index()]
+            .listeners
+            .register(listener.clone());
+
+        let pending = scheduler::prepare_block_current_with_key(listener.wait_key());
+
+        (pending, registration)
+    }
+}
+
+impl Drop for Connected {
+    fn drop(&mut self) {
+        let peer_listeners = {
+            let mut states = self.connection.states.lock();
+            let index = self.side.index();
+            let peer = self.side.other().index();
+
+            states[index].open = false;
+            states[index].received_data.clear();
+            states[peer].listeners.clone()
+        };
+
+        peer_listeners.notify();
+    }
+}
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use roxy_fd::{FileError, FileType, SeekError, SeekFrom};
+    use roxy_test::kernel_test;
+
+    use super::super::buffer::CAPACITY;
+    use super::super::pair;
+
+    kernel_test!("roxy-unix-socket::connected", transfers_bidirectionally, {
+        let (first, second) = pair();
+        let mut output = [0; 4];
+
+        assert_eq!(first.write(b"ping"), Ok(4));
+        assert_eq!(second.read(&mut output), Ok(4));
+        assert_eq!(&output, b"ping");
+        assert_eq!(second.write(b"pong"), Ok(4));
+        assert_eq!(first.read(&mut output), Ok(4));
+        assert_eq!(&output, b"pong");
+    });
+
+    kernel_test!("roxy-unix-socket::connected", reports_socket_metadata, {
+        let (first, _) = pair();
+
+        assert_eq!(first.metadata().unwrap().file_type, FileType::Socket);
+        assert_eq!(first.seek(SeekFrom::Start(0)), Err(SeekError::NotSeekable));
+    });
+
+    kernel_test!("roxy-unix-socket::connected", reports_readiness, {
+        let (first, second) = pair();
+
+        let initial = second.poll().unwrap();
+        assert!(!initial.readable);
+        assert!(initial.writable);
+        assert!(!initial.hangup);
+
+        assert_eq!(first.write(b"x"), Ok(1));
+        let received = second.poll().unwrap();
+        assert!(received.readable);
+        assert!(received.writable);
+        assert!(!received.hangup);
+    });
+
+    kernel_test!("roxy-unix-socket::connected", respects_buffer_capacity, {
+        let (first, _) = pair();
+        let input = alloc::vec![7; CAPACITY + 1];
+
+        assert_eq!(first.write(&input), Ok(CAPACITY));
+    });
+
+    kernel_test!("roxy-unix-socket::connected", reports_peer_close, {
+        let (first, second) = pair();
+        drop(second);
+
+        assert_eq!(first.read(&mut [0; 1]), Ok(0));
+        assert_eq!(first.write(b"x"), Err(FileError::BrokenPipe));
+        let events = first.poll().unwrap();
+        assert!(events.readable);
+        assert!(events.hangup);
+        assert!(!events.writable);
+    });
+}

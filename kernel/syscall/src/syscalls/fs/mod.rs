@@ -43,6 +43,7 @@ fn map_file_error(error: FileError) -> Errno {
     match error {
         FileError::BadOperation => unsupported("fsync.fd-object", 0),
         FileError::BrokenPipe => Errno::Pipe,
+        FileError::NotConnected => Errno::NotConnected,
         FileError::Io => Errno::Io,
     }
 }
