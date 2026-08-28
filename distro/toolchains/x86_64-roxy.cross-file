@@ -7,6 +7,9 @@ strip = 'llvm-strip'
 [properties]
 needs_exe_wrapper = true
 
+sys_root = '/sysroot'
+pkg_config_libdir = ['/sysroot/usr/lib/pkgconfig', '/sysroot/usr/share/pkgconfig']
+
 [host_machine]
 system = 'roxy'
 cpu_family = 'x86_64'
