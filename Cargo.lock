@@ -778,6 +778,7 @@ dependencies = [
 name = "roxy-signal"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.13.1",
  "linkme",
  "roxy-test",
  "strum",

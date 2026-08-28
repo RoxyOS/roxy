@@ -76,6 +76,7 @@ mod tests {
     use roxy_fbterm::{ColorChannelLayout, FramebufferLayout};
     use roxy_fd::{
         FbFixedInfo, FbVarInfo, FileType, IoctlError, IoctlRequest, MmapError, MmapTarget,
+        WindowSize,
     };
     use roxy_test::kernel_test;
 
@@ -170,7 +171,7 @@ mod tests {
     kernel_test!("roxy-fbdev::unsupported-ioctl", rejects_unknown_requests, {
         let device = FramebufferDevice::new(&LAYOUT);
         assert!(matches!(
-            device.ioctl(IoctlRequest::GetWindowSize(&mut Default::default())),
+            device.ioctl(IoctlRequest::GetWindowSize(&mut WindowSize::default())),
             Err(IoctlError::Unsupported { .. })
         ));
     });

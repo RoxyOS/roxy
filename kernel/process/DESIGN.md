@@ -31,28 +31,42 @@ published.
 
 ## Signals
 
-Each running process owns `Vec<Signal>` collections for pending process-directed signals and its
-signal mask, plus a `HashMap<Signal, SignalAction>` of configured dispositions. These are empty
-when a process is constructed. Absence from the action map means `Default`; installing
-`Ignore` removes already-pending instances of that signal. Sending an ignored signal succeeds
-without queuing or waking the target. Otherwise sending appends the signal while holding the
-process-table lock and wakes the target's main thread after the lock is released. The sender never
-tears down the target directly: that target may still execute on its own kernel stack. Signals
-whose effective default action is currently unsupported are rejected before they enter this queue.
-A masked signal remains pending until the mask is replaced; `SIGKILL` and `SIGSTOP` cannot be
-masked or ignored.
+Each running process owns a `Vec<Signal>` queue of pending process-directed signals, a `SignalSet`
+signal mask, a `HashMap<Signal, SignalAction>` of configured dispositions, and a LIFO stack of
+outstanding signal-frame addresses. These are empty when a process is constructed. Absence from
+the action map means `Default`; installing `Ignore` removes already-pending instances of that
+signal. Sending an ignored signal succeeds without queuing or waking the target. Otherwise
+sending appends the signal while holding the process-table lock and wakes the target's main thread
+after the lock is released. The sender never tears down the target directly: that target may still
+execute on its own kernel stack. Signals whose effective default action is currently unsupported
+are rejected before they enter this queue, while handler dispositions always queue. A masked
+signal remains pending until the mask is replaced; `SIGKILL` and `SIGSTOP` cannot be masked,
+ignored, or caught.
 
-At a syscall return boundary, `process_latest_signal` removes the most recently queued signal of the
-current process, resolves its disposition, and calls `process_signal`. Only `Default` may reach
-delivery because ignored signals are discarded before queuing and installing `Ignore` clears
-existing pending instances. The default disposition maps through `Signal::default_action`. A
-terminating action exits the current thread with a signal-derived `ExitStatus`; normal
-`waitpid` reaping then observes the corresponding low-byte signal status. This applies at most one
-action because termination does not return.
+At a syscall return boundary, `deliver_pending_signal` removes the most recently queued unmasked
+signal, resolves its disposition, and either executes the default action immediately or delivers
+to a user handler. Handler delivery writes a signal frame below the interrupted user stack pointer
+(skipping the 128-byte red zone and aligned to the System V entry convention), pushes the frame
+address onto the process frame stack, adds the handler mask and the signal itself to the process
+mask, and returns a `ResumeInfo` that the architecture layer applies to the saved user context.
+The frame carries the trampoline entry as the handler return address, a snapshot of the
+interrupted context, and the pre-delivery mask; its layout is a kernel-internal contract between
+`roxy-process` and the kernel-injected trampoline, and userspace only ever observes the signal
+number argument. `pop_signal_frame` validates that the caller's stack pointer matches the recorded
+frame, restores the context and mask, and is invoked by the `sigreturn` syscall, which replaces
+the syscall-return contract itself in the syscall subsystem. Spurious `sigreturn` calls return
+`EINVAL`; a handler that never returns (for example after `longjmp`) leaks its frame entry, which
+is a known limitation of the single-frame-stack model.
 
-Fork clones the parent's dispositions while starting with no pending signals. `execve` preserves
-ignored dispositions. Future userspace-handler dispositions must instead reset to default during
-successful image replacement.
+`execve` reverts all dispositions to `Default` and clears outstanding signal frames because
+handler addresses point into the replaced image; the mask and pending set survive. The
+terminating default action exits the current thread with a signal-derived `ExitStatus`; normal
+`waitpid` reaping then observes the corresponding low-byte signal status. Delivery applies at
+most one signal per userspace return boundary because termination does not return; remaining
+pending signals are delivered at subsequent boundaries.
+
+Fork clones the parent's dispositions while starting with no pending signals and no outstanding
+signal frames.
 
 ## Initial descriptor injection
 

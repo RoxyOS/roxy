@@ -1,3 +1,7 @@
+// The `Poll` syscall shim lives in a sibling file named `poll.rs`, so this module shares its
+// parent module's name (`crate::syscalls::poll::poll`). That keeps each syscall shim in its own
+// file; the inception is intentional.
+#[allow(clippy::module_inception)]
 mod poll;
 mod ppoll;
 mod pselect;

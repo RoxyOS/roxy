@@ -55,6 +55,7 @@ pub(crate) enum SyscallNumber {
     Listen = 51,
     Accept = 52,
     Connect = 53,
+    Sigreturn = 54,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -116,6 +117,7 @@ impl TryFrom<u64> for SyscallNumber {
             51 => Ok(Self::Listen),
             52 => Ok(Self::Accept),
             53 => Ok(Self::Connect),
+            54 => Ok(Self::Sigreturn),
             _ => Err(()),
         }
     }
@@ -181,6 +183,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(51), Ok(SyscallNumber::Listen));
         assert_eq!(SyscallNumber::try_from(52), Ok(SyscallNumber::Accept));
         assert_eq!(SyscallNumber::try_from(53), Ok(SyscallNumber::Connect));
-        assert!(SyscallNumber::try_from(54).is_err());
+        assert_eq!(SyscallNumber::try_from(54), Ok(SyscallNumber::Sigreturn));
+        assert!(SyscallNumber::try_from(55).is_err());
     });
 }

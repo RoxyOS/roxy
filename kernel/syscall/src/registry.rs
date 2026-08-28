@@ -331,6 +331,12 @@ mod tests {
                 .iter()
                 .any(|syscall| syscall.number == SyscallNumber::Connect)
         );
+        assert!(
+            REGISTRY
+                .syscalls
+                .iter()
+                .any(|syscall| syscall.number == SyscallNumber::Sigreturn)
+        );
     });
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {

@@ -203,7 +203,7 @@ fn map_device_error(error: FileError) -> VfsError {
 mod tests {
     use alloc::sync::Arc;
 
-    use roxy_fd::{FileMetadata, FileType, IoctlRequest};
+    use roxy_fd::{FileMetadata, FileType, IoctlRequest, WindowSize};
     use roxy_test::kernel_test;
     use roxy_vfs::{FileType as VfsFileType, ResolvedPath, Vfs, VfsError};
 
@@ -253,7 +253,7 @@ mod tests {
             Err(VfsError::Unsupported)
         );
         assert!(
-            file.ioctl(IoctlRequest::GetWindowSize(&mut Default::default()))
+            file.ioctl(IoctlRequest::GetWindowSize(&mut WindowSize::default()))
                 .is_err()
         );
     });

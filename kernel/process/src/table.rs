@@ -65,6 +65,18 @@ impl ProcessTable {
         process.addrspace.replace(addrspace).unwrap()
     }
 
+    /// Clears user signal dispositions and outstanding signal frames for `execve`.
+    ///
+    /// Handler addresses point into the replaced image, so POSIX requires reversion to default
+    /// dispositions; the mask and pending set survive.
+    pub(super) fn clear_signal_actions(&mut self, thread_id: ThreadId) {
+        let process_id = self.thread_owners[&thread_id];
+        let process = self.processes.get_mut(&process_id).unwrap();
+
+        process.signal_actions.clear();
+        process.signal_frames.clear();
+    }
+
     pub(super) fn activate_addrspace(&self, thread_id: ThreadId) {
         let process_id = self.thread_owners[&thread_id];
         let addrspace = self.processes[&process_id]

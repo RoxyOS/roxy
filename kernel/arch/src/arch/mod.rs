@@ -112,7 +112,37 @@ const _: () = {
     assert!(core::mem::offset_of!(RawSyscall, arguments) == 8);
 };
 
-pub type SyscallHandler = fn(RawSyscall) -> u64;
+/// Describes how to resume user code: the instruction to continue at, the stack to use, and the
+/// first three argument registers.
+///
+/// Signal delivery uses it to resume into a user handler with the signal number as the first
+/// argument; it mirrors the `resume_user` contract without resetting floating-point state.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ResumeInfo {
+    pub instruction_pointer: u64,
+    pub stack_pointer: u64,
+    pub arguments: [u64; 3],
+}
+
+/// The exit state of one syscall.
+#[derive(Clone, Copy, Debug)]
+pub enum SyscallExit {
+    /// Resumes the interrupted userspace context with `value` as the syscall result.
+    Returned(u64),
+    /// Resumes with `return_value` as the syscall result, but resumes into the user code
+    /// described by `resume` first — currently the only producer is signal delivery into a user
+    /// handler.
+    Resume {
+        return_value: u64,
+        resume: ResumeInfo,
+    },
+    /// Replaces the entire saved context — including the syscall result — with the context
+    /// restored from a signal frame. Used exclusively by `sigreturn`; never combined with
+    /// delivery.
+    RestoreContext(UserContext),
+}
+
+pub type SyscallHandler = fn(RawSyscall) -> SyscallExit;
 
 pub trait Architecture: sealed::Sealed {
     fn initialize(exception_handler: ExceptionHandler);

@@ -79,11 +79,21 @@ must use the centralized diagnostic path.
 current process's signal mask. A null input set queries without changing the mask, and a non-null
 old-set output receives the mask active before the operation. The output range is validated before
 state changes. The process subsystem removes `SIGKILL` and `SIGSTOP` from every installed mask.
-`sigaction` supports querying and installing `SIG_DFL` and `SIG_IGN` dispositions through the Roxy
-x86_64 ABI record. Null action and old-action pointers independently select query and output
-behavior. The syscall validates its input and output before changing process state. Userspace
-handlers, nonzero flags or restorers, and nonempty per-handler masks remain unsupported and use the
-centralized diagnostic path. `SIGKILL` and `SIGSTOP` cannot be ignored.
+`sigaction` supports querying and installing `SIG_DFL`, `SIG_IGN`, and user-handler dispositions
+through the Roxy x86_64 ABI record. Null action and old-action pointers independently select query
+and output behavior. The syscall validates its input and output before changing process state.
+A handler disposition records the user function address and the per-handler mask; the ABI
+restorer field is ignored because the kernel injects its own `sigreturn` trampoline into every
+process image. `SA_SIGINFO` and all other flags use the centralized diagnostic path.
+`SIGKILL` and `SIGSTOP` cannot be ignored.
+
+`sigreturn` (syscall 54) is a registry handler with a dedicated `Handler::Exit` variant whose
+function returns `SyscallExit` directly, replacing the syscall-return contract itself. It asks
+`roxy-process` to pop and validate the most recent signal frame against the caller's stack
+pointer, and returns a full context restoration. Because its handler returns `SyscallExit`, it
+skips the signal-delivery step ordinary value-returning syscalls apply on exit. A spurious call
+returns `EINVAL`. The `syscall!` macro exposes a `-> SyscallExit` form for handlers that own
+their resume contract.
 
 `send_signal` is the Roxy ABI operation backing mlibc's `kill`. It accepts a positive process ID
 and a Linux-compatible signal number, translates both into ABI-neutral process and signal types,

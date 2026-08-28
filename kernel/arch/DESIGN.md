@@ -32,8 +32,11 @@ that state type available to the thread subsystem. Long mode guarantees the requ
 and SSE2 capabilities.
 
 Syscall entry normalizes the raw register frame, dispatches one handler, and restores the saved
-userspace general-purpose registers when that handler returns, retaining `RAX` for the syscall
-result. A fresh `execve` image uses the separate
+userspace general-purpose registers when that handler returns. The handler returns a `SyscallExit` (`Returned`, `Resume`, or `RestoreContext`)
+instead of a bare value: `value` is written back as the syscall result, an optional `redirect`
+rewrites the saved instruction/stack pointers and argument registers (signal delivery), and an
+optional `restore` replaces the entire saved context (`sigreturn`). A fresh `execve` image uses
+the separate
 `resume_user` contract so it can reset floating-point state and enter new RIP/RSP values without
 returning through the old userspace frame.
 

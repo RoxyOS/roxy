@@ -1,7 +1,7 @@
 use core::mem;
 
 use roxy_process::SignalAction;
-use roxy_signal::Signal;
+use roxy_signal::{Signal, SignalSet};
 
 use crate::{
     SyscallResult,
@@ -88,35 +88,38 @@ fn handle(
 }
 
 fn decode(value: SigactionAbi, signal: Signal) -> Result<SignalAction, Errno> {
-    if value.flags != 0 || value.restorer != 0 || value.mask.bits.iter().any(|bits| *bits != 0) {
+    // Only `SA_SIGINFO` is defined in the Roxy ABI today, and handler delivery with a siginfo
+    // frame is not implemented; everything else is rejected through the centralized diagnostic.
+    if value.flags != 0 {
         return Err(unsupported_argument(
-            "sigaction.features",
+            "sigaction.flags",
             signal.number(),
             Errno::NotSupported,
         ));
     }
 
+    // The kernel injects its own sigreturn trampoline, so a user-supplied restorer is never
+    // required or consulted.
+    let mask = value.mask.to_set(signal)?;
+
     Ok(match value.handler {
         0 => SignalAction::Default,
         1 => SignalAction::Ignore,
-        handler => {
-            return Err(unsupported_argument(
-                "sigaction.handler",
-                handler,
-                Errno::NoSys,
-            ));
-        }
+        address => SignalAction::Handler { address, mask },
     })
 }
 
 fn encode(action: SignalAction) -> SigactionAbi {
+    let (handler, mask) = match action {
+        SignalAction::Default => (0, SignalSet::empty()),
+        SignalAction::Ignore => (1, SignalSet::empty()),
+        SignalAction::Handler { address, mask } => (address, mask),
+    };
+
     SigactionAbi {
-        handler: match action {
-            SignalAction::Default => 0,
-            SignalAction::Ignore => 1,
-        },
+        handler,
         flags: 0,
         restorer: 0,
-        mask: SignalSetAbi { bits: [0; 16] },
+        mask: SignalSetAbi::from_set(mask),
     }
 }

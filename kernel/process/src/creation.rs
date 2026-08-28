@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
+use roxy_signal::SignalSet;
 
 use hashbrown::HashMap;
 use roxy_thread::{Thread, ThreadCreateError, ThreadId, scheduler};
@@ -51,7 +52,8 @@ impl Process {
             working_directory: ResolvedPath::root(),
             fds,
             pending_signals: Vec::new(),
-            masked_signals: Vec::new(),
+            masked_signals: SignalSet::empty(),
+            signal_frames: Vec::new(),
             signal_actions: HashMap::new(),
             state: ProcessState::Running,
         }
@@ -73,7 +75,8 @@ impl Process {
             working_directory,
             fds,
             pending_signals: Vec::new(),
-            masked_signals: Vec::new(),
+            masked_signals: SignalSet::empty(),
+            signal_frames: Vec::new(),
             signal_actions,
             state: ProcessState::Running,
         }

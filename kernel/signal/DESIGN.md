@@ -2,28 +2,29 @@
 
 ## Purpose and scope
 
-`roxy-signal` owns ABI-neutral signal identities and the actions selected when they are delivered.
-It contains no process-table access, scheduler integration, userspace ABI layout, or signal-frame
-construction.
+`roxy-signal` owns ABI-neutral signal identities, per-signal default-action policy, and the
+domain-wide `SignalSet` mask type. It contains no process-table access, scheduler integration,
+userspace ABI layout, or signal-frame construction.
 
 ## Ownership and extension
 
 `Signal` identifies a supported process-directed signal. `Signal::default_action` explicitly maps
-each signal to a `DefaultAction`; the match is intentionally kept local so new signals and future
-actions, such as userspace handlers, have one policy definition. The process delivery path retains
-the originating signal separately when it needs to encode a terminating wait status.
+each signal to a `DefaultAction`; the match is intentionally kept local so new signals have one
+policy definition.
 
-`roxy-process` owns pending signal queues, per-process dispositions, and executes actions against a
-target process. The
-syscall subsystem remains responsible for translating an ABI-specific signal number into `Signal`
-when a userspace sending interface is added.
+`SignalSet` is the single mask representation shared by `roxy-process` state, the syscall layer's
+decoded ABI sets, and signal delivery. It is a 64-bit set covering every supported signal;
+extended ABI masks (wider sets from future ABI personalities) are rejected at the syscall
+boundary before they reach this type.
+
+`roxy-process` owns pending signal queues, per-process dispositions, signal frames, and executes
+actions against a target process. The syscall subsystem remains responsible for translating
+ABI-specific signal numbers and mask records into `Signal` and `SignalSet`.
 
 ## Limits
 
 The initial signal set includes the conventional process, fault, timer, child, and terminal signal
-identities. `SIGHUP`, `SIGINT`, `SIGKILL`, `SIGPIPE`, `SIGALRM`, `SIGTERM`, `SIGUSR1`, and
-`SIGUSR2` terminate; `SIGCHLD` and `SIGWINCH` are ignored. Core-dump, stop, continue, and terminal
-job-control actions map to `Unsupported` and must be rejected before they enter a process queue.
-User handlers, realtime queues, process groups, and userspace signal ABI records are not
-implemented. Per-process default and ignore dispositions remain process-owned rather than part of
-this crate's signal policy.
+identities. Core-dump, stop, continue, and terminal job-control default actions map to
+`Unsupported` and are rejected when sent. Realtime signals, process groups, and userspace signal
+ABI records are not implemented. Per-process dispositions remain process-owned rather than part
+of this crate's signal policy.

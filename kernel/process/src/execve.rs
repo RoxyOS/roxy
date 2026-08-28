@@ -30,6 +30,7 @@ pub fn execve_current(
         let _previous = PROCESS_TABLE
             .lock()
             .replace_addrspace(thread_id, image.addrspace.clone());
+        PROCESS_TABLE.lock().clear_signal_actions(thread_id);
 
         image.addrspace.activate();
     });

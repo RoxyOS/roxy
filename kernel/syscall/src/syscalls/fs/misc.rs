@@ -7,7 +7,7 @@ pub(super) const SYNC_SYSCALL: Syscall = sync::SYSCALL;
 pub(super) const FSYNC_SYSCALL: Syscall = fsync::SYSCALL;
 
 mod sync {
-    use super::*;
+    use super::{SyscallNumber, SyscallResult, map_vfs_error, syscall};
 
     syscall!(SyscallNumber::Sync, handle());
 
@@ -19,7 +19,7 @@ mod sync {
 }
 
 mod fsync {
-    use super::*;
+    use super::{Errno, Fd, SyscallNumber, SyscallResult, map_file_error, syscall};
 
     syscall!(SyscallNumber::Fsync, handle(fd: Fd => BadFd));
 

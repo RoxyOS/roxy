@@ -1,14 +1,9 @@
 mod action;
 mod mask;
 mod send;
+mod sigreturn;
 
-use alloc::vec::Vec;
 use core::mem;
-
-use bitflags::bitflags;
-use roxy_memory::UserAddress;
-use roxy_signal::Signal;
-use strum::IntoEnumIterator;
 
 use crate::{
     Syscall,
@@ -16,10 +11,13 @@ use crate::{
     errno::Errno,
     unsupported::unsupported_argument,
 };
+use roxy_memory::UserAddress;
+use roxy_signal::{Signal, SignalSet};
 
 pub(super) const ACTION_SYSCALL: Syscall = action::SYSCALL;
 pub(super) const MASK_SYSCALL: Syscall = mask::SYSCALL;
 pub(super) const SEND_SYSCALL: Syscall = send::SYSCALL;
+pub(super) const SIGRETURN_SYSCALL: Syscall = sigreturn::SYSCALL;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -29,56 +27,23 @@ pub(super) struct SignalSetAbi {
 
 const _: () = assert!(mem::size_of::<SignalSetAbi>() == 128);
 
-const fn signal_bit(signal: Signal) -> u64 {
-    1 << (signal.number() - 1)
-}
-
-bitflags! {
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub(crate) struct SignalSet: u64 {
-        const HANGUP = signal_bit(Signal::Hangup);
-        const INTERRUPT = signal_bit(Signal::Interrupt);
-        const QUIT = signal_bit(Signal::Quit);
-        const ILLEGAL_INSTRUCTION = signal_bit(Signal::IllegalInstruction);
-        const ABORT = signal_bit(Signal::Abort);
-        const BUS_ERROR = signal_bit(Signal::BusError);
-        const FLOATING_POINT_EXCEPTION = signal_bit(Signal::FloatingPointException);
-        const KILL = signal_bit(Signal::Kill);
-        const USER1 = signal_bit(Signal::User1);
-        const SEGMENTATION_FAULT = signal_bit(Signal::SegmentationFault);
-        const USER2 = signal_bit(Signal::User2);
-        const BROKEN_PIPE = signal_bit(Signal::BrokenPipe);
-        const ALARM = signal_bit(Signal::Alarm);
-        const TERMINATE = signal_bit(Signal::Terminate);
-        const CHILD = signal_bit(Signal::Child);
-        const CONTINUE = signal_bit(Signal::Continue);
-        const STOP = signal_bit(Signal::Stop);
-        const TERMINAL_STOP = signal_bit(Signal::TerminalStop);
-        const TERMINAL_INPUT = signal_bit(Signal::TerminalInput);
-        const TERMINAL_OUTPUT = signal_bit(Signal::TerminalOutput);
-        const WINDOW_CHANGED = signal_bit(Signal::WindowChanged);
-    }
-}
-
-impl SignalSet {
-    pub(crate) fn to_vec(self) -> Vec<Signal> {
-        Signal::iter()
-            .filter(|signal| self.bits() & signal_bit(*signal) != 0)
-            .collect()
-    }
-
-    pub(super) fn from_signals(signals: &[Signal]) -> Self {
-        let mut set = Self::empty();
-        for signal in signals {
-            set.insert(Self::from_bits_retain(signal_bit(*signal)));
-        }
-        set
-    }
-
-    pub(super) const fn to_abi(self) -> SignalSetAbi {
+impl SignalSetAbi {
+    pub(super) const fn from_set(set: SignalSet) -> Self {
         let mut bits = [0; 16];
-        bits[0] = self.bits();
-        SignalSetAbi { bits }
+        bits[0] = set.bits();
+        Self { bits }
+    }
+
+    pub(super) fn to_set(self, signal: Signal) -> Result<SignalSet, Errno> {
+        if self.bits[1..].iter().any(|bits| *bits != 0) {
+            return Err(unsupported_argument(
+                "signal_set.extended_bits",
+                signal.number(),
+                Errno::NotSupported,
+            ));
+        }
+
+        Ok(SignalSet::from_bits_retain(self.bits[0]))
     }
 }
 
@@ -136,18 +101,26 @@ impl SyscallArg for Signal {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use alloc::vec;
-
-    use roxy_signal::Signal;
+    use roxy_signal::SignalSet;
     use roxy_test::kernel_test;
 
-    use super::SignalSet;
+    use super::SignalSetAbi;
+    use crate::numbers::SyscallNumber;
 
-    kernel_test!("roxy-syscall::signal-set", converts_to_signal_vector, {
+    kernel_test!("roxy-syscall::signal-set", round_trips_through_abi, {
         let set = SignalSet::TERMINATE | SignalSet::INTERRUPT;
 
-        assert_eq!(set.to_vec(), vec![Signal::Interrupt, Signal::Terminate]);
-        assert_eq!(SignalSet::from_signals(&set.to_vec()), set);
-        assert_eq!(set.to_abi().bits[0], set.bits());
+        assert_eq!(SignalSetAbi::from_set(set).bits[0], set.bits());
     });
+
+    kernel_test!(
+        "roxy-syscall::sigreturn-number",
+        matches_process_trampoline,
+        {
+            assert_eq!(
+                roxy_process::SIGRETURN_SYSCALL_NUMBER,
+                SyscallNumber::Sigreturn as u64
+            );
+        }
+    );
 }

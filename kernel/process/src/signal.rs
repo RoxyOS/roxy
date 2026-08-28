@@ -1,14 +1,20 @@
-use alloc::vec::Vec;
-
-use roxy_signal::{DefaultAction, Signal};
+use roxy_arch::{ResumeInfo, UserContext};
+use roxy_signal::{DefaultAction, Signal, SignalSet};
 use roxy_thread::scheduler;
 
-use crate::{ExitStatus, Process, ProcessId, ProcessState, table::PROCESS_TABLE};
+use crate::{ExitStatus, Process, ProcessId, ProcessState, signal_frame, table::PROCESS_TABLE};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SignalAction {
     Default,
     Ignore,
+    /// Runs the user handler at `address` with the signal number as the only argument.
+    ///
+    /// `mask` is added to the process mask for the duration of the handler.
+    Handler {
+        address: u64,
+        mask: SignalSet,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -44,7 +50,7 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
             {
                 return Err(SignalError::UnsupportedAction);
             }
-            SignalAction::Default => {}
+            SignalAction::Handler { .. } | SignalAction::Default => {}
         }
 
         process.queue_signal(signal);
@@ -56,17 +62,115 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
     Ok(())
 }
 
-/// Applies one pending signal action for the current process.
+/// Applies one pending signal for the current process.
 ///
-/// This function must run only where abandoning the current userspace return is safe.
-pub fn process_latest_signal() {
-    let signal = take_latest_signal();
-    let Some(signal) = signal else {
-        return;
-    };
+/// Default actions run immediately; handler dispositions build a signal frame on the user stack
+/// and return the resume that enters the handler. Must run only where abandoning the current
+/// userspace return is safe, exactly once per userspace return boundary.
+#[must_use]
+pub fn deliver_pending_signal(context: &UserContext) -> Option<ResumeInfo> {
+    let signal = take_pending_unmasked_signal()?;
     let action = signal_action_of(signal);
 
-    process_signal(signal, action);
+    match action {
+        SignalAction::Ignore => None,
+        SignalAction::Default => {
+            do_default_action(signal, signal.default_action());
+
+            None
+        }
+        SignalAction::Handler { address, mask } => {
+            Some(prepare_handler_resume(context, signal, address, mask))
+        }
+    }
+}
+
+/// Builds the signal frame and signal-mask updates that enter the user handler, returning the
+/// `ResumeInfo` that actually resumes into it. Delivery itself completes only when the caller
+/// applies that resume to the saved context.
+fn prepare_handler_resume(
+    context: &UserContext,
+    signal: Signal,
+    address: u64,
+    handler_mask: SignalSet,
+) -> ResumeInfo {
+    let mut table = PROCESS_TABLE.lock();
+    let process = table
+        .current_process()
+        .expect("current thread has no process");
+    let addrspace = process
+        .addrspace
+        .clone()
+        .expect("running process has no address space");
+
+    // Skips the 128-byte red zone below the interrupted stack pointer and aligns the frame so
+    // the handler entry satisfies the System V stack alignment (`frame % 16 == 8`).
+    let frame_base = context
+        .stack_pointer
+        .checked_sub(128)
+        .and_then(|value| value.checked_sub(signal_frame::SIGNAL_FRAME_SIZE as u64))
+        .map(|value| value & !0xF)
+        .and_then(|value| value.checked_sub(8))
+        .expect("user stack has room for a signal frame");
+    let frame_bytes = signal_frame::build_bytes(context, process.masked_signals);
+
+    addrspace
+        .write_bytes(
+            roxy_memory::UserAddress::new(frame_base).expect("aligned frame address is canonical"),
+            &frame_bytes,
+        )
+        .expect("signal frame stack region is mapped");
+
+    process.signal_frames.push(frame_base);
+    process.masked_signals |= handler_mask | SignalSet::from_signal(signal);
+
+    ResumeInfo {
+        instruction_pointer: address,
+        stack_pointer: frame_base,
+        arguments: [u64::from(signal.number()), 0, 0],
+    }
+}
+
+/// Pops the most recent signal frame for the current process and restores its context.
+///
+/// Returns `None` when the process has no outstanding signal frame, which is a spurious
+/// `sigreturn` rather than missing kernel functionality.
+#[must_use]
+pub fn pop_signal_frame(context: &UserContext) -> Option<UserContext> {
+    let mut table = PROCESS_TABLE.lock();
+    let process = table.current_process()?;
+    let frame_address = process.signal_frames.pop()?;
+
+    if frame_address != context.stack_pointer {
+        // The handler returned to the trampoline with an unexpected stack pointer; refuse to
+        // restore instead of trusting a foreign frame.
+        process.signal_frames.push(frame_address);
+
+        return None;
+    }
+
+    let mut frame = [0u8; signal_frame::SIGNAL_FRAME_SIZE];
+    let addrspace = process
+        .addrspace
+        .clone()
+        .expect("running process has no address space");
+
+    addrspace
+        .read_bytes(
+            roxy_memory::UserAddress::new(frame_address)
+                .expect("recorded frame address is canonical"),
+            &mut frame,
+        )
+        .expect("recorded signal frame region is mapped");
+
+    let restored = signal_frame::restore_context(
+        &frame[signal_frame::USER_CONTEXT_OFFSET
+            ..signal_frame::USER_CONTEXT_OFFSET + signal_frame::USER_CONTEXT_SIZE],
+    );
+
+    process.masked_signals = signal_frame::restore_old_mask(&frame);
+
+    Some(restored)
 }
 
 /// Replaces one signal disposition and returns the previously installed action.
@@ -105,7 +209,7 @@ pub fn signal_action_of(signal: Signal) -> SignalAction {
 ///
 /// `SIGKILL` and `SIGSTOP` are always removed because Unix does not permit masking them.
 /// Returns the mask that was active before replacement.
-pub fn replace_masked_signals(signals: Vec<Signal>) -> Vec<Signal> {
+pub fn replace_masked_signals(signals: SignalSet) -> SignalSet {
     let mut table = PROCESS_TABLE.lock();
     let process = table
         .current_process()
@@ -116,57 +220,48 @@ pub fn replace_masked_signals(signals: Vec<Signal>) -> Vec<Signal> {
 
 /// Returns the signals currently blocked by the current process.
 #[must_use]
-pub fn currently_blocked_signals() -> Vec<Signal> {
+pub fn currently_blocked_signals() -> SignalSet {
     let mut table = PROCESS_TABLE.lock();
     let process = table
         .current_process()
         .expect("current thread has no process");
 
-    process.masked_signals.clone()
+    process.masked_signals
 }
 
 /// Adds signals to the current process's signal mask and returns the previous mask.
 #[must_use]
-pub fn block_signals(signals: Vec<Signal>) -> Vec<Signal> {
-    update_masked_signals(|masked| {
-        for signal in signals {
-            if !masked.contains(&signal) {
-                masked.push(signal);
-            }
-        }
-    })
+pub fn block_signals(signals: SignalSet) -> SignalSet {
+    update_masked_signals(|masked| masked.insert(signals))
 }
 
 /// Removes signals from the current process's signal mask and returns the previous mask.
 #[must_use]
-pub fn unblock_signals(signals: &[Signal]) -> Vec<Signal> {
-    update_masked_signals(|masked| masked.retain(|signal| !signals.contains(signal)))
+pub fn unblock_signals(signals: SignalSet) -> SignalSet {
+    update_masked_signals(|masked| masked.remove(signals))
 }
 
 /// Updates the current process's mask while holding the process-table lock.
 ///
-/// `update` receives the current mask and mutates it in place. The returned vector is the mask
+/// `update` receives the current mask and mutates it in place. The returned set is the mask
 /// that was active before `update` ran; unmaskable signals are removed before the new mask is
 /// published.
-fn update_masked_signals(update: impl FnOnce(&mut Vec<Signal>)) -> Vec<Signal> {
+fn update_masked_signals(update: impl FnOnce(&mut SignalSet)) -> SignalSet {
     let mut table = PROCESS_TABLE.lock();
     let process = table
         .current_process()
         .expect("current thread has no process");
-    let old_mask = process.masked_signals.clone();
+    let old_mask = process.masked_signals;
 
     update(&mut process.masked_signals);
-    process.masked_signals =
-        filter_unmaskable_signals(core::mem::take(&mut process.masked_signals));
+    process.masked_signals = filter_unmaskable_signals(process.masked_signals);
 
     old_mask
 }
 
 #[must_use]
-fn filter_unmaskable_signals(mut signals: Vec<Signal>) -> Vec<Signal> {
-    signals.retain(|signal| !matches!(signal, Signal::Kill | Signal::Stop));
-
-    signals
+fn filter_unmaskable_signals(signals: SignalSet) -> SignalSet {
+    signals - (SignalSet::KILL | SignalSet::STOP)
 }
 
 /// Reports whether the current process has a pending signal that its mask permits.
@@ -180,18 +275,11 @@ pub fn has_pending_signal() -> bool {
     process.has_pending_signal()
 }
 
-fn take_latest_signal() -> Option<Signal> {
+fn take_pending_unmasked_signal() -> Option<Signal> {
     let mut table = PROCESS_TABLE.lock();
     let process = table.current_process()?;
 
     process.take_latest_signal()
-}
-
-fn process_signal(signal: Signal, action: SignalAction) {
-    match action {
-        SignalAction::Ignore => unreachable!("ignored signals cannot reach delivery"),
-        SignalAction::Default => do_default_action(signal, signal.default_action()),
-    }
 }
 
 fn do_default_action(signal: Signal, action: DefaultAction) {
@@ -232,21 +320,24 @@ impl Process {
     }
 
     fn take_latest_signal(&mut self) -> Option<Signal> {
-        let index = self
-            .pending_signals
-            .iter()
-            .rposition(|signal| !self.masked_signals.contains(signal))?;
+        let index = self.pending_signals.iter().rposition(|signal| {
+            !self
+                .masked_signals
+                .contains(SignalSet::from_signal(*signal))
+        })?;
 
         Some(self.pending_signals.remove(index))
     }
 
     fn has_pending_signal(&self) -> bool {
-        self.pending_signals
-            .iter()
-            .any(|signal| !self.masked_signals.contains(signal))
+        self.pending_signals.iter().any(|signal| {
+            !self
+                .masked_signals
+                .contains(SignalSet::from_signal(*signal))
+        })
     }
 
-    fn replace_masked_signals(&mut self, signals: Vec<Signal>) -> Vec<Signal> {
+    fn replace_masked_signals(&mut self, signals: SignalSet) -> SignalSet {
         let signals = filter_unmaskable_signals(signals);
 
         core::mem::replace(&mut self.masked_signals, signals)
@@ -255,10 +346,9 @@ impl Process {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use alloc::{vec, vec::Vec};
 
     use roxy_memory::statistics;
-    use roxy_signal::Signal;
+    use roxy_signal::{Signal, SignalSet};
     use roxy_test::kernel_test;
     use roxy_thread::Thread;
     use roxy_vm::AddrSpace;
@@ -337,15 +427,15 @@ mod tests {
             process.queue_signal(Signal::Terminate);
             process.queue_signal(Signal::Interrupt);
             assert_eq!(
-                process.replace_masked_signals(vec![Signal::Interrupt]),
-                Vec::new()
+                process.replace_masked_signals(SignalSet::from_signal(Signal::Interrupt)),
+                SignalSet::empty()
             );
 
             assert_eq!(process.take_latest_signal(), Some(Signal::Terminate));
             assert_eq!(process.take_latest_signal(), None);
             assert_eq!(
-                process.replace_masked_signals(Vec::new()),
-                vec![Signal::Interrupt]
+                process.replace_masked_signals(SignalSet::empty()),
+                SignalSet::from_signal(Signal::Interrupt)
             );
             assert_eq!(process.take_latest_signal(), Some(Signal::Interrupt));
             drop(process);
@@ -365,9 +455,14 @@ mod tests {
             let mut process =
                 Process::new(thread.id(), address_space.clone(), roxy_fd::FdTable::new());
 
-            process.replace_masked_signals(vec![Signal::Kill, Signal::Stop, Signal::Terminate]);
+            process.replace_masked_signals(
+                SignalSet::KILL | SignalSet::STOP | SignalSet::from_signal(Signal::Terminate),
+            );
 
-            assert_eq!(process.masked_signals, vec![Signal::Terminate]);
+            assert_eq!(
+                process.masked_signals,
+                SignalSet::from_signal(Signal::Terminate)
+            );
             drop(process);
             drop(thread);
             drop(address_space);
@@ -380,8 +475,8 @@ mod tests {
         filter_unmaskable,
         {
             assert_eq!(
-                filter_unmaskable_signals(vec![Signal::Kill, Signal::Interrupt, Signal::Stop]),
-                vec![Signal::Interrupt]
+                filter_unmaskable_signals(SignalSet::KILL | SignalSet::INTERRUPT | SignalSet::STOP),
+                SignalSet::from_signal(Signal::Interrupt)
             );
         }
     );

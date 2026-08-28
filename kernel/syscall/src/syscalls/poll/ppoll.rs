@@ -1,7 +1,6 @@
 use crate::{
     SyscallResult,
     args::{Nullable, SignalSet, Timespec},
-    errno::Errno,
     numbers::SyscallNumber,
     syscall,
 };
@@ -23,16 +22,10 @@ fn handle(
 
     let old_mask = match signal_mask {
         Nullable::Null => None,
-        Nullable::Value(signal_mask) => {
-            Some(roxy_process::replace_masked_signals(signal_mask.to_vec()))
-        }
+        Nullable::Value(signal_mask) => Some(roxy_process::replace_masked_signals(signal_mask)),
     };
 
     let result = poll(entries, count, timeout);
-
-    if matches!(result, Err(Errno::Interrupted)) {
-        roxy_process::process_latest_signal();
-    }
 
     if let Some(old_mask) = old_mask {
         roxy_process::replace_masked_signals(old_mask);

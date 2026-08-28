@@ -71,16 +71,16 @@ fn handle(
 
     let first_fd = roxy_process::insert_open_file(first);
     let second_fd = roxy_process::insert_open_file(second);
-    let descriptors = match (
+
+    let descriptors = if let (Ok(first), Ok(second)) = (
         i32::try_from(first_fd.as_u32()),
         i32::try_from(second_fd.as_u32()),
     ) {
-        (Ok(first), Ok(second)) => [first, second],
-        _ => {
-            close_pair(first_fd, second_fd);
+        [first, second]
+    } else {
+        close_pair(first_fd, second_fd);
 
-            return Err(Errno::Overflow);
-        }
+        return Err(Errno::Overflow);
     };
 
     // SAFETY: The array contains two initialized i32 values and has no padding.

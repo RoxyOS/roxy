@@ -2,6 +2,7 @@ use super::SyscallArg;
 use crate::errno::Errno;
 
 /// An ABI pointer argument that may be null.
+#[derive(Clone, Copy)]
 pub(crate) enum Nullable<T> {
     Null,
     Value(T),

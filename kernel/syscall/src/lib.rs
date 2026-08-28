@@ -11,18 +11,24 @@ mod registry;
 mod syscalls;
 mod unsupported;
 
-use roxy_arch::{Architecture, CurrentArchitectureBackend, RawSyscall};
+use roxy_arch::{Architecture, CurrentArchitectureBackend, RawSyscall, SyscallExit};
 
 use crate::{errno::Errno, numbers::SyscallNumber};
 
 type SyscallHandler = fn([u64; 6]) -> SyscallResult;
 type ContextualSyscallHandler = fn(RawSyscall) -> SyscallResult;
+type SyscallExitHandler = fn(RawSyscall) -> SyscallExit;
 type SyscallResult = Result<u64, Errno>;
 
 #[derive(Clone, Copy)]
 enum Handler {
     Arguments(SyscallHandler),
     Context(ContextualSyscallHandler),
+    /// Returns a `SyscallExit` directly, replacing the syscall-return contract entirely.
+    ///
+    /// The only handler today is `sigreturn`, which restores an interrupted context instead of
+    /// producing a return value; it deliberately skips signal delivery on exit.
+    Exit(SyscallExitHandler),
 }
 
 struct Syscall {
@@ -42,6 +48,13 @@ impl Syscall {
         Self {
             number,
             handler: Handler::Context(handler),
+        }
+    }
+
+    const fn with_exit(number: SyscallNumber, handler: SyscallExitHandler) -> Self {
+        Self {
+            number,
+            handler: Handler::Exit(handler),
         }
     }
 }

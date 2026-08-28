@@ -15,7 +15,10 @@ pub(super) const SYMLINKAT_SYSCALL: Syscall = symlinkat::SYSCALL;
 pub(super) const RENAMEAT_SYSCALL: Syscall = renameat::SYSCALL;
 
 mod readlinkat {
-    use super::*;
+    use super::{
+        DirectoryFd, Errno, Path, Slice, SyscallNumber, SyscallResult, UserAddress, map_vfs_error,
+        syscall,
+    };
 
     syscall!(SyscallNumber::Readlinkat, handle(dirfd: DirectoryFd => Invalid, path: Path => Fault, buffer: UserAddress => Fault, size: usize => Fault));
 
@@ -40,7 +43,9 @@ mod readlinkat {
 }
 
 mod linkat {
-    use super::*;
+    use super::{
+        DirectoryFd, Path, SyscallNumber, SyscallResult, map_vfs_error, syscall, unsupported,
+    };
 
     syscall!(SyscallNumber::Linkat, handle(old_dirfd: DirectoryFd => Invalid, old_path: Path => Fault, new_dirfd: DirectoryFd => Invalid, new_path: Path => Fault, flags: u64));
 
@@ -64,7 +69,7 @@ mod linkat {
 }
 
 mod symlinkat {
-    use super::*;
+    use super::{CString, DirectoryFd, Path, SyscallNumber, SyscallResult, map_vfs_error, syscall};
 
     syscall!(SyscallNumber::Symlinkat, handle(target: CString => Fault, dirfd: DirectoryFd => Invalid, link: Path => Fault));
 
@@ -78,7 +83,7 @@ mod symlinkat {
 }
 
 mod renameat {
-    use super::*;
+    use super::{DirectoryFd, Path, SyscallNumber, SyscallResult, map_vfs_error, syscall};
 
     syscall!(SyscallNumber::Renameat, handle(old_dirfd: DirectoryFd => Invalid, old_path: Path => Fault, new_dirfd: DirectoryFd => Invalid, new_path: Path => Fault));
 

@@ -12,7 +12,7 @@ use x86_64::{
     },
 };
 
-use crate::{Architecture, CurrentArchitectureBackend, RawSyscall, SyscallHandler};
+use crate::{Architecture, CurrentArchitectureBackend, RawSyscall, SyscallExit, SyscallHandler};
 
 use super::{float, init};
 
@@ -127,6 +127,7 @@ unsafe extern "C" fn entry() -> ! {
         "push r15",
         "mov rdi, rsp",
         "call {dispatch}",
+        "mov rax, [rsp + {rax}]",
         "mov r15, [rsp + {r15}]",
         "mov r14, [rsp + {r14}]",
         "mov r13, [rsp + {r13}]",
@@ -146,6 +147,7 @@ unsafe extern "C" fn entry() -> ! {
         kernel_stack_top = sym KERNEL_STACK_TOP,
         user_stack_pointer = sym USER_STACK_POINTER,
         dispatch = sym dispatch,
+        rax = const offset_of!(EntryFrame, rax),
         r15 = const offset_of!(EntryFrame, r15),
         r14 = const offset_of!(EntryFrame, r14),
         r13 = const offset_of!(EntryFrame, r13),
@@ -164,12 +166,13 @@ unsafe extern "C" fn entry() -> ! {
     )
 }
 
-extern "C" fn dispatch(frame: *const EntryFrame) -> u64 {
+extern "C" fn dispatch(frame: *mut EntryFrame) -> u64 {
     let address = HANDLER.load(Ordering::Acquire);
     assert_ne!(address, 0, "syscall handler not initialized");
 
-    // SAFETY: entry passes a pointer to its complete, live frame on the kernel stack.
-    let frame = unsafe { &*frame };
+    // SAFETY: entry passes a pointer to its complete, live frame on the kernel stack; it stays
+    // live until this function returns and the naked epilogue reads it back.
+    let frame = unsafe { &mut *frame };
 
     let request = RawSyscall {
         number: frame.rax,
@@ -199,7 +202,44 @@ extern "C" fn dispatch(frame: *const EntryFrame) -> u64 {
 
     // SAFETY: configure stores one permanent SyscallHandler function pointer.
     let handler: SyscallHandler = unsafe { transmute(address) };
-    handler(request)
+
+    // The naked epilogue restores rax from the frame, so every branch must write it there.
+    match handler(request) {
+        SyscallExit::Returned(value) => frame.rax = value,
+        SyscallExit::Resume {
+            return_value,
+            resume,
+        } => {
+            frame.rax = return_value;
+            frame.user_instruction_pointer = resume.instruction_pointer;
+            frame.user_stack_pointer = resume.stack_pointer;
+            frame.rdi = resume.arguments[0];
+            frame.rsi = resume.arguments[1];
+            frame.rdx = resume.arguments[2];
+        }
+        SyscallExit::RestoreContext(restore) => {
+            *frame = EntryFrame {
+                r15: restore.r15,
+                r14: restore.r14,
+                r13: restore.r13,
+                r12: restore.r12,
+                rbp: restore.rbp,
+                rbx: restore.rbx,
+                rax: restore.rax,
+                rdi: restore.rdi,
+                rsi: restore.rsi,
+                rdx: restore.rdx,
+                r10: restore.r10,
+                r8: restore.r8,
+                r9: restore.r9,
+                user_instruction_pointer: restore.instruction_pointer,
+                user_flags: restore.flags,
+                user_stack_pointer: restore.stack_pointer,
+            };
+        }
+    }
+
+    0
 }
 
 pub(super) unsafe fn resume_user(instruction_pointer: u64, stack_pointer: u64) -> ! {

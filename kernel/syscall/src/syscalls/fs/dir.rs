@@ -35,7 +35,9 @@ impl SyscallArg for UnlinkFlags {
 }
 
 mod mkdirat {
-    use super::*;
+    use super::{
+        DirectoryFd, FilePermissions, Path, SyscallNumber, SyscallResult, map_vfs_error, syscall,
+    };
 
     syscall!(SyscallNumber::Mkdirat, handle(dirfd: DirectoryFd => Invalid, path: Path => Fault, permissions: FilePermissions => Invalid));
 
@@ -49,7 +51,9 @@ mod mkdirat {
 }
 
 mod unlinkat {
-    use super::*;
+    use super::{
+        DirectoryFd, Path, SyscallNumber, SyscallResult, UnlinkFlags, map_vfs_error, syscall,
+    };
 
     syscall!(SyscallNumber::Unlinkat, handle(dirfd: DirectoryFd => Invalid, path: Path => Fault, flags: UnlinkFlags => Invalid));
 

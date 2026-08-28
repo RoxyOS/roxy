@@ -186,15 +186,14 @@ impl SocketOps for Socket {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use alloc::boxed::Box;
 
     use roxy_fd::{File, FileError, SocketError, SocketOps};
     use roxy_test::kernel_test;
 
     use super::Socket;
 
-    fn socket() -> Box<Socket> {
-        Box::new(Socket::new())
+    fn socket() -> Socket {
+        Socket::new()
     }
 
     kernel_test!(

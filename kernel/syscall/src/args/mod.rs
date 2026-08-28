@@ -12,12 +12,12 @@ mod slice;
 mod timespec;
 pub(crate) mod user_memory;
 
-pub(crate) use crate::syscalls::signal::SignalSet;
 pub(crate) use c_string::CString;
 pub(crate) use c_string_array::CStringArray;
 pub(crate) use nullable::Nullable;
 pub(crate) use out::Out;
 pub(crate) use path::Path;
+pub(crate) use roxy_signal::SignalSet;
 pub(crate) use slice::Slice;
 pub(crate) use timespec::Timespec;
 
@@ -74,6 +74,22 @@ macro_rules! syscall {
 
         fn parse(arguments: [u64; 6]) -> $crate::SyscallResult {
             let mut raw = arguments.into_iter();
+            $(
+                let $name = syscall!(@parse raw.next().unwrap(), $type $(=> $error)?);
+            )*
+
+            $handler($($name),*)
+        }
+    };
+
+    // A handler that returns `SyscallExit` directly, replacing the syscall-return contract.
+    // Used only by syscalls that change the userspace resume themselves (e.g. `sigreturn`);
+    // ordinary value-returning handlers must use the arms above.
+    ($number:expr, $handler:ident($($name:ident: $type:ty $(=> $error:ident)?),* $(,)?) -> SyscallExit) => {
+        pub(super) const SYSCALL: $crate::Syscall = $crate::Syscall::with_exit($number, parse);
+
+        fn parse(request: $crate::RawSyscall) -> $crate::SyscallExit {
+            let mut raw = request.arguments.into_iter();
             $(
                 let $name = syscall!(@parse raw.next().unwrap(), $type $(=> $error)?);
             )*

@@ -1,5 +1,3 @@
-use alloc::vec::Vec;
-
 use crate::{
     SyscallResult,
     args::{Nullable, Out, SyscallArg},
@@ -8,7 +6,8 @@ use crate::{
     syscall,
 };
 
-use super::{SignalSet, SignalSetAbi};
+use super::SignalSetAbi;
+use roxy_signal::SignalSet;
 
 #[derive(Clone, Copy)]
 enum SignalMaskHow {
@@ -48,7 +47,7 @@ fn handle(
     };
 
     if let Some(old_set) = old_set {
-        let old_set_value = SignalSet::from_signals(&old_signals).to_abi();
+        let old_set_value = SignalSetAbi::from_set(old_signals);
         // SAFETY: SignalSetAbi has a checked C layout and every byte is initialized.
         unsafe { old_set.write(&old_set_value) }?;
     }
@@ -56,12 +55,10 @@ fn handle(
     Ok(0)
 }
 
-fn update_mask(how: SignalMaskHow, set: SignalSet) -> Vec<roxy_signal::Signal> {
-    let signals = set.to_vec();
-
+fn update_mask(how: SignalMaskHow, set: SignalSet) -> SignalSet {
     match how {
-        SignalMaskHow::Block => roxy_process::block_signals(signals),
-        SignalMaskHow::Unblock => roxy_process::unblock_signals(&signals),
-        SignalMaskHow::SetMask => roxy_process::replace_masked_signals(signals),
+        SignalMaskHow::Block => roxy_process::block_signals(set),
+        SignalMaskHow::Unblock => roxy_process::unblock_signals(set),
+        SignalMaskHow::SetMask => roxy_process::replace_masked_signals(set),
     }
 }

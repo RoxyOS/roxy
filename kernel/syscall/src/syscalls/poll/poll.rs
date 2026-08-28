@@ -10,6 +10,8 @@ fn handle(entries: PollEntriesAddress, count: usize, timeout: PollTimeout) -> Sy
     poll(entries, count, timeout.0)
 }
 
+/// A millisecond timeout that treats `-1` as blocking indefinitely.
+#[derive(Clone, Copy)]
 struct PollTimeout(Option<Duration>);
 
 impl SyscallArg for PollTimeout {

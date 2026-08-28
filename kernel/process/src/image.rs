@@ -9,6 +9,7 @@ use roxy_vm::{AddrSpace, AddrSpaceHandle, VmError};
 
 use crate::{
     ProcessError,
+    signal_frame::{TRAMPOLINE_BASE, trampoline},
     startup_stack::{self, StartupStackData},
 };
 
@@ -45,12 +46,35 @@ pub(super) fn build(
             interpreter_base: entry.interpreter_base,
         },
     )?;
+    let addrspace = addrspace.into_handle();
+    map_trampoline(&addrspace)?;
 
     Ok(ProcessImage {
-        addrspace: addrspace.into_handle(),
+        addrspace,
         entry: entry.address,
         stack_pointer,
     })
+}
+
+/// Maps the one-page read-execute `sigreturn` trampoline at its fixed address.
+///
+/// `fork` copies the mapping like any other user mapping, so every process image carries it.
+fn map_trampoline(addrspace: &AddrSpaceHandle) -> Result<(), ProcessError> {
+    use roxy_vm::Permissions;
+
+    let address = UserAddress::new(TRAMPOLINE_BASE).ok_or(ProcessError::InvalidAddressSpace)?;
+
+    addrspace
+        .allocate_anonymous_at(address, trampoline().len())
+        .map_err(process_vm_error)?;
+    addrspace
+        .write_bytes(address, trampoline())
+        .map_err(process_vm_error)?;
+    addrspace
+        .protect(address, trampoline().len(), Permissions::ReadExecute)
+        .map_err(process_vm_error)?;
+
+    Ok(())
 }
 
 fn entry_point(

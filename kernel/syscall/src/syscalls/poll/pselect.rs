@@ -33,16 +33,10 @@ fn handle(
 
     let old_mask = match signal_mask {
         Nullable::Null => None,
-        Nullable::Value(signal_mask) => {
-            Some(roxy_process::replace_masked_signals(signal_mask.to_vec()))
-        }
+        Nullable::Value(signal_mask) => Some(roxy_process::replace_masked_signals(signal_mask)),
     };
 
     let result = pselect(count.0, read, write, exception, timeout);
-
-    if matches!(result, Err(Errno::Interrupted)) {
-        roxy_process::process_latest_signal();
-    }
 
     if let Some(old_mask) = old_mask {
         roxy_process::replace_masked_signals(old_mask);
@@ -91,7 +85,7 @@ fn poll_entries(
 
         if !events.is_empty() {
             entries.push(PollFdAbi {
-                fd: fd as i32,
+                fd: i32::try_from(fd).expect("descriptor indices are bounded by FD_SET_SIZE"),
                 events: events.bits(),
                 revents: 0,
             });
@@ -117,7 +111,7 @@ fn update_sets(
             return Err(Errno::BadFd);
         }
 
-        let fd = entry.fd as usize;
+        let fd = usize::try_from(entry.fd).expect("descriptor indices are bounded by FD_SET_SIZE");
         read.set(fd, events.contains(PollEventFlags::IN));
         write.set(fd, events.contains(PollEventFlags::OUT));
         exception.set(fd, events.contains(PollEventFlags::PRI));
@@ -128,6 +122,7 @@ fn update_sets(
     exception.write()
 }
 
+#[derive(Clone, Copy)]
 struct FdCount(usize);
 
 impl SyscallArg for FdCount {
@@ -149,6 +144,7 @@ struct FdSetAbi {
 
 const _: () = assert!(mem::size_of::<FdSetAbi>() == 128);
 
+#[derive(Clone, Copy)]
 struct FdSet {
     address: UserAddress,
     bits: [u64; FD_SET_WORDS],

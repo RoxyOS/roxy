@@ -1,8 +1,11 @@
 #![no_std]
+extern crate alloc;
 
 mod action;
+mod set;
 
 pub use action::DefaultAction;
+pub use set::SignalSet;
 use strum::EnumIter;
 
 /// A process-directed signal supported by the current kernel.

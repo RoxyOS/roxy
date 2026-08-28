@@ -11,6 +11,8 @@ mod initial_fds;
 mod lifecycle;
 mod memory;
 mod signal;
+mod signal_frame;
+pub use signal_frame::SIGRETURN_SYSCALL_NUMBER;
 mod startup_stack;
 mod table;
 mod wait;
@@ -26,9 +28,9 @@ pub use memory::{
     protect_memory, unmap_anonymous, unmap_memory,
 };
 pub use signal::{
-    SignalAction, SignalError, block_signals, currently_blocked_signals, has_pending_signal,
-    process_latest_signal, replace_masked_signals, replace_signal_action, send_signal,
-    signal_action_of, unblock_signals,
+    SignalAction, SignalError, block_signals, currently_blocked_signals, deliver_pending_signal,
+    has_pending_signal, pop_signal_frame, replace_masked_signals, replace_signal_action,
+    send_signal, signal_action_of, unblock_signals,
 };
 pub use table::{current_parent_process_id, current_process_id};
 pub use wait::{WaitError, WaitResult, WaitTarget, wait_current};
@@ -37,7 +39,7 @@ use alloc::{sync::Arc, vec::Vec};
 
 use hashbrown::HashMap;
 use roxy_fd::{Fd, FdTable, OpenFile};
-use roxy_signal::Signal;
+use roxy_signal::{Signal, SignalSet};
 use roxy_thread::ThreadId;
 use roxy_vfs::ResolvedPath;
 use roxy_vm::AddrSpaceHandle;
@@ -54,7 +56,8 @@ struct Process {
     working_directory: ResolvedPath,
     fds: FdTable,
     pending_signals: Vec<Signal>,
-    masked_signals: Vec<Signal>,
+    masked_signals: SignalSet,
+    signal_frames: Vec<u64>,
     signal_actions: HashMap<Signal, SignalAction>,
     state: ProcessState,
 }

@@ -15,6 +15,9 @@ pub(crate) struct Timespec {
 const _: () = assert!(mem::size_of::<Timespec>() == 16);
 
 impl Timespec {
+    /// Nanoseconds are validated to `[0, 1_000_000_000)` during parsing, so the truncating cast
+    /// cannot lose information.
+    #[allow(clippy::cast_possible_truncation)]
     #[must_use]
     pub(crate) const fn duration(self) -> Duration {
         Duration::new(
