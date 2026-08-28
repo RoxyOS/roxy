@@ -15,7 +15,7 @@ use crate::{
 
 const BOOTSTRAP_HEAP_SIZE: usize = 256 * 1024;
 const HEAP_ORDER: usize = 32;
-const PERMANENT_HEAP_SIZE: usize = 16 * 1024 * 1024;
+const PERMANENT_HEAP_SIZE: usize = 64 * 1024 * 1024;
 
 unsafe extern "C" {
     static __kernel_end: u8;
