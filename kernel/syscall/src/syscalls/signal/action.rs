@@ -14,6 +14,9 @@ use crate::{
 
 use super::SignalSetAbi;
 
+/// `SA_SIGINFO`: invoke the handler with `(signo, siginfo_t *, ucontext_t *)`.
+const SA_SIGINFO: u64 = 4;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct SigactionAbi {
@@ -88,15 +91,20 @@ fn handle(
 }
 
 fn decode(value: SigactionAbi, signal: Signal) -> Result<SignalAction, Errno> {
-    // Only `SA_SIGINFO` is defined in the Roxy ABI today, and handler delivery with a siginfo
-    // frame is not implemented; everything else is rejected through the centralized diagnostic.
-    if value.flags != 0 {
-        return Err(unsupported_argument(
-            "sigaction.flags",
-            signal.number(),
-            Errno::NotSupported,
-        ));
-    }
+    // Only `SA_SIGINFO` (which switches the handler to the three-argument form and supplies a
+    // `siginfo_t`/`ucontext_t` on the frame) is defined in the Roxy ABI today; anything else is
+    // rejected through the centralized diagnostic.
+    let include_siginfo = match value.flags {
+        0 => false,
+        SA_SIGINFO => true,
+        flags => {
+            return Err(unsupported_argument(
+                "sigaction.flags",
+                flags,
+                Errno::NotSupported,
+            ));
+        }
+    };
 
     // The kernel injects its own sigreturn trampoline, so a user-supplied restorer is never
     // required or consulted.
@@ -105,20 +113,28 @@ fn decode(value: SigactionAbi, signal: Signal) -> Result<SignalAction, Errno> {
     Ok(match value.handler {
         0 => SignalAction::Default,
         1 => SignalAction::Ignore,
-        address => SignalAction::Handler { address, mask },
+        address => SignalAction::Handler {
+            address,
+            mask,
+            include_siginfo,
+        },
     })
 }
 
 fn encode(action: SignalAction) -> SigactionAbi {
-    let (handler, mask) = match action {
-        SignalAction::Default => (0, SignalSet::empty()),
-        SignalAction::Ignore => (1, SignalSet::empty()),
-        SignalAction::Handler { address, mask } => (address, mask),
+    let (handler, mask, flags) = match action {
+        SignalAction::Default => (0, SignalSet::empty(), 0),
+        SignalAction::Ignore => (1, SignalSet::empty(), 0),
+        SignalAction::Handler {
+            address,
+            mask,
+            include_siginfo,
+        } => (address, mask, if include_siginfo { SA_SIGINFO } else { 0 }),
     };
 
     SigactionAbi {
         handler,
-        flags: 0,
+        flags,
         restorer: 0,
         mask: SignalSetAbi::from_set(mask),
     }

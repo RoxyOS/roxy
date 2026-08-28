@@ -31,12 +31,13 @@ published.
 
 ## Signals
 
-Each running process owns a `Vec<Signal>` queue of pending process-directed signals, a `SignalSet`
+Each running process owns a queue of pending process-directed signals — `Vec<PendingSignal>`, where each entry pairs the `Signal` with the sender's pid and an ABI-neutral `SignalSource` (mapped to the Linux `si_code` only when the `siginfo_t` is serialized) so a later `siginfo_t` can be produced — a `SignalSet`
 signal mask, a `HashMap<Signal, SignalAction>` of configured dispositions, and a LIFO stack of
 outstanding signal-frame addresses. These are empty when a process is constructed. Absence from
 the action map means `Default`; installing `Ignore` removes already-pending instances of that
 signal. Sending an ignored signal succeeds without queuing or waking the target. Otherwise
-sending appends the signal while holding the process-table lock and wakes the target's main thread
+sending appends the signal (recording the current process as sender with `SignalSource::Process`)
+while holding the process-table lock and wakes the target's main thread
 after the lock is released. The sender never tears down the target directly: that target may still
 execute on its own kernel stack. Signals whose effective default action is currently unsupported
 are rejected before they enter this queue, while handler dispositions always queue. A masked
@@ -50,9 +51,15 @@ to a user handler. Handler delivery writes a signal frame below the interrupted 
 address onto the process frame stack, adds the handler mask and the signal itself to the process
 mask, and returns a `ResumeInfo` that the architecture layer applies to the saved user context.
 The frame carries the trampoline entry as the handler return address, a snapshot of the
-interrupted context, and the pre-delivery mask; its layout is a kernel-internal contract between
-`roxy-process` and the kernel-injected trampoline, and userspace only ever observes the signal
-number argument. `pop_signal_frame` validates that the caller's stack pointer matches the recorded
+interrupted context, the pre-delivery mask, and — for a handler installed with `SA_SIGINFO` — a
+`siginfo_t` and a `ucontext_t` laid out per the Linux ABI. Its layout is a kernel-internal contract
+between `roxy-process` and the kernel-injected trampoline. A plain handler observes only the
+signal number (its `RSI`/`RDX` are zeroed); an `SA_SIGINFO` handler is invoked as
+`(signo, siginfo_t *, ucontext_t *)` with `RSI`/`RDX` pointing at the structures inside its own
+frame. The `siginfo_t` carries the real `si_signo`, `si_code`, and sender `si_pid` recorded at
+queue time; the `ucontext_t` mirrors the interrupted general registers and the pre-delivery mask
+(FPU/SSE state stays zeroed, since Roxy does not save or restore it).
+`pop_signal_frame` validates that the caller's stack pointer matches the recorded
 frame, restores the context and mask, and is invoked by the `sigreturn` syscall, which replaces
 the syscall-return contract itself in the syscall subsystem. Spurious `sigreturn` calls return
 `EINVAL`; a handler that never returns (for example after `longjmp`) leaks its frame entry, which
@@ -133,12 +140,9 @@ at the syscall boundary; process reports whether a matching child is pending or 
 
 The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
 survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
-multi-threaded exec cleanup, credentials, userspace signal handlers, asynchronous interrupt-return delivery,
-process groups, and PID 1 reparenting are not. Process-owned signal-mask storage, atomic
-block/unblock/replace operations, and pending delivery filtering are implemented. Consequently, a
-process that never enters a syscall does not yet observe a pending terminating signal. Signal queues currently preserve
-duplicate deliveries; it delivers the most recently queued signal first. POSIX standard-signal
-coalescing is not implemented.
+multi-threaded exec cleanup, credentials, asynchronous interrupt-return delivery,
+process groups, and PID 1 reparenting are not. POSIX real-time signals are supported; standard-signal
+coalescing is not, so every delivery is queued and the most recent one is delivered first.
 Orphan zombies are retained because no init reaper adopts them. Process-identity callers encode an
 absent parent as PID 0. `chdir` can replace cwd after VFS validation; descriptor-based `fchdir`
 remains unsupported.

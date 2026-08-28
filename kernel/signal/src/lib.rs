@@ -33,6 +33,42 @@ pub enum Signal {
     TerminalInput = 21,
     TerminalOutput = 22,
     WindowChanged = 28,
+    /// POSIX reserved cancellation signal (Linux `SIGCANCEL`, the first reserved real-time
+    /// number). Disposed of by the pthread runtime when it installs its cancellation handler.
+    Cancellation = 32,
+    /// Linux `SIGTIMER`, the second reserved real-time number.
+    Timer = 33,
+    RealTime1 = 34,
+    RealTime2 = 35,
+    RealTime3 = 36,
+    RealTime4 = 37,
+    RealTime5 = 38,
+    RealTime6 = 39,
+    RealTime7 = 40,
+    RealTime8 = 41,
+    RealTime9 = 42,
+    RealTime10 = 43,
+    RealTime11 = 44,
+    RealTime12 = 45,
+    RealTime13 = 46,
+    RealTime14 = 47,
+    RealTime15 = 48,
+    RealTime16 = 49,
+    RealTime17 = 50,
+    RealTime18 = 51,
+    RealTime19 = 52,
+    RealTime20 = 53,
+    RealTime21 = 54,
+    RealTime22 = 55,
+    RealTime23 = 56,
+    RealTime24 = 57,
+    RealTime25 = 58,
+    RealTime26 = 59,
+    RealTime27 = 60,
+    RealTime28 = 61,
+    RealTime29 = 62,
+    RealTime30 = 63,
+    RealTime31 = 64,
 }
 
 impl Signal {
@@ -46,7 +82,41 @@ impl Signal {
             | Self::User2
             | Self::BrokenPipe
             | Self::Alarm
-            | Self::Terminate => DefaultAction::Terminate,
+            | Self::Terminate
+            // POSIX mandates that the default action for a real-time signal is to terminate.
+            | Self::Cancellation
+            | Self::Timer
+            | Self::RealTime1
+            | Self::RealTime2
+            | Self::RealTime3
+            | Self::RealTime4
+            | Self::RealTime5
+            | Self::RealTime6
+            | Self::RealTime7
+            | Self::RealTime8
+            | Self::RealTime9
+            | Self::RealTime10
+            | Self::RealTime11
+            | Self::RealTime12
+            | Self::RealTime13
+            | Self::RealTime14
+            | Self::RealTime15
+            | Self::RealTime16
+            | Self::RealTime17
+            | Self::RealTime18
+            | Self::RealTime19
+            | Self::RealTime20
+            | Self::RealTime21
+            | Self::RealTime22
+            | Self::RealTime23
+            | Self::RealTime24
+            | Self::RealTime25
+            | Self::RealTime26
+            | Self::RealTime27
+            | Self::RealTime28
+            | Self::RealTime29
+            | Self::RealTime30
+            | Self::RealTime31 => DefaultAction::Terminate,
             Self::Child | Self::WindowChanged => DefaultAction::Ignore,
             Self::Quit
             | Self::IllegalInstruction
@@ -115,4 +185,25 @@ mod tests {
             assert_eq!(signal.default_action(), action);
         }
     }
+
+    kernel_test!(
+        "roxy-signal::realtime-default-actions",
+        realtime_default_actions,
+        {
+            assert_actions(
+                &[
+                    Signal::Cancellation,
+                    Signal::Timer,
+                    Signal::RealTime1,
+                    Signal::RealTime7,
+                    Signal::RealTime16,
+                    Signal::RealTime31,
+                ],
+                DefaultAction::Terminate,
+            );
+            assert_eq!(Signal::Cancellation.number(), 32);
+            assert_eq!(Signal::RealTime1.number(), 34);
+            assert_eq!(Signal::RealTime31.number(), 64);
+        }
+    );
 }

@@ -5,7 +5,8 @@ use core::{mem::size_of, ptr, slice};
 use roxy_arch::UserContext;
 use roxy_signal::SignalSet;
 
-use super::SIGRETURN_SYSCALL_NUMBER;
+use super::{SIGRETURN_SYSCALL_NUMBER, build_siginfo};
+use crate::signal::PendingSignal;
 
 /// Base address of the one-page read-execute trampoline mapping.
 ///
@@ -16,11 +17,45 @@ const RETURN_ADDRESS_SIZE: usize = size_of::<u64>();
 const OLD_MASK_SIZE: usize = size_of::<u64>();
 pub(crate) const USER_CONTEXT_SIZE: usize = size_of::<UserContext>();
 
-/// Total frame size: return address, saved user context, and the mask active before delivery.
-pub(crate) const SIGNAL_FRAME_SIZE: usize = RETURN_ADDRESS_SIZE + USER_CONTEXT_SIZE + OLD_MASK_SIZE;
+/// Size of a Linux-compatible `siginfo_t` as consumed by `SA_SIGINFO` handlers.
+const SIGINFO_SIZE: usize = 128;
+/// Size of the `x86_64` `ucontext_t` passed as a handler's third argument.
+const UCONTEXT_SIZE: usize = 968;
+
+/// Total frame size: return address, saved user context, the mask active before delivery, the
+/// `siginfo_t`, and the `ucontext_t` handed to `SA_SIGINFO` handlers.
+pub(crate) const SIGNAL_FRAME_SIZE: usize =
+    RETURN_ADDRESS_SIZE + USER_CONTEXT_SIZE + OLD_MASK_SIZE + SIGINFO_SIZE + UCONTEXT_SIZE;
 
 pub(crate) const USER_CONTEXT_OFFSET: usize = RETURN_ADDRESS_SIZE;
 const OLD_MASK_OFFSET: usize = USER_CONTEXT_OFFSET + USER_CONTEXT_SIZE;
+/// Offset of the `siginfo_t` within the frame; also the `RSI` argument of an `SA_SIGINFO` handler.
+pub(crate) const SIGINFO_OFFSET: usize = OLD_MASK_OFFSET + OLD_MASK_SIZE;
+/// Offset of the `ucontext_t` within the frame; also the `RDX` argument of an `SA_SIGINFO` handler.
+pub(crate) const UCONTEXT_OFFSET: usize = SIGINFO_OFFSET + SIGINFO_SIZE;
+
+/// The `x86_64` `ucontext_t` per mlibc `abis/linux/signal.h`.
+///
+/// The general registers and sigmask are populated; FPU/SSE state and the segment, error, trap,
+/// and reserved slots stay zeroed.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Ucontext {
+    uc_flags: u64,
+    uc_link: u64,
+    ss_sp: u64,
+    ss_flags: i32,
+    ss_size: u64,
+    gregs: [u64; 23],
+    fpregs: u64,
+    reserved: [u64; 8],
+    sigmask: [u64; 16],
+    _fpregs_mem_and_ssp: [u8; 544],
+}
+
+const _: () = assert!(size_of::<Ucontext>() == 968);
+const _: () = assert!(core::mem::offset_of!(Ucontext, gregs) == 40);
+const _: () = assert!(core::mem::offset_of!(Ucontext, sigmask) == 296);
 
 core::arch::global_asm!(
     ".section .rodata",
@@ -57,12 +92,17 @@ pub(crate) fn trampoline() -> &'static [u8] {
 /// Builds the frame bytes for one signal delivery.
 ///
 /// Layout: the trampoline entry (the handler's `ret` target), a snapshot of the interrupted user
-/// context that `sigreturn` restores, and the mask that was active before delivery.
+/// context that `sigreturn` restores, the mask that was active before delivery, and — for
+/// `SA_SIGINFO` handlers — the `siginfo_t` and `ucontext_t` those handlers receive.
 ///
 /// The frame address must satisfy the System V entry alignment (`frame % 16 == 8`), which the
 /// caller selects when placing the frame.
 #[must_use]
-pub(crate) fn build_bytes(context: &UserContext, old_mask: SignalSet) -> [u8; SIGNAL_FRAME_SIZE] {
+pub(crate) fn build_bytes(
+    context: &UserContext,
+    old_mask: SignalSet,
+    pending: PendingSignal,
+) -> [u8; SIGNAL_FRAME_SIZE] {
     let mut frame = [0u8; SIGNAL_FRAME_SIZE];
 
     // The frame's return address targets the user-mapped trampoline copy at `TRAMPOLINE_BASE`,
@@ -75,6 +115,12 @@ pub(crate) fn build_bytes(context: &UserContext, old_mask: SignalSet) -> [u8; SI
     write_context(
         &mut frame[USER_CONTEXT_OFFSET..USER_CONTEXT_OFFSET + USER_CONTEXT_SIZE],
         context,
+    );
+    write_struct(&mut frame, SIGINFO_OFFSET, build_siginfo(pending));
+    write_struct(
+        &mut frame,
+        UCONTEXT_OFFSET,
+        build_ucontext(context, old_mask),
     );
 
     frame
@@ -167,16 +213,55 @@ fn write_context(slot: &mut [u8], context: &UserContext) {
     }
 }
 
+/// Builds the `ucontext_t` whose general registers mirror `context` and whose sigmask is
+/// `old_mask`. FPU/SSE state and the segment, error, trap, and reserved slots stay zeroed.
+fn build_ucontext(context: &UserContext, old_mask: SignalSet) -> Ucontext {
+    // SAFETY: `Ucontext` is a POD of `u64`/`i32`/`u8` fields, so an all-zero bit pattern is a valid
+    // `ucontext_t`.
+    let mut value = unsafe { core::mem::zeroed::<Ucontext>() };
+
+    // `REG_*` indices from `abis/linux/signal.h`; `REG_R11` and `REG_RCX` are clobbered by the
+    // syscall and stay zeroed.
+    value.gregs[0] = context.r8;
+    value.gregs[1] = context.r9;
+    value.gregs[2] = context.r10;
+    value.gregs[4] = context.r12;
+    value.gregs[5] = context.r13;
+    value.gregs[6] = context.r14;
+    value.gregs[7] = context.r15;
+    value.gregs[8] = context.rdi;
+    value.gregs[9] = context.rsi;
+    value.gregs[10] = context.rbp;
+    value.gregs[11] = context.rbx;
+    value.gregs[12] = context.rdx;
+    value.gregs[13] = context.rax;
+    value.gregs[15] = context.stack_pointer;
+    value.gregs[16] = context.instruction_pointer;
+    value.gregs[17] = context.flags;
+    value.sigmask[0] = old_mask.bits();
+
+    value
+}
+
+/// Copies a POD struct into `frame` at `offset`.
+fn write_struct<T: Copy>(frame: &mut [u8], offset: usize, value: T) {
+    let bytes =
+        unsafe { core::slice::from_raw_parts((&raw const value).cast::<u8>(), size_of::<T>()) };
+
+    frame[offset..offset + size_of::<T>()].copy_from_slice(bytes);
+}
+
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_arch::UserContext;
-    use roxy_signal::SignalSet;
+    use roxy_signal::{Signal, SignalSet};
     use roxy_test::kernel_test;
 
     use super::{
         RETURN_ADDRESS_SIZE, SIGRETURN_SYSCALL_NUMBER, TRAMPOLINE_BASE, USER_CONTEXT_OFFSET,
         build_bytes, restore_context, restore_old_mask, trampoline,
     };
+    use crate::signal::{PendingSignal, SignalSource};
 
     fn sample_context() -> UserContext {
         UserContext {
@@ -203,14 +288,43 @@ mod tests {
     kernel_test!("roxy-signal::frame", round_trips_context_and_mask, {
         let context = sample_context();
         let old_mask = SignalSet::USER1 | SignalSet::ALARM;
-        let frame = build_bytes(&context, old_mask);
+        let pending = PendingSignal {
+            signal: Signal::Interrupt,
+            sender_pid: 1,
+            source: SignalSource::Process,
+        };
+        let frame = build_bytes(&context, old_mask, pending);
 
         assert_eq!(restore_context(&frame[USER_CONTEXT_OFFSET..]), context);
         assert_eq!(restore_old_mask(&frame), old_mask);
     });
 
+    kernel_test!("roxy-signal::frame", siginfo_carries_sender_and_code, {
+        let pending = PendingSignal {
+            signal: Signal::Cancellation,
+            sender_pid: 7,
+            source: SignalSource::Tkill,
+        };
+        let frame = build_bytes(&sample_context(), SignalSet::empty(), pending);
+        let siginfo = &frame[super::SIGINFO_OFFSET..];
+
+        let read_i32 =
+            |offset: usize| i32::from_le_bytes(siginfo[offset..offset + 4].try_into().unwrap());
+        assert_eq!(read_i32(0), i32::from(Signal::Cancellation.number()));
+        assert_eq!(read_i32(8), -6);
+        assert_eq!(read_i32(16), 7);
+
+        // `si_pid`/`si_uid` occupy the pid/uid union at 16; `si_uid` follows `si_pid` and is zero.
+        assert_eq!(read_i32(20), 0);
+    });
+
     kernel_test!("roxy-signal::frame", aims_return_address_at_trampoline, {
-        let frame = build_bytes(&sample_context(), SignalSet::empty());
+        let pending = crate::signal::PendingSignal {
+            signal: Signal::Interrupt,
+            sender_pid: 1,
+            source: SignalSource::Process,
+        };
+        let frame = build_bytes(&sample_context(), SignalSet::empty(), pending);
 
         assert_eq!(
             u64::from_le_bytes(

@@ -8,12 +8,16 @@ use crate::{ExitStatus, Process, ProcessId, ProcessState, signal_frame, table::P
 pub enum SignalAction {
     Default,
     Ignore,
-    /// Runs the user handler at `address` with the signal number as the only argument.
+    /// Runs the user handler at `address`.
     ///
-    /// `mask` is added to the process mask for the duration of the handler.
+    /// `mask` is added to the process mask for the duration of the handler. When `include_siginfo` is
+    /// set the handler was installed with `SA_SIGINFO`, so it is invoked as
+    /// `(signo, siginfo_t *, ucontext_t *)` with real structures on the signal frame; otherwise
+    /// it receives the signal number as its only argument.
     Handler {
         address: u64,
         mask: SignalSet,
+        include_siginfo: bool,
     },
 }
 
@@ -21,6 +25,35 @@ pub enum SignalAction {
 pub enum SignalError {
     NoSuchProcess,
     UnsupportedAction,
+}
+
+/// A queued signal and the metadata needed to build its `siginfo_t`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct PendingSignal {
+    pub(super) signal: Signal,
+    /// Process id of the sender; `0` for kernel-originated signals.
+    pub(super) sender_pid: u64,
+    /// Why the signal was generated; mapped to the ABI `si_code` only when the `siginfo_t` is
+    /// serialized onto a frame.
+    pub(super) source: SignalSource,
+}
+
+/// The origin of a pending signal, kept ABI-neutral by `roxy-process`.
+///
+/// Converted to the Linux `si_code` integer only at the frame-serialization boundary, so the
+/// process layer never depends on an ABI's numeric conventions.
+///
+/// `Tkill` and `Kernel` are reserved for `tgkill`-directed and kernel-raised signals, which Roxy
+/// does not produce yet; only `Process` is currently queued.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[allow(dead_code)]
+pub(super) enum SignalSource {
+    /// A user process sent it through the process-directed send syscall.
+    Process,
+    /// A thread-directed `tgkill`/`tkill` sent it (not yet produced by Roxy).
+    Tkill,
+    /// The kernel itself generated it (exceptions, hardware faults).
+    Kernel,
 }
 
 /// Queues a signal for a running process and wakes it if it is blocked.
@@ -35,6 +68,7 @@ pub enum SignalError {
 pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalError> {
     let thread_id = {
         let mut table = PROCESS_TABLE.lock();
+        let sender_pid = table.current_process_id().as_u64();
         let Some(process) = table.processes.get_mut(&process_id) else {
             return Err(SignalError::NoSuchProcess);
         };
@@ -53,7 +87,11 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
             SignalAction::Handler { .. } | SignalAction::Default => {}
         }
 
-        process.queue_signal(signal);
+        process.queue_signal(PendingSignal {
+            signal,
+            sender_pid,
+            source: SignalSource::Process,
+        });
         process.main_thread_id
     };
 
@@ -69,7 +107,8 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
 /// userspace return is safe, exactly once per userspace return boundary.
 #[must_use]
 pub fn deliver_pending_signal(context: &UserContext) -> Option<ResumeInfo> {
-    let signal = take_pending_unmasked_signal()?;
+    let pending = take_pending_unmasked_signal()?;
+    let signal = pending.signal;
     let action = signal_action_of(signal);
 
     match action {
@@ -79,9 +118,18 @@ pub fn deliver_pending_signal(context: &UserContext) -> Option<ResumeInfo> {
 
             None
         }
-        SignalAction::Handler { address, mask } => {
-            Some(prepare_handler_resume(context, signal, address, mask))
-        }
+        SignalAction::Handler {
+            address,
+            mask,
+            include_siginfo,
+        } => Some(prepare_handler_resume(
+            context,
+            signal,
+            address,
+            mask,
+            include_siginfo,
+            pending,
+        )),
     }
 }
 
@@ -93,6 +141,8 @@ fn prepare_handler_resume(
     signal: Signal,
     address: u64,
     handler_mask: SignalSet,
+    include_siginfo: bool,
+    pending: PendingSignal,
 ) -> ResumeInfo {
     let mut table = PROCESS_TABLE.lock();
     let process = table
@@ -103,6 +153,9 @@ fn prepare_handler_resume(
         .clone()
         .expect("running process has no address space");
 
+    // The mask active before delivery, snapshot before the handler's mask is merged in.
+    let old_mask = process.masked_signals;
+
     // Skips the 128-byte red zone below the interrupted stack pointer and aligns the frame so
     // the handler entry satisfies the System V stack alignment (`frame % 16 == 8`).
     let frame_base = context
@@ -112,7 +165,7 @@ fn prepare_handler_resume(
         .map(|value| value & !0xF)
         .and_then(|value| value.checked_sub(8))
         .expect("user stack has room for a signal frame");
-    let frame_bytes = signal_frame::build_bytes(context, process.masked_signals);
+    let frame_bytes = signal_frame::build_bytes(context, old_mask, pending);
 
     addrspace
         .write_bytes(
@@ -124,10 +177,23 @@ fn prepare_handler_resume(
     process.signal_frames.push(frame_base);
     process.masked_signals |= handler_mask | SignalSet::from_signal(signal);
 
+    // An `SA_SIGINFO` handler receives pointers into its own frame; a plain handler gets the
+    // signal number and zeroed arguments (the frame still carries the structures so the layout is
+    // uniform, but the handler cannot observe them).
+    let arguments = if include_siginfo {
+        [
+            u64::from(signal.number()),
+            frame_base + signal_frame::SIGINFO_OFFSET as u64,
+            frame_base + signal_frame::UCONTEXT_OFFSET as u64,
+        ]
+    } else {
+        [u64::from(signal.number()), 0, 0]
+    };
+
     ResumeInfo {
         instruction_pointer: address,
         stack_pointer: frame_base,
-        arguments: [u64::from(signal.number()), 0, 0],
+        arguments,
     }
 }
 
@@ -275,7 +341,7 @@ pub fn has_pending_signal() -> bool {
     process.has_pending_signal()
 }
 
-fn take_pending_unmasked_signal() -> Option<Signal> {
+fn take_pending_unmasked_signal() -> Option<PendingSignal> {
     let mut table = PROCESS_TABLE.lock();
     let process = table.current_process()?;
 
@@ -307,7 +373,8 @@ impl Process {
             .unwrap_or(SignalAction::Default);
 
         if matches!(action, SignalAction::Ignore) {
-            self.pending_signals.retain(|pending| *pending != signal);
+            self.pending_signals
+                .retain(|pending| pending.signal != signal);
         }
 
         old_action
@@ -315,25 +382,25 @@ impl Process {
 }
 
 impl Process {
-    fn queue_signal(&mut self, signal: Signal) {
-        self.pending_signals.push(signal);
+    fn queue_signal(&mut self, pending: PendingSignal) {
+        self.pending_signals.push(pending);
     }
 
-    fn take_latest_signal(&mut self) -> Option<Signal> {
-        let index = self.pending_signals.iter().rposition(|signal| {
+    fn take_latest_signal(&mut self) -> Option<PendingSignal> {
+        let index = self.pending_signals.iter().rposition(|pending| {
             !self
                 .masked_signals
-                .contains(SignalSet::from_signal(*signal))
+                .contains(SignalSet::from_signal(pending.signal))
         })?;
 
         Some(self.pending_signals.remove(index))
     }
 
     fn has_pending_signal(&self) -> bool {
-        self.pending_signals.iter().any(|signal| {
+        self.pending_signals.iter().any(|pending| {
             !self
                 .masked_signals
-                .contains(SignalSet::from_signal(*signal))
+                .contains(SignalSet::from_signal(pending.signal))
         })
     }
 
@@ -353,7 +420,15 @@ mod tests {
     use roxy_thread::Thread;
     use roxy_vm::AddrSpace;
 
-    use super::{Process, SignalAction, filter_unmaskable_signals};
+    use super::{PendingSignal, Process, SignalAction, SignalSource, filter_unmaskable_signals};
+
+    fn pending(signal: Signal) -> PendingSignal {
+        PendingSignal {
+            signal,
+            sender_pid: 1,
+            source: SignalSource::Process,
+        }
+    }
 
     kernel_test!(
         "roxy-process::signal-actions-default-and-ignore",
@@ -369,7 +444,7 @@ mod tests {
                 process.signal_action_of(Signal::Interrupt),
                 SignalAction::Default
             );
-            process.queue_signal(Signal::Interrupt);
+            process.queue_signal(pending(Signal::Interrupt));
             assert_eq!(
                 process.replace_signal_action(Signal::Interrupt, SignalAction::Ignore),
                 SignalAction::Default
@@ -401,11 +476,17 @@ mod tests {
                 Process::new(thread.id(), address_space.clone(), roxy_fd::FdTable::new());
 
             assert!(process.masked_signals.is_empty());
-            process.queue_signal(Signal::Terminate);
-            process.queue_signal(Signal::Interrupt);
+            process.queue_signal(pending(Signal::Terminate));
+            process.queue_signal(pending(Signal::Interrupt));
 
-            assert_eq!(process.take_latest_signal(), Some(Signal::Interrupt));
-            assert_eq!(process.take_latest_signal(), Some(Signal::Terminate));
+            assert_eq!(
+                process.take_latest_signal(),
+                Some(pending(Signal::Interrupt))
+            );
+            assert_eq!(
+                process.take_latest_signal(),
+                Some(pending(Signal::Terminate))
+            );
             assert_eq!(process.take_latest_signal(), None);
             drop(process);
             drop(thread);
@@ -424,20 +505,26 @@ mod tests {
             let mut process =
                 Process::new(thread.id(), address_space.clone(), roxy_fd::FdTable::new());
 
-            process.queue_signal(Signal::Terminate);
-            process.queue_signal(Signal::Interrupt);
+            process.queue_signal(pending(Signal::Terminate));
+            process.queue_signal(pending(Signal::Interrupt));
             assert_eq!(
                 process.replace_masked_signals(SignalSet::from_signal(Signal::Interrupt)),
                 SignalSet::empty()
             );
 
-            assert_eq!(process.take_latest_signal(), Some(Signal::Terminate));
+            assert_eq!(
+                process.take_latest_signal(),
+                Some(pending(Signal::Terminate))
+            );
             assert_eq!(process.take_latest_signal(), None);
             assert_eq!(
                 process.replace_masked_signals(SignalSet::empty()),
                 SignalSet::from_signal(Signal::Interrupt)
             );
-            assert_eq!(process.take_latest_signal(), Some(Signal::Interrupt));
+            assert_eq!(
+                process.take_latest_signal(),
+                Some(pending(Signal::Interrupt))
+            );
             drop(process);
             drop(thread);
             drop(address_space);

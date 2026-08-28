@@ -27,6 +27,7 @@ pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, map_physical,
     protect_memory, unmap_anonymous, unmap_memory,
 };
+use signal::PendingSignal;
 pub use signal::{
     SignalAction, SignalError, block_signals, currently_blocked_signals, deliver_pending_signal,
     has_pending_signal, pop_signal_frame, replace_masked_signals, replace_signal_action,
@@ -55,7 +56,7 @@ struct Process {
     main_thread_id: ThreadId,
     working_directory: ResolvedPath,
     fds: FdTable,
-    pending_signals: Vec<Signal>,
+    pending_signals: Vec<PendingSignal>,
     masked_signals: SignalSet,
     signal_frames: Vec<u64>,
     signal_actions: HashMap<Signal, SignalAction>,
