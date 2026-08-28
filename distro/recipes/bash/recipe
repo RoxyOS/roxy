@@ -16,6 +16,10 @@ imagedeps="gcc libc6-dev make"
 
 source "${base_dir}/build-systems/autotools.sh"
 
+prepare() {
+	autotools_patch_roxy_target
+}
+
 configure() {
 	autotools_configure \
 		--disable-nls \
