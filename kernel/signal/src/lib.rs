@@ -16,6 +16,7 @@ pub enum Signal {
     Interrupt = 2,
     Quit = 3,
     IllegalInstruction = 4,
+    Trap = 5,
     BusError = 7,
     Abort = 6,
     FloatingPointException = 8,
@@ -32,7 +33,16 @@ pub enum Signal {
     TerminalStop = 20,
     TerminalInput = 21,
     TerminalOutput = 22,
+    StackFault = 16,
+    Urgent = 23,
+    CpuLimit = 24,
+    FileSizeLimit = 25,
+    VirtualAlarm = 26,
+    ProfilingAlarm = 27,
     WindowChanged = 28,
+    Io = 29,
+    PowerFailure = 30,
+    SystemCall = 31,
     /// POSIX reserved cancellation signal (Linux `SIGCANCEL`, the first reserved real-time
     /// number). Disposed of by the pthread runtime when it installs its cancellation handler.
     Cancellation = 32,
@@ -83,6 +93,15 @@ impl Signal {
             | Self::BrokenPipe
             | Self::Alarm
             | Self::Terminate
+            | Self::Trap
+            | Self::StackFault
+            | Self::CpuLimit
+            | Self::FileSizeLimit
+            | Self::VirtualAlarm
+            | Self::ProfilingAlarm
+            | Self::Io
+            | Self::PowerFailure
+            | Self::SystemCall
             // POSIX mandates that the default action for a real-time signal is to terminate.
             | Self::Cancellation
             | Self::Timer
@@ -117,7 +136,7 @@ impl Signal {
             | Self::RealTime29
             | Self::RealTime30
             | Self::RealTime31 => DefaultAction::Terminate,
-            Self::Child | Self::WindowChanged => DefaultAction::Ignore,
+            Self::Child | Self::WindowChanged | Self::Urgent => DefaultAction::Ignore,
             Self::Quit
             | Self::IllegalInstruction
             | Self::BusError
@@ -155,11 +174,20 @@ mod tests {
                 Signal::BrokenPipe,
                 Signal::Alarm,
                 Signal::Terminate,
+                Signal::Trap,
+                Signal::StackFault,
+                Signal::CpuLimit,
+                Signal::FileSizeLimit,
+                Signal::VirtualAlarm,
+                Signal::ProfilingAlarm,
+                Signal::Io,
+                Signal::PowerFailure,
+                Signal::SystemCall,
             ],
             DefaultAction::Terminate,
         );
         assert_actions(
-            &[Signal::Child, Signal::WindowChanged],
+            &[Signal::Child, Signal::WindowChanged, Signal::Urgent],
             DefaultAction::Ignore,
         );
         assert_actions(
