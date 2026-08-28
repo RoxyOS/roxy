@@ -30,6 +30,10 @@ autotools_configure() {
 	export NM=llvm-nm
 	export RANLIB=llvm-ranlib
 	export STRIP=llvm-strip
+	export PKG_CONFIG="pkg-config"
+
+	export PKG_CONFIG_LIBDIR="${sysroot}/usr/lib/pkgconfig:${sysroot}/usr/share/pkgconfig"
+	export PKG_CONFIG_SYSROOT_DIR="${sysroot}"
 
 	"${configure_script}" \
 		--build="$(clang -dumpmachine)" \
