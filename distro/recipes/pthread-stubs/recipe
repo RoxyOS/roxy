@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+version=0.5
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libpthread-stubs-${version}.tar.xz"
+tarball_sha256="59da566decceba7c2a7970a4a03b48d9905f1262ff94410a649224e33d2442bc"
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

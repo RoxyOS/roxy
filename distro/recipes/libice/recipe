@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+version=1.1.2
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libICE-${version}.tar.xz"
+tarball_sha256="974e4ed414225eb3c716985df9709f4da8d22a67a2890066bc6dfc89ad298625"
+
+cross_compile=yes
+
+deps="mlibc xorgproto xtrans"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

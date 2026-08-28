@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+version=0.1.3
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libxcvt-${version}.tar.xz"
+tarball_sha256="a929998a8767de7dfa36d6da4751cdbeef34ed630714f2f4a767b351f2442e01"
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="meson roxy-llvm"
+imagedeps="ninja-build pkg-config python3"
+
+source "${base_dir}/build-systems/meson.sh"
+
+configure() {
+	meson_configure
+}
+
+build() {
+	meson_build
+}
+
+package() {
+	meson_install
+}

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+version=6.0.1
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libXfixes-${version}.tar.xz"
+tarball_sha256="b695f93cd2499421ab02d22744458e650ccc88c1d4c8130d60200213abc02d58"
+
+cross_compile=yes
+
+deps="mlibc libx11 libxext xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

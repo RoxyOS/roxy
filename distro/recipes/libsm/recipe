@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+version=1.2.6
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libSM-${version}.tar.xz"
+tarball_sha256="be7c0abdb15cbfd29ac62573c1c82e877f9d4047ad15321e7ea97d1e43d835be"
+
+cross_compile=yes
+
+deps="mlibc libice xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure \
+		--without-libuuid
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

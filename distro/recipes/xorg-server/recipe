@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+version=21.1.24
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/xserver/xorg-server-${version}.tar.xz"
+tarball_sha256="1a4eb36ca65cc3b1b936566d677a9786e13c11cd5806e951ac55f3f5ce3984af"
+
+cross_compile=yes
+
+deps="mlibc pixman libxfont2 libxau libxkbfile libxcvt libmd \
+font-misc-misc xkbcomp xkeyboard-config xorgproto xtrans"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure \
+		--enable-xorg \
+		--disable-xvfb \
+		--disable-xnest \
+		--disable-xquartz \
+		--disable-xwin \
+		--disable-kdrive \
+		--disable-glx \
+		--disable-glamor \
+		--disable-libdrm \
+		--disable-pciaccess \
+		--disable-int10-module \
+		--with-int10=stub \
+		--disable-vgahw \
+		--disable-dri \
+		--disable-dri2 \
+		--disable-dri3 \
+		--disable-xshmfence \
+		--disable-mitshm \
+		--disable-xdmcp \
+		--disable-xdm-auth-1 \
+		--disable-config-udev \
+		--disable-config-hal \
+		--disable-systemd-logind \
+		--disable-suid-wrapper \
+		--disable-unit-tests \
+		--with-sha1=libmd \
+		--with-xkb-path=/usr/share/X11/xkb \
+		--with-xkb-output=/var/lib/xkb \
+		--with-xkb-bin-directory=/usr/bin
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

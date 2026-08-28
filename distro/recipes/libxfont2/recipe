@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+version=2.0.9
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libXfont2-${version}.tar.xz"
+tarball_sha256="f042a370666815e7b941e9b7019024755bd1c6c2954afbfa515af378251799e2"
+
+cross_compile=yes
+
+deps="mlibc xorgproto xtrans libfontenc zlib"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure \
+		--disable-freetype
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

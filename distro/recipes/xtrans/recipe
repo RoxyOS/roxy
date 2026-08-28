@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+version=1.6.0
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/xtrans-${version}.tar.xz"
+tarball_sha256="faafea166bf2451a173d9d593352940ec6404145c5d1da5c213423ce4d359e92"
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+version=0.46.4
+revision=1
+
+tarball_url="https://www.cairographics.org/releases/pixman-${version}.tar.gz"
+tarball_sha256="d09c44ebc3bd5bee7021c79f922fe8fb2fb57f7320f55e97ff9914d2346a591c"
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="meson roxy-llvm"
+imagedeps="ninja-build pkg-config python3"
+
+source "${base_dir}/build-systems/meson.sh"
+
+configure() {
+	meson_configure \
+		-Dlibpng=disabled \
+		-Dtests=disabled \
+		-Ddemos=disabled
+}
+
+build() {
+	meson_build
+}
+
+package() {
+	meson_install
+}

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+version=1.0.13.1
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/app/twm-${version}.tar.xz"
+tarball_sha256="a52534755aa8b492c884e52fa988bac84ab4d54641954679b9aaf08e323df2c5"
+
+cross_compile=yes
+
+deps="mlibc libx11 libxext libxt libxmu libice libsm xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config bison"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

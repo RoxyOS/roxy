@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+version=2.48
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/data/xkeyboard-config/xkeyboard-config-${version}.tar.xz"
+tarball_sha256="b77041324f0109f77161ee43743fe04baa485866af8460d31e476ad3f7648fd5"
+
+cross_compile=yes
+
+deps=""
+hostdeps="meson roxy-llvm"
+imagedeps="ninja-build pkg-config python3 perl"
+
+source "${base_dir}/build-systems/meson.sh"
+
+configure() {
+	meson_configure \
+		-Dnls=false
+}
+
+build() {
+	meson_build
+}
+
+package() {
+	meson_install
+}

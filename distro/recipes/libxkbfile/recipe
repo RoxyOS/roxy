@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+version=1.2.0
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libxkbfile-${version}.tar.xz"
+tarball_sha256="7f71884e5faf56fb0e823f3848599cf9b5a9afce51c90982baeb64f635233ebf"
+
+cross_compile=yes
+
+deps="mlibc libx11 xorgproto"
+hostdeps="meson roxy-llvm"
+imagedeps="ninja-build pkg-config python3"
+
+source "${base_dir}/build-systems/meson.sh"
+
+configure() {
+	meson_configure
+}
+
+build() {
+	meson_build
+}
+
+package() {
+	meson_install
+}

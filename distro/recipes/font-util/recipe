@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+version=1.4.2
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/font/font-util-${version}.tar.xz"
+tarball_sha256="02e4f8afdcf03cc8372ca9c37aa104b1e36b47722dbc79531be08f0a4c622999"
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure \
+		--with-fontrootdir=/usr/share/fonts/X11
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

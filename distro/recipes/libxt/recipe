@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+version=1.3.1
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libXt-${version}.tar.xz"
+tarball_sha256="e0a774b33324f4d4c05b199ea45050f87206586d81655f8bef4dba434d931288"
+
+cross_compile=yes
+
+deps="mlibc libx11 libice libsm xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}

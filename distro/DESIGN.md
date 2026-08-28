@@ -36,9 +36,44 @@ GUI, X11, localization, channels, and optional system integrations, while retain
 runtime installed by its Autotools flow. Its terminal dependency is the shared wide-character
 ncurses library; Roxy enables ncurses' ordinary ELF shared-library rules with a package patch.
 
-Meson identifies the host system as Roxy. Autotools packages temporarily use the compatible
-`x86_64-unknown-none` host tuple because GNU `config.sub` rejects the Roxy OS name; the compiler's
-`x86_64-unknown-roxy` target remains authoritative for generated code and linking.
+Meson identifies the host system as Roxy. Autotools packages use the `x86_64-unknown-roxy-mlibc`
+host tuple: `toolchains/config.sub` accepts the triplet, and `autotools_patch_roxy_target` swaps
+that config.sub into upstream build trees and folds `roxy-mlibc` into libtool's linux-family
+branch where the shipped configure lacks a native `*-mlibc` one, so shared libraries can be built.
+The compiler's `x86_64-unknown-roxy` target remains authoritative for generated code and linking.
+
+## X11 userspace stack
+
+`base` installs the X server (`xorg-server`), the twm window manager, and the xeyes demo client;
+the X packages form a layered graph. Protocol headers (`xorgproto`, `xtrans`) sit below the XCB
+transport (`xcb-proto`, `libxau`, `pthread-stubs`, `libxcb`) and the Xlib family (`libx11`, `libxext`,
+`libxfixes`, `libice`, `libsm`, `libxt`, `libxi`, `libxmu`, `libxkbfile`). Font plumbing (`zlib`, `libfontenc`,
+`libxfont2`, `font-util`, `font-misc-misc`) and XKB data (`xkbcomp`, `xkeyboard-config`) feed the
+server and driver layers (`xorg-server`, `xf86-video-fbdev`, `twm`, `xeyes`); `pixman`, `libxcvt`, and
+`libmd` (server SHA1) complete the set. Release tarballs ship pre-generated `configure`, so `util-macros`
+is not required; `font-util` still supplies the encoding map files and `fontutil.pc`.
+
+Every X configure script and Meson `dependency()` call resolves libraries through pkg-config, which
+no earlier package used. The autotools adapter exports `PKG_CONFIG_LIBDIR` (the sysroot pkg-config
+directories) and `PKG_CONFIG_SYSROOT_DIR` (`/sysroot`); for Meson builds the cross file's `sys_root`
+and `pkg_config_libdir` properties feed the same variables. Cross-compiled packages therefore see
+only target `.pc` files, and `pkg-config --variable` output stays unprefixed, keeping compile-time
+paths such as `XKB_BASE_DIRECTORY=/usr/share/X11/xkb` equal to the runtime paths.
+
+The X server builds with the `x86_64-unknown-roxy-mlibc` host tuple. Configure recognizes no such
+OS and selects the `os-support/stub` layer (no-op VT, IO-port, and PM hooks), so no Linux OS code
+is needed. GLX,
+glamor, DRI, DRM, pciaccess, and MIT-SHM are explicitly disabled; SHA1 comes from `libmd`. The font
+encoding maps are resolved by `ucs2any` through `fontutil.pc`'s `mapdir`, which records the runtime
+(host) path; `font-misc-misc` binds that host path to the sysroot copy during its build and keeps
+only the ISO8859-1 encoding for the default "fixed" font. Host-side font tooling (`bdftopcf`,
+`mkfontdir`, `mkfontscale`, `bdftruncate`, `ucs2any`) comes from the Debian `xfonts-utils` image
+dependency rather than host recipes.
+
+Known runtime gaps are tracked separately from the recipe graph: the kernel currently lacks
+`pipe(2)` and addressed Unix sockets (blocking xkbcomp invocation and X client connections), and
+the `fbdevhw` module needs a `linux/fb.h` header in the mlibc sysroot before `xf86-video-fbdev` can
+drive `/dev/fb0`.
 
 ## Build flow
 

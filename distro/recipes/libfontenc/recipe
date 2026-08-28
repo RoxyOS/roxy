@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+version=1.1.9
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libfontenc-${version}.tar.xz"
+tarball_sha256="9d8392705cb10803d5fe1d27d236cbab3f664e26841ce01916bbbe430cf273e2"
+
+cross_compile=yes
+
+deps="mlibc zlib xorgproto"
+hostdeps="meson roxy-llvm"
+imagedeps="ninja-build pkg-config python3"
+
+source "${base_dir}/build-systems/meson.sh"
+
+configure() {
+	meson_configure
+}
+
+build() {
+	meson_build
+}
+
+package() {
+	meson_install
+}

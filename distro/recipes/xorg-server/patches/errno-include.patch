@@ -1,0 +1,17 @@
+--- a/include/dix-config.h.in
++++ b/include/dix-config.h.in
+@@ -5,3 +5,4 @@
+ 
++#include <errno.h>
+ /* Support BigRequests extension */
+ #undef BIGREQS
+--- a/hw/xfree86/os-support/shared/posix_tty.c
++++ b/hw/xfree86/os-support/shared/posix_tty.c
+@@ -55,6 +55,7 @@
+ #ifdef HAVE_XORG_CONFIG_H
+ #include <xorg-config.h>
+ #endif
+ 
++#include <termios.h>
+ #include <X11/X.h>
+ #include <xserver_poll.h>

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+version=2025.1
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/proto/xorgproto-${version}.tar.xz"
+tarball_sha256="56898c716c0578df8a2d828c9c3e5c528277705c0484381a81960fe1a67668e8"
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="meson roxy-llvm"
+imagedeps="ninja-build pkg-config python3"
+
+source "${base_dir}/build-systems/meson.sh"
+
+configure() {
+	meson_configure
+}
+
+build() {
+	meson_build
+}
+
+package() {
+	meson_install
+}

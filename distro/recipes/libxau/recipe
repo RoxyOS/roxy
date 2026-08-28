@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+version=1.0.12
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libXau-${version}.tar.xz"
+tarball_sha256="74d0e4dfa3d39ad8939e99bda37f5967aba528211076828464d2777d477fc0fb"
+
+cross_compile=yes
+
+deps="mlibc xorgproto"
+hostdeps="meson roxy-llvm"
+imagedeps="ninja-build pkg-config python3"
+
+source "${base_dir}/build-systems/meson.sh"
+
+configure() {
+	meson_configure
+}
+
+build() {
+	meson_build
+}
+
+package() {
+	meson_install
+}
