@@ -91,6 +91,39 @@ impl SyscallArg for Signal {
             21 => Signal::TerminalInput,
             22 => Signal::TerminalOutput,
             28 => Signal::WindowChanged,
+            32 => Signal::Cancellation,
+            33 => Signal::Timer,
+            34 => Signal::RealTime1,
+            35 => Signal::RealTime2,
+            36 => Signal::RealTime3,
+            37 => Signal::RealTime4,
+            38 => Signal::RealTime5,
+            39 => Signal::RealTime6,
+            40 => Signal::RealTime7,
+            41 => Signal::RealTime8,
+            42 => Signal::RealTime9,
+            43 => Signal::RealTime10,
+            44 => Signal::RealTime11,
+            45 => Signal::RealTime12,
+            46 => Signal::RealTime13,
+            47 => Signal::RealTime14,
+            48 => Signal::RealTime15,
+            49 => Signal::RealTime16,
+            50 => Signal::RealTime17,
+            51 => Signal::RealTime18,
+            52 => Signal::RealTime19,
+            53 => Signal::RealTime20,
+            54 => Signal::RealTime21,
+            55 => Signal::RealTime22,
+            56 => Signal::RealTime23,
+            57 => Signal::RealTime24,
+            58 => Signal::RealTime25,
+            59 => Signal::RealTime26,
+            60 => Signal::RealTime27,
+            61 => Signal::RealTime28,
+            62 => Signal::RealTime29,
+            63 => Signal::RealTime30,
+            64 => Signal::RealTime31,
             0 => return Err(unsupported_argument("signal", raw, Errno::NotSupported)),
             _ => return Err(error),
         };
@@ -123,4 +156,19 @@ mod tests {
             );
         }
     );
+
+    kernel_test!("roxy-syscall::signal-number", parses_realtime_signals, {
+        use crate::{args::SyscallArg, errno::Errno};
+        use roxy_signal::Signal;
+
+        assert_eq!(
+            <Signal as SyscallArg>::parse(32, Errno::Invalid),
+            Ok(Signal::Cancellation)
+        );
+        assert_eq!(
+            <Signal as SyscallArg>::parse(64, Errno::Invalid),
+            Ok(Signal::RealTime31)
+        );
+        assert!(<Signal as SyscallArg>::parse(0, Errno::Invalid).is_err());
+    });
 }
