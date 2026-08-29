@@ -114,6 +114,9 @@ The mlibc recipe pins a commit and has `clean_workdirs=no` — the local clone l
 4. One clean `jinx rebuild mlibc` after the pin change, then refresh the rootfs if installed
    behavior or the kernel ABI changed. No `revbump` of dependents — mlibc is dynamically linked
    (`libc.so`/`ld.so`), consumers pick up the new libc at runtime.
+5. ABI changes validate the kernel and mlibc contracts together: syscall numbers must match
+   `kernel/syscall/src/numbers.rs`, and result-struct layouts must match the kernel's generated
+   checks.
 
 ## Gotchas
 
