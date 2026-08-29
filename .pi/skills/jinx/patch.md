@@ -4,8 +4,11 @@ Use when a recipe's sources need a change.
 
 ## Steps
 
-1. Get into the package's workdir (see `inspect-source.md`) and edit the sources **in place** there.
-   Never hand-write or directly edit a package patch — always generate it from workdir edits.
+1. Edit the package's working copy at `distro/sources/<name>-workdir` **in place**. This is the
+   build tree (jinx's `source_dir` points here) and the tree `regenerate` diffs against `-clean`.
+   Never edit `distro/sources/<name>` or the `-clean` snapshot: they are only the pristine diff
+   base, and edits there are discarded or poison the generated patch. Never hand-write or directly
+   edit a package patch — always generate it from the `-workdir` edits via `jinx regen`.
 2. `jinx regen <name>` — regenerates `patches/jinx-working-patch.patch` from your workdir edits
 3. `jinx rebuild <name>` — clean rebuild to verify the patched sources actually build.
 

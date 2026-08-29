@@ -6,8 +6,8 @@ Use when you need to locate the source tree a recipe builds.
 
 | What | Where |
 |---|---|
-| Sources that get built | `distro/sources/<name>` (normal) or `distro/host-sources/<name>` (host) |
-| Workdir — the editable working copy (what `regen` diffs) | `distro/sources/<name>-workdir` |
+| Original unpacked source — the pristine diff base; not edited | `distro/sources/<name>` (normal) or `distro/host-sources/<name>` (host) |
+| Workdir — the editable working copy, and the build tree (`source_dir` points here; what `regen` diffs) | `distro/sources/<name>-workdir` |
 | Patches | `distro/recipes/<name>/patches/` |
 
 jinx's `JINX_SOURCE_DIR` is `distro/`, so sources and workdirs live under `distro/sources/`. To get
