@@ -34,10 +34,10 @@ programs and libraries Jinx builds — not the kernel's user-mode execution mode
   workdir only reaches a build after `jinx regen <name>` regenerates
   `patches/jinx-working-patch.patch` — or the change is published as a regular patch. To test a
   workdir edit: `jinx regen <name>` first, then `jinx rebuild <name>`.
-- **`jinx regen` diffs against the patched tree and syncs `-clean`.** A regen emits only the
-  increment since the last regen (the official patches are already in the diff base), and it
-  writes the workdir changes back into `distro/sources/<name>-clean`, so `-clean` is no longer
-  pristine. Details in [`references/commands.md`](references/commands.md).
+- **`jinx regen` diffs `-workdir` against `-clean`, then overwrites the build tree.** `-clean` is
+  upstream plus the official patches (never the working patch); regen emits only the increment
+  since the last regen and copies the workdir into `distro/sources/<name>` (the build tree).
+  Details in [`references/commands.md`](references/commands.md).
 - **recipes vs host-recipes**: `recipes/` → target sysroot; `host-recipes/` → tools for the build
   machine.
 - **Dependency kinds**: `deps` (runtime), `builddeps` (build-only), `hostdeps` (host tools),
