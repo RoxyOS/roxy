@@ -1,6 +1,7 @@
 use std::{
     fs::{self, File},
     io::{ErrorKind, Read, Seek, SeekFrom},
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
 
@@ -38,6 +39,7 @@ pub(crate) fn build() -> Result<PathBuf> {
     fs::create_dir_all(output.parent().unwrap())
         .context("failed to create root filesystem output directory")?;
     install_base(&workspace, &staging)?;
+    create_standard_dirs(&staging)?;
     create_image(&output, &staging)?;
 
     ensure!(output.is_file(), "root filesystem image was not produced");
@@ -116,6 +118,24 @@ fn reset_staging(staging: &Path) -> Result<()> {
     }
 
     fs::create_dir_all(staging).context("failed to create root filesystem staging directory")
+}
+
+/// Create the standard runtime directory layout. These are image-assembly concerns, not
+/// package content, and so are created here rather than in any recipe's `package()` (empty
+/// directories are dropped by `xbps-create`).
+fn create_standard_dirs(staging: &Path) -> Result<()> {
+    for dir in ["run", "proc", "sys", "root", "dev", "var/log"] {
+        fs::create_dir_all(staging.join(dir))
+            .with_context(|| format!("failed to create staging directory {dir}"))?;
+    }
+    fs::create_dir_all(staging.join("tmp")).context("failed to create staging directory tmp")?;
+
+    fs::set_permissions(staging.join("tmp"), fs::Permissions::from_mode(0o1777))
+        .context("failed to set /tmp permissions")?;
+    fs::set_permissions(staging.join("root"), fs::Permissions::from_mode(0o700))
+        .context("failed to set /root permissions")?;
+
+    Ok(())
 }
 
 fn create_image(output: &Path, staging: &Path) -> Result<()> {

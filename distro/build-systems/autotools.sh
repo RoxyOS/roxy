@@ -39,6 +39,7 @@ autotools_configure() {
 		--build="$(clang -dumpmachine)" \
 		--host=x86_64-unknown-roxy-mlibc \
 		--prefix="${prefix}" \
+		--localstatedir=/var \
 		"$@"
 }
 

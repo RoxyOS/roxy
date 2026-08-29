@@ -7,6 +7,7 @@ meson_configure() {
 		--cross-file="${base_dir}/toolchains/x86_64-roxy.cross-file" \
 		--prefix="${prefix}" \
 		--libdir=lib \
+		--localstatedir=/var \
 		"$@"
 }
 
