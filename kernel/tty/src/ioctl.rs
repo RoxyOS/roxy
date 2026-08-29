@@ -27,9 +27,9 @@ impl Tty {
                 *self.window_size.lock() = window_size;
                 Ok(())
             }
-            IoctlRequest::FbGetVarInfo(_) | IoctlRequest::FbGetFixedInfo(_) => {
-                Err(IoctlError::NotTty)
-            }
+            IoctlRequest::FbGetVarInfo(_)
+            | IoctlRequest::FbSetVarInfo(_)
+            | IoctlRequest::FbGetFixedInfo(_) => Err(IoctlError::NotTty),
         }
     }
 

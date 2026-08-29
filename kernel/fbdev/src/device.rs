@@ -40,6 +40,17 @@ impl Device for FramebufferDevice {
                 *info = convert::var_info(self.layout);
                 Ok(())
             }
+            IoctlRequest::FbSetVarInfo(info) => {
+                // The boot loader fixes the framebuffer mode, so there is no mode hardware to
+                // program. Mirror fixed-mode Linux drivers: accept requests that describe the
+                // current mode (including FB_ACTIVATE_TEST probes) and reject actual mode
+                // changes.
+                if info == convert::var_info(self.layout) {
+                    Ok(())
+                } else {
+                    Err(IoctlError::Invalid)
+                }
+            }
             IoctlRequest::FbGetFixedInfo(info) => {
                 *info = convert::fixed_info(self.layout);
                 Ok(())
@@ -152,6 +163,30 @@ mod tests {
         assert_eq!(info.xres, 1024);
         assert_eq!(info.bits_per_pixel, 32);
     });
+
+    kernel_test!("roxy-fbdev::set-var-ioctl", accepts_current_mode, {
+        let device = FramebufferDevice::new(&LAYOUT);
+        let mut info = var_info_request();
+        device.ioctl(IoctlRequest::FbGetVarInfo(&mut info)).unwrap();
+
+        assert!(device.ioctl(IoctlRequest::FbSetVarInfo(info)).is_ok());
+    });
+
+    kernel_test!(
+        "roxy-fbdev::set-var-ioctl-mode-change",
+        rejects_mode_changes,
+        {
+            let device = FramebufferDevice::new(&LAYOUT);
+            let mut info = var_info_request();
+            device.ioctl(IoctlRequest::FbGetVarInfo(&mut info)).unwrap();
+            info.xres = 800;
+
+            assert_eq!(
+                device.ioctl(IoctlRequest::FbSetVarInfo(info)),
+                Err(IoctlError::Invalid)
+            );
+        }
+    );
 
     kernel_test!("roxy-fbdev::fixed-info-ioctl", dispatches_fixed_info, {
         let device = FramebufferDevice::new(&LAYOUT);

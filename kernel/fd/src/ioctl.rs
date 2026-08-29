@@ -10,12 +10,15 @@ pub enum IoctlRequest<'a> {
     GetWindowSize(&'a mut WindowSize),
     SetWindowSize(WindowSize),
     FbGetVarInfo(&'a mut FbVarInfo),
+    FbSetVarInfo(FbVarInfo),
     FbGetFixedInfo(&'a mut FbFixedInfo),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IoctlError {
     NotTty,
+    /// The request is supported but its arguments are not (reported as `EINVAL`).
+    Invalid,
     Unsupported {
         operation: &'static str,
         argument: u64,

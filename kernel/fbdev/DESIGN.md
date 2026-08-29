@@ -30,6 +30,10 @@ functions, so the conversion is testable without the ioctl dispatch path.
   reserved fields report zero.
 - `FBIOGET_FSCREENINFO` reports the physical framebuffer address, the memory length
   (`pitch × height`), packed-pixels type, truecolor visual, and the pitch as `line_length`.
+- `FBIOPUT_VSCREENINFO` mirrors fixed-mode Linux drivers: the boot loader owns the mode, so a
+  request describing the current mode (including `FB_ACTIVATE_TEST` probes) succeeds as a
+  no-op, and any actual mode change is rejected with `EINVAL`. The user buffer is never
+  written back, so callers observe the mode exactly as requested.
 - `mmap` accepts only `offset == 0` with `size` up to `smem_len` rounded up to a whole page
   (userspace mmaps at page granularity), and only when the framebuffer address
   is page-aligned; it returns the physical range without copying or retaining any reference,
@@ -39,7 +43,7 @@ functions, so the conversion is testable without the ioctl dispatch path.
 
 ## Limits
 
-Mode setting (`FBIOPUT_VSCREENINFO`), panning, palette, and double-buffer control are
-unsupported and rejected as unknown requests. The device does not coordinate with the framebuffer
+Mode changes (`FBIOPUT_VSCREENINFO` with values other than the current mode), panning,
+palette, and double-buffer control are unsupported and rejected. The device does not coordinate with the framebuffer
 terminal: userspace drawing and terminal rendering write the same memory, so taking the device
 over for graphics requires a future exclusive-mode switch outside this crate's scope.

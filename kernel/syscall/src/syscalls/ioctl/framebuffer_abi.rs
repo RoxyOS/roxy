@@ -1,8 +1,12 @@
 use core::mem::{align_of, offset_of, size_of};
 
 use roxy_fb_types::{FbBitfield, FbFixedInfo, FbVarInfo};
+use roxy_memory::UserAddress;
 
-use crate::{args::Out, errno::Errno};
+use crate::{
+    args::{Out, SyscallArg, user_memory},
+    errno::Errno,
+};
 
 /// Linux `struct fb_var_screeninfo` as seen by `x86_64` userspace.
 ///
@@ -49,6 +53,61 @@ const _: () = assert!(offset_of!(FbVarScreenInfoAbi, bits_per_pixel) == 24);
 const _: () = assert!(offset_of!(FbVarScreenInfoAbi, red) == 32);
 const _: () = assert!(offset_of!(FbVarScreenInfoAbi, reserved) == 144);
 
+impl FbVarScreenInfoAbi {
+    const fn zeroed() -> Self {
+        const ZERO_BITFIELD: FbBitfieldAbi = FbBitfieldAbi {
+            offset: 0,
+            length: 0,
+            msb_right: 0,
+        };
+
+        Self {
+            xres: 0,
+            yres: 0,
+            xres_virtual: 0,
+            yres_virtual: 0,
+            xoffset: 0,
+            yoffset: 0,
+            bits_per_pixel: 0,
+            grayscale: 0,
+            red: ZERO_BITFIELD,
+            green: ZERO_BITFIELD,
+            blue: ZERO_BITFIELD,
+            transp: ZERO_BITFIELD,
+            nonstd: 0,
+            activate: 0,
+            height: 0,
+            width: 0,
+            accel_flags: 0,
+            pixclock: 0,
+            left_margin: 0,
+            right_margin: 0,
+            upper_margin: 0,
+            lower_margin: 0,
+            hsync_len: 0,
+            vsync_len: 0,
+            sync: 0,
+            vmode: 0,
+            rotate: 0,
+            colorspace: 0,
+            reserved: [0; 4],
+        }
+    }
+}
+
+impl SyscallArg for FbVarScreenInfoAbi {
+    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        let address = UserAddress::parse(raw, error)?;
+        let mut abi = Self::zeroed();
+
+        // SAFETY: FbVarScreenInfoAbi's checked repr(C) layout has no padding and contains only
+        // integers, and every bit pattern is valid.
+        unsafe { user_memory::read(address, &mut abi) }?;
+
+        Ok(abi)
+    }
+}
+
 /// Linux `struct fb_bitfield` as seen by `x86_64` userspace.
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -60,6 +119,21 @@ struct FbBitfieldAbi {
 
 const _: () = assert!(size_of::<FbBitfieldAbi>() == 12);
 const _: () = assert!(align_of::<FbBitfieldAbi>() == 4);
+
+pub(super) fn read_var_screen_info(address: UserAddress) -> Result<FbVarInfo, Errno> {
+    let abi = FbVarScreenInfoAbi::parse(address.as_u64(), Errno::Fault)?;
+
+    Ok(FbVarInfo {
+        xres: abi.xres,
+        yres: abi.yres,
+        xres_virtual: abi.xres_virtual,
+        yres_virtual: abi.yres_virtual,
+        bits_per_pixel: abi.bits_per_pixel,
+        red: fb_bitfield(abi.red),
+        green: fb_bitfield(abi.green),
+        blue: fb_bitfield(abi.blue),
+    })
+}
 
 /// Linux `struct fb_fix_screeninfo` as seen by `x86_64` userspace.
 ///
@@ -170,6 +244,13 @@ fn bitfield(bitfield: FbBitfield) -> FbBitfieldAbi {
         offset: bitfield.offset,
         length: bitfield.length,
         msb_right: 0,
+    }
+}
+
+fn fb_bitfield(abi: FbBitfieldAbi) -> FbBitfield {
+    FbBitfield {
+        offset: abi.offset,
+        length: abi.length,
     }
 }
 

@@ -9,6 +9,7 @@ use crate::{
 };
 
 pub(super) const FBIOGET_VSCREENINFO: u64 = 0x4600;
+pub(super) const FBIOPUT_VSCREENINFO: u64 = 0x4601;
 pub(super) const FBIOGET_FSCREENINFO: u64 = 0x4602;
 
 pub(super) fn get_var_screen_info(file: &OpenFile, address: UserAddress) -> Result<(), Errno> {
@@ -28,6 +29,13 @@ pub(super) fn get_var_screen_info(file: &OpenFile, address: UserAddress) -> Resu
     file.ioctl(IoctlRequest::FbGetVarInfo(&mut info))
         .map_err(super::execute::map_ioctl_error)?;
     framebuffer_abi::write_var_screen_info(output, info)
+}
+
+pub(super) fn set_var_screen_info(file: &OpenFile, address: UserAddress) -> Result<(), Errno> {
+    let info = framebuffer_abi::read_var_screen_info(address)?;
+
+    file.ioctl(IoctlRequest::FbSetVarInfo(info))
+        .map_err(super::execute::map_ioctl_error)
 }
 
 pub(super) fn get_fix_screen_info(file: &OpenFile, address: UserAddress) -> Result<(), Errno> {
