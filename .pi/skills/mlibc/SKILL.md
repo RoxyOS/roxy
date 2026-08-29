@@ -109,10 +109,20 @@ The mlibc recipe pins a commit and has `clean_workdirs=no` — the local clone l
 2. Push to the canonical `RoxyOS/mlibc` fork; verify the exact commit SHA is reachable before
    touching the recipe.
 3. Update `distro/recipes/mlibc/recipe` only after the commit is published: pin the immutable
-   SHA. Version convention: `0.0.0.YYYYMMDD` for the first update on a date; append `.1`, `.2`,
-   ... for further updates the same day. Keep `revision=1`.
-4. One clean `jinx rebuild mlibc` after the pin change, then refresh the rootfs if installed
-   behavior or the kernel ABI changed. No `revbump` of dependents — mlibc is dynamically linked
+   SHA and update `version` for the publication date. The version must represent this new
+   upstream publication, not remain at the previous recipe version.
+
+   Use the following convention:
+   - The first mlibc publication on a date uses `0.0.0.YYYYMMDD`.
+   - Additional publications on the same date append `.1`, `.2`, and so on.
+   - Determine the next suffix from the versions already present in repository history or the
+     current recipe state.
+   - Keep `revision=1`.
+
+   Before finishing, verify that the recipe diff changes both `version` and `commit`, while
+   leaving `revision=1`. A commit-only update is incomplete.
+4. One clean `jinx rebuild mlibc` after the version and pin change, then refresh the rootfs if
+   installed behavior or the kernel ABI changed. No `revbump` of dependents — mlibc is dynamically linked
    (`libc.so`/`ld.so`), consumers pick up the new libc at runtime.
 5. ABI changes validate the kernel and mlibc contracts together: syscall numbers must match
    `kernel/syscall/src/numbers.rs`, and result-struct layouts must match the kernel's generated
