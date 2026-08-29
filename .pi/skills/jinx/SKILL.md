@@ -1,6 +1,6 @@
 ---
 name: jinx
-description: Use when a task touches distro/
+description: Use when a task involves the distro userland (the user programs and libraries built under `distro/`): viewing or patching package sources, adding a new package, or changing any packaged component's build, configuration, flags, dependencies, runtime libraries, or behavior. "Userland" here means the `distro/` package tree, not the kernel's user-mode execution model.
 ---
 
 # Jinx — Roxy OS distro package manager
@@ -9,6 +9,9 @@ description: Use when a task touches distro/
 
 Roxy OS cross-compiles its userspace with [Jinx](https://github.com/Mintsuki/Jinx), a
 shell-based meta-build-system. Each package is a **recipe** (a shell script) in `distro/`.
+
+Throughout this skill, "userland" and "userspace" mean the `distro/` package tree — the user
+programs and libraries Jinx builds — not the kernel's user-mode execution model.
 
 **Rebuilding a dependency does NOT rebuild its dependents.** Bumping a library's
    `version`/`revision` leaves every consumer stale until you `jinx revbump <lib>` and
