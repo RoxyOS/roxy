@@ -19,3 +19,13 @@
 
 Prefix a package with `host:` to target `host-recipes/` (e.g. `jinx build host:roxy-llvm`); globs
 work (`'*'`, `'host:*'`).
+
+## `jinx regen` behavior
+
+- It diffs the workdir against the source tree **with the official patches already applied**, so
+  it emits only the increment since the last regen — not a full diff against pristine upstream.
+- It syncs the workdir changes into `distro/sources/<name>-clean`, so the `-clean` snapshot is
+  **no longer pristine** once a regen has run. Never assume `-clean` equals the upstream tarball.
+- During a build, patches apply in lexical order (`0001-*`, `0002-*`, ...) followed by
+  `jinx-working-patch.patch`. The working patch carries the un-published increment; keep it until
+  the change is folded into an official patch, then delete it.
