@@ -1,0 +1,22 @@
+diff --git xorg-server-clean/configure xorg-server-workdir/configure
+index 1e6c6e8..74568e1 100755
+--- xorg-server-clean/configure
++++ xorg-server-workdir/configure
+@@ -25353,7 +25353,6 @@ fi
+ ac_fn_c_check_func "$LINENO" "backtrace" "ac_cv_func_backtrace"
+ if test "x$ac_cv_func_backtrace" = xyes
+ then :
+-  printf "%s\n" "#define HAVE_BACKTRACE 1" >>confdefs.h
+ 
+ fi
+ ac_fn_c_check_func "$LINENO" "geteuid" "ac_cv_func_geteuid"
+@@ -26149,9 +26148,6 @@ if test "x$ac_cv_lib_c_backtrace" = xyes
+ then :
+ 
+ 
+-printf "%s\n" "#define HAVE_BACKTRACE 1" >>confdefs.h
+-
+-
+ printf "%s\n" "#define HAVE_EXECINFO_H 1" >>confdefs.h
+ 
+ 
