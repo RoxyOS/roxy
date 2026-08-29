@@ -58,4 +58,7 @@ build() {
 
 package() {
 	autotools_install
+
+	install -D -m 0644 "${base_dir}/recipes/xorg-server/xorg.conf" \
+		"${dest_dir}/usr/share/X11/xorg.conf.d/10-fbdev.conf"
 }
