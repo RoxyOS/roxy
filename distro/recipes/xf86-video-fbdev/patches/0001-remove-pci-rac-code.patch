@@ -1,0 +1,80 @@
+diff --git xf86-video-fbdev-clean/src/fbdev.c xf86-video-fbdev-workdir/src/fbdev.c
+index 939c5b8..d306272 100644
+--- xf86-video-fbdev-clean/src/fbdev.c
++++ xf86-video-fbdev-workdir/src/fbdev.c
+@@ -308,9 +308,6 @@ FBDevProbe(DriverPtr drv, int flags)
+ 	ScrnInfoPtr pScrn;
+        	GDevPtr *devSections;
+ 	int numDevSections;
+-#ifndef XSERVER_LIBPCIACCESS
+-	int bus,device,func;
+-#endif
+ 	char *dev;
+ 	Bool foundScreen = FALSE;
+ 
+@@ -327,40 +324,11 @@ FBDevProbe(DriverPtr drv, int flags)
+ 	    return FALSE;
+ 	    
+ 	for (i = 0; i < numDevSections; i++) {
+-	    Bool isPci = FALSE;
+ 
+ 	    dev = xf86FindOptionValue(devSections[i]->options,"fbdev");
+-	    if (devSections[i]->busID) {
+-#ifndef XSERVER_LIBPCIACCESS
+-	        if (xf86ParsePciBusString(devSections[i]->busID,&bus,&device,
+-					  &func)) {
+-		    if (!xf86CheckPciSlot(bus,device,func))
+-		        continue;
+-		    isPci = TRUE;
+-		}
+-#endif
+-	    }
+ 	    if (fbdevHWProbe(NULL,dev,NULL)) {
+ 		pScrn = NULL;
+-		if (isPci) {
+-#ifndef XSERVER_LIBPCIACCESS
+-		    /* XXX what about when there's no busID set? */
+-		    int entity;
+-		    
+-		    entity = xf86ClaimPciSlot(bus,device,func,drv,
+-					      0,devSections[i],
+-					      TRUE);
+-		    pScrn = xf86ConfigPciEntity(pScrn,0,entity,
+-						      NULL,RES_SHARED_VGA,
+-						      NULL,NULL,NULL,NULL);
+-		    /* xf86DrvMsg() can't be called without setting these */
+-		    pScrn->driverName    = FBDEV_DRIVER_NAME;
+-		    pScrn->name          = FBDEV_NAME;
+-		    xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
+-			       "claimed PCI slot %d:%d:%d\n",bus,device,func);
+-
+-#endif
+-		} else {
++		{
+ 		   int entity;
+ 
+ 		    entity = xf86ClaimFbSlot(drv, 0,
+@@ -418,21 +386,8 @@ FBDevPreInit(ScrnInfoPtr pScrn, int flags)
+ 
+ 	fPtr->pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
+ 
+-#ifndef XSERVER_LIBPCIACCESS
+-	pScrn->racMemFlags = RAC_FB | RAC_COLORMAP | RAC_CURSOR | RAC_VIEWPORT;
+-	/* XXX Is this right?  Can probably remove RAC_FB */
+-	pScrn->racIoFlags = RAC_FB | RAC_COLORMAP | RAC_CURSOR | RAC_VIEWPORT;
+-
+-	if (fPtr->pEnt->location.type == BUS_PCI &&
+-	    xf86RegisterResources(fPtr->pEnt->index,NULL,ResExclusive)) {
+-		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+-		   "xf86RegisterResources() found resource conflicts\n");
+-		return FALSE;
+-	}
+-#else
+-	if (fPtr->pEnt->location.type == BUS_PCI)
+-	    pci_dev = fPtr->pEnt->location.id.pci;
+-#endif
++	/* Roxy exposes the framebuffer as /dev/fb0, never via PCI: leave pci_dev NULL
++	 * and skip the removed RAC resource-registration path entirely. */
+ 	/* open device */
+ 	if (!fbdevHWInit(pScrn, pci_dev,
+ 			 xf86FindOptionValue(fPtr->pEnt->device->options,

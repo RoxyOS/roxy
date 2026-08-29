@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=0.5.1
-revision=1
+revision=2
 
 tarball_url="https://xorg.freedesktop.org/archive/individual/driver/xf86-video-fbdev-${version}.tar.gz"
 tarball_sha256="5e73c01f6ede09ddbc1f553fecdf35dd8efe76b44c7ed263de786a5968c5116f"
