@@ -20,9 +20,12 @@ provider before dispatching the operation. The process subsystem registers that 
 initialization and retains ownership of cwd state. Absolute paths bypass the callback. Provider
 execution and path normalization complete before any filesystem or mount-table operation begins.
 
-Mount resolution selects the longest matching component boundary. The resolved filesystem receives
-a path local to its mount. A mount owns an `Arc<dyn FileSystem>` and active-handle counter; unmount
-is rejected while any file or directory from that mount remains active.
+Mount resolution selects the longest matching component boundary. The resolved filesystem
+receives a path local to its mount: the unchanged absolute path for the root mount, and
+otherwise the mount prefix stripped without a leading separator, so `/dev/fb0` at a `/dev`
+mount arrives as `fb0`. The mount point itself arrives as the root path. A mount owns an
+`Arc<dyn FileSystem>` and active-handle counter; unmount is rejected while any file or
+directory from that mount remains active.
 
 ## Global interface and ownership
 
@@ -52,7 +55,8 @@ be translated inside adapters such as `roxy-ext4`.
 
 - Mount points are normalized and unique.
 - Raw bytes do not cross the global facade except as symbolic-link target data.
-- Filesystem operations and mount routing receive only normalized absolute paths.
+- Mount routing and global path handling receive only normalized absolute paths; filesystem
+  callbacks receive the mount-local form described above.
 - The working-directory provider may acquire the process-table lock, but it must not perform VFS
   operations or retain that lock after returning the cwd snapshot.
 - Path resolution never matches a partial component such as `/mnt` against `/mnt2`.

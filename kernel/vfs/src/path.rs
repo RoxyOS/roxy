@@ -133,6 +133,11 @@ impl ResolvedPath {
             || (path.0.starts_with(&self.0) && path.0.get(self.0.len()) == Some(&b'/'))
     }
 
+    /// Returns the mount-local form of this path. The root mount receives the unchanged
+    /// absolute path; any other mount receives the path with its mount prefix and the
+    /// separating `/` stripped, so `/dev/fb0` under a `/dev` mount becomes `fb0`. The mount
+    /// point itself maps to the root path. Callers must route through `contains` first so the
+    /// mount prefix is present.
     #[must_use]
     pub fn relative_to(&self, mount: &Self) -> Self {
         if mount.is_root() {
@@ -143,7 +148,7 @@ impl ResolvedPath {
             return Self::root();
         }
 
-        Self(self.0[mount.0.len()..].to_vec())
+        Self(self.0[mount.0.len() + 1..].to_vec())
     }
 }
 
@@ -265,6 +270,20 @@ mod tests {
 
             assert!(mount.contains(&ResolvedPath::resolve(b"/mnt/a").unwrap()));
             assert!(!mount.contains(&ResolvedPath::resolve(b"/mnt2").unwrap()));
+        }
+    );
+
+    roxy_test::kernel_test!(
+        "roxy-vfs::computes-mount-local-paths",
+        computes_mount_local_paths,
+        {
+            let root = ResolvedPath::root();
+            let dev = ResolvedPath::resolve(b"/dev").unwrap();
+            let device = ResolvedPath::resolve(b"/dev/fb0").unwrap();
+
+            assert_eq!(device.relative_to(&root).as_bytes(), b"/dev/fb0");
+            assert_eq!(device.relative_to(&dev).as_bytes(), b"fb0");
+            assert_eq!(dev.relative_to(&dev).as_bytes(), b"/");
         }
     );
 }

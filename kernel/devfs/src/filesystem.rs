@@ -228,8 +228,13 @@ mod tests {
         let registry = Arc::new(DeviceRegistry::new());
         registry.register(b"fb0", Arc::new(Stub)).unwrap();
         let vfs = Vfs::new();
-        vfs.mount(ResolvedPath::root(), Arc::new(DevFs::new(registry.clone())))
-            .unwrap();
+        // Mount below the root so lookups exercise mount-relative registry paths,
+        // matching the real `/dev` mount in kernel-main.
+        vfs.mount(
+            ResolvedPath::resolve(b"/dev").unwrap(),
+            Arc::new(DevFs::new(registry.clone())),
+        )
+        .unwrap();
 
         (vfs, registry)
     }
@@ -238,7 +243,7 @@ mod tests {
         let (vfs, _) = filesystem();
         let mut file = vfs
             .open(
-                &ResolvedPath::resolve(b"/fb0").unwrap(),
+                &ResolvedPath::resolve(b"/dev/fb0").unwrap(),
                 roxy_vfs::OpenOptions::read_only(),
             )
             .unwrap();
@@ -260,7 +265,7 @@ mod tests {
 
     kernel_test!("roxy-devfs::missing-device", rejects_unknown_device, {
         let (vfs, _) = filesystem();
-        let missing = ResolvedPath::resolve(b"/tty0").unwrap();
+        let missing = ResolvedPath::resolve(b"/dev/tty0").unwrap();
 
         assert!(
             vfs.open(&missing, roxy_vfs::OpenOptions::read_only())
@@ -273,22 +278,24 @@ mod tests {
         let (vfs, _) = filesystem();
 
         assert_eq!(
-            vfs.metadata(&ResolvedPath::resolve(b"/").unwrap())
+            vfs.metadata(&ResolvedPath::resolve(b"/dev").unwrap())
                 .unwrap()
                 .file_type,
             VfsFileType::Directory
         );
-        let entries = vfs.read_dir(&ResolvedPath::resolve(b"/").unwrap()).unwrap();
+        let entries = vfs
+            .read_dir(&ResolvedPath::resolve(b"/dev").unwrap())
+            .unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, b"fb0");
         assert_eq!(entries[0].file_type, VfsFileType::CharacterDevice);
         assert_eq!(
-            vfs.read_dir(&ResolvedPath::resolve(b"/fb0").unwrap()),
+            vfs.read_dir(&ResolvedPath::resolve(b"/dev/fb0").unwrap()),
             Err(VfsError::NotDirectory)
         );
         assert_eq!(
             vfs.mkdir(
-                &ResolvedPath::resolve(b"/new").unwrap(),
+                &ResolvedPath::resolve(b"/dev/new").unwrap(),
                 roxy_vfs::FilePermissions::DEFAULT_DIRECTORY
             ),
             Err(VfsError::ReadOnly)
