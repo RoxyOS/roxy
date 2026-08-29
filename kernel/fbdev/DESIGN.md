@@ -30,7 +30,8 @@ functions, so the conversion is testable without the ioctl dispatch path.
   reserved fields report zero.
 - `FBIOGET_FSCREENINFO` reports the physical framebuffer address, the memory length
   (`pitch × height`), packed-pixels type, truecolor visual, and the pitch as `line_length`.
-- `mmap` accepts only `offset == 0` with `size ≤ smem_len`, and only when the framebuffer address
+- `mmap` accepts only `offset == 0` with `size` up to `smem_len` rounded up to a whole page
+  (userspace mmaps at page granularity), and only when the framebuffer address
   is page-aligned; it returns the physical range without copying or retaining any reference,
   because the mapping lives for the kernel lifetime.
 - Unknown typed requests return `IoctlError::Unsupported`; the syscall layer reports them through

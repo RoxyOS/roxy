@@ -29,6 +29,7 @@ pub struct ColorChannelLayout {
 /// as `roxy-fbdev` that expose the framebuffer to userspace.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FramebufferLayout {
+    /// The framebuffer's physical base address (the HHDM offset is already removed).
     pub address: u64,
     pub width: u32,
     pub height: u32,

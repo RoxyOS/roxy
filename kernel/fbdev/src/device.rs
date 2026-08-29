@@ -59,7 +59,11 @@ impl Device for FramebufferDevice {
         let length =
             usize::try_from(convert::memory_length(self.layout)).expect("memory length fits usize");
 
-        if size > length {
+        // Userspace rounds the mapping length up to whole pages (fbmem_len in the Linux fbdev
+        // ABI), so accept sizes up to the page-rounded framebuffer length even when
+        // pitch * height is not itself page-aligned.
+        if size > length.next_multiple_of(usize::try_from(PAGE_SIZE).expect("page size fits usize"))
+        {
             return Err(MmapError::InvalidArgument);
         }
 
@@ -91,6 +95,14 @@ mod tests {
         red: ColorChannelLayout { size: 8, shift: 16 },
         green: ColorChannelLayout { size: 8, shift: 8 },
         blue: ColorChannelLayout { size: 8, shift: 0 },
+    };
+
+    /// A layout whose framebuffer length is not page-aligned, for page-rounded mmap tests.
+    const UNALIGNED_LENGTH_LAYOUT: FramebufferLayout = FramebufferLayout {
+        address: 0x2000,
+        pitch: 5464,
+        height: 1,
+        ..LAYOUT
     };
 
     fn var_info_request() -> FbVarInfo {
@@ -166,6 +178,13 @@ mod tests {
             Err(MmapError::InvalidArgument)
         );
         assert_eq!(device.mmap(4096, 4096), Err(MmapError::InvalidArgument));
+
+        // A framebuffer length that is not page-aligned still accepts mapping sizes rounded
+        // up to whole pages, matching the page granularity of the mmap ABI.
+        let unaligned = FramebufferDevice::new(&UNALIGNED_LENGTH_LAYOUT);
+        assert!(unaligned.mmap(5464, 0).is_ok());
+        assert!(unaligned.mmap(8192, 0).is_ok());
+        assert_eq!(unaligned.mmap(8193, 0), Err(MmapError::InvalidArgument));
     });
 
     kernel_test!("roxy-fbdev::unsupported-ioctl", rejects_unknown_requests, {

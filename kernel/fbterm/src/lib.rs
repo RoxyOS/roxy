@@ -43,7 +43,15 @@ pub fn initialize(boot_info: &BootInfo) -> Result<(), InitError> {
     );
 
     let terminal = adapter::FbTerminal::new(&boot_info.framebuffers)?;
-    let layout = terminal.layout();
+    let mut layout = terminal.layout();
+
+    // The boot protocol reports the framebuffer through its HHDM mapping, but the layout is
+    // the userspace-facing contract (smem_start, mmap targets), so publish the physical
+    // address. The terminal keeps the virtual address for its own drawing.
+    layout.address = layout
+        .address
+        .checked_sub(boot_info.hhdm_offset)
+        .ok_or(InitError::InvalidLayout)?;
 
     TERMINAL.call_once(|| Arc::new(terminal));
     LAYOUT.call_once(|| layout);
