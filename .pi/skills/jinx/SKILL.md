@@ -29,6 +29,11 @@ programs and libraries Jinx builds — not the kernel's user-mode execution mode
 
 ## Concepts every guide uses
 
+- **Workdir edits never apply automatically.** Jinx builds `<name>` from `distro/sources/<name>`
+  (`-clean` plus the applied patch set), not from `distro/sources/<name>-workdir`. An edit in the
+  workdir only reaches a build after `jinx regen <name>` regenerates
+  `patches/jinx-working-patch.patch` — or the change is published as a regular patch. To test a
+  workdir edit: `jinx regen <name>` first, then `jinx rebuild <name>`.
 - **recipes vs host-recipes**: `recipes/` → target sysroot; `host-recipes/` → tools for the build
   machine.
 - **Dependency kinds**: `deps` (runtime), `builddeps` (build-only), `hostdeps` (host tools),
