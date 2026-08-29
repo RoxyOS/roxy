@@ -86,11 +86,13 @@ The mlibc recipe pins a commit and has `clean_workdirs=no` — the local clone l
 `distro/sources/mlibc` (workdir: `distro/sources/mlibc-workdir`, the tree you edit).
 
 1. Edit the workdir (`distro/sources/mlibc-workdir`).
-2. Commit and push to the fork, then update the recipe: bump `commit` to the new SHA and `version`
-   per the convention below (see Publishing for the exact rules).
-3. Incremental build to test your changes: `jinx build mlibc`. Use `jinx rebuild mlibc` (fresh `configure()`) only
-   when incremental state is invalid or the Meson configuration must be recreated — e.g. after
-   changing the recipe pin or `meson.build`.
+2. To test locally: run `jinx regen mlibc`, then `jinx build mlibc`. Re-run `jinx regen` after
+   each further workdir edit; the regenerated patch is what actually reaches the build. Use
+   `jinx rebuild mlibc` (fresh `configure()`) only when incremental state is invalid or the
+   Meson configuration must be recreated — e.g. after changing the recipe pin or `meson.build`.
+3. When validated, commit and push to the fork, then update the recipe: bump `commit` to the new
+   SHA and `version` per the convention below (see Publishing for the exact rules), and remove
+   the temporary `jinx-working-patch.patch`.
 4. mlibc is **dynamically linked** (`libc.so`, `ld.so`, ...) — consumers pick up the new libc at
    runtime, so no `revbump` of dependents is needed.
 
