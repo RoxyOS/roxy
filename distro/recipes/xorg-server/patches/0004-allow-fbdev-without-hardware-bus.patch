@@ -1,0 +1,16 @@
+diff --git xorg-server-clean/hw/xfree86/common/xf86Bus.c xorg-server-workdir/hw/xfree86/common/xf86Bus.c
+index fd144db..2ed5dbd 100644
+--- xorg-server-clean/hw/xfree86/common/xf86Bus.c
++++ xorg-server-workdir/hw/xfree86/common/xf86Bus.c
+@@ -566,7 +566,10 @@ xf86PostProbe(void)
+ #ifdef XSERVER_LIBPCIACCESS
+                              pciSlotClaimed
+ #else
+-                             TRUE
++                             /* Roxy: with no hardware bus support compiled in, no
++                                hardware slot can ever be claimed, so a bare fb claim
++                                is never ambiguous and must not be fatal. */
++                             FALSE
+ #endif
+         ))
+         FatalError("Cannot run in framebuffer mode. Please specify busIDs "
