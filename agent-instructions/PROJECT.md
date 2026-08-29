@@ -85,4 +85,4 @@ The standard commands are:
 Image, run, and test commands reuse an existing structurally valid rootfs image. They do not infer
 that a distro or mlibc edit made the cache stale, so rebuild it explicitly after userspace changes.
 Kernel-only iteration should reuse the cached rootfs. Package and mlibc work has additional
-procedures in `agent-instructions/WORKFLOW.md`.
+procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`).
