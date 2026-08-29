@@ -5,6 +5,11 @@ description: Use when working on mlibc
 
 # mlibc — Roxy OS's C library
 
+> **Read the jinx skill first.** Distro build mechanics — workdir edits, `jinx regen`, patches,
+> recipes, and the `-clean`/`-workdir`/`patches/` layout — are covered by the jinx skill
+> (`.pi/skills/jinx/SKILL.md`, `patch.md`). This skill only covers mlibc-specific development
+> and publishing.
+
 ## What mlibc is
 
 mlibc is the C library every Roxy OS userspace package links against. Roxy OS maintains its own
