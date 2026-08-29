@@ -7,7 +7,7 @@ description: "Use when a task involves the distro userland (the user programs an
 
 ## What Jinx is
 
-Roxy OS cross-compiles its userspace with [Jinx](https://github.com/Mintsuki/Jinx), a
+Roxy OS cross-compiles its userspace with [Jinx](https://github.com/Mintsuki/Jinx), /
 shell-based meta-build-system. Each package is a **recipe** (a shell script) in `distro/`.
 
 Throughout this skill, "userland" and "userspace" mean the `distro/` package tree — the user
@@ -51,6 +51,18 @@ programs and libraries Jinx builds — not the kernel's user-mode execution mode
 | Inspect an existing package's sources | [`inspect-source.md`](inspect-source.md) |
 | Patch a package | [`patch.md`](patch.md) |
 | Debug a build failure | [`debug.md`](debug.md) |
+
+## Refreshing the rootfs
+
+Userspace builds land in the sysroot; the rootfs image is separate. After any installed
+userspace change (package, mlibc, new recipe), refresh it:
+
+```sh
+rm target/roxy/rootfs.img
+cargo run -p xtask -- rootfs
+```
+
+Kernel-only changes reuse the cached rootfs and must not trigger a rebuild.
 
 Reference material:
 - [`references/commands.md`](references/commands.md) — command cheatsheet.
