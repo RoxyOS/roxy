@@ -1,0 +1,73 @@
+diff --git xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.c xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.c
+index 9c30f00..3f91216 100644
+--- xorg-server-clean/hw/xfree86/fbdevhw/fbdevhw.c
++++ xorg-server-workdir/hw/xfree86/fbdevhw/fbdevhw.c
+@@ -10,7 +10,9 @@
+ #include "xf86_OSproc.h"
+ 
+ /* pci stuff */
++#ifdef XSERVER_LIBPCIACCESS
+ #include "xf86Pci.h"
++#endif
+ 
+ #include "xf86cmap.h"
+ 
+@@ -256,6 +258,7 @@ fbdev2xfree_timing(struct fb_var_screeninfo *var, DisplayModePtr mode)
+ /* -------------------------------------------------------------------- */
+ /* open correct framebuffer device                                      */
+ 
++#ifdef XSERVER_LIBPCIACCESS
+ /**
+  * Try to find the framebuffer device for a given PCI device
+  */
+@@ -303,6 +306,7 @@ fbdev_open_pci(struct pci_device *pPci, char **namep)
+     xf86DrvMsg(-1, X_ERROR, "Unable to find a valid framebuffer device\n");
+     return -1;
+ }
++#endif
+ 
+ static int
+ fbdev_open(int scrnIndex, const char *dev, char **namep)
+@@ -329,7 +333,9 @@ fbdev_open(int scrnIndex, const char *dev, char **namep)
+         return -1;
+     }
+ 
+-    /* only touch non-PCI devices on this path */
++    /* Only touch non-PCI devices on this path. Roxy has no sysfs, so this
++     * probe is pointless there; keep it confined to Linux. */
++#if defined(__linux__)
+     {
+         char buf[PATH_MAX] = {0};
+         char *sysfs_path = NULL;
+@@ -344,6 +350,7 @@ fbdev_open(int scrnIndex, const char *dev, char **namep)
+         }
+         free(sysfs_path);
+     }
++#endif
+ 
+     if (namep) {
+         if (-1 == ioctl(fd, FBIOGET_FSCREENINFO, (void *) (&fix))) {
+@@ -367,9 +374,11 @@ fbdevHWProbe(struct pci_device *pPci, char *device, char **namep)
+ {
+     int fd;
+ 
++#ifdef XSERVER_LIBPCIACCESS
+     if (pPci)
+         fd = fbdev_open_pci(pPci, namep);
+     else
++#endif
+         fd = fbdev_open(-1, device, namep);
+ 
+     if (-1 == fd)
+@@ -387,9 +396,11 @@ fbdevHWInit(ScrnInfoPtr pScrn, struct pci_device *pPci, char *device)
+     fPtr = FBDEVHWPTR(pScrn);
+ 
+     /* open device */
++#ifdef XSERVER_LIBPCIACCESS
+     if (pPci)
+         fPtr->fd = fbdev_open_pci(pPci, NULL);
+     else
++#endif
+         fPtr->fd = fbdev_open(pScrn->scrnIndex, device, NULL);
+     if (-1 == fPtr->fd) {
+         xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
