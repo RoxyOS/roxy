@@ -7,7 +7,7 @@ impl FilePermissions {
 
     #[must_use]
     pub const fn new(bits: u16) -> Option<Self> {
-        if bits & !0o777 == 0 {
+        if bits & !0o7777 == 0 {
             Some(Self(bits))
         } else {
             None
@@ -26,6 +26,7 @@ mod tests {
 
     roxy_test::kernel_test!("roxy-vfs::file-permissions", validates_permission_bits, {
         assert_eq!(FilePermissions::new(0o640).unwrap().bits(), 0o640);
-        assert!(FilePermissions::new(0o1000).is_none());
+        assert_eq!(FilePermissions::new(0o1777).unwrap().bits(), 0o1777);
+        assert!(FilePermissions::new(0o10000).is_none());
     });
 }

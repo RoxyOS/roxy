@@ -28,7 +28,11 @@ mod tests {
                 Ok(FilePermissions::new(0o750).unwrap())
             );
             assert_eq!(
-                FilePermissions::parse(0o1000, Errno::Invalid),
+                FilePermissions::parse(0o1777, Errno::Invalid),
+                Ok(FilePermissions::new(0o1777).unwrap())
+            );
+            assert_eq!(
+                FilePermissions::parse(0o10000, Errno::Invalid),
                 Err(Errno::Invalid)
             );
         }
