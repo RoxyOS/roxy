@@ -13,7 +13,7 @@ fn handle(fd: Fd) -> SyscallResult {
         .ok_or(Errno::NotSocket)?
         .map_err(super::map_socket_error)?;
 
-    let new_fd = roxy_process::insert_open_file(connection);
+    let new_fd = roxy_process::insert_open_file(connection, false);
 
     Ok(u64::from(new_fd.as_u32()))
 }

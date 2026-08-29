@@ -132,15 +132,17 @@ pub fn current_open_file(fd: Fd) -> Result<Arc<OpenFile>, DescriptorError> {
 
 /// Inserts an open file into the current process at the lowest available descriptor.
 ///
+/// `close_on_exec` records whether `execve` should close the descriptor.
+///
 /// # Panics
 ///
 /// Panics when the current scheduled thread is not owned by a running process.
-pub fn insert_open_file(file: Arc<OpenFile>) -> Fd {
+pub fn insert_open_file(file: Arc<OpenFile>, close_on_exec: bool) -> Fd {
     let mut table = table::PROCESS_TABLE.lock();
     let process_id = table.current_process_id();
     let process = table.processes.get_mut(&process_id).unwrap();
 
-    process.fds.insert(file)
+    process.fds.insert(file, close_on_exec)
 }
 
 /// Closes a descriptor belonging to the currently scheduled process.

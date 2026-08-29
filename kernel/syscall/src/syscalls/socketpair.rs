@@ -69,8 +69,8 @@ fn handle(
         (Domain::Unix, SocketType::Stream, Protocol::Default) => stream::pair(),
     };
 
-    let first_fd = roxy_process::insert_open_file(first);
-    let second_fd = roxy_process::insert_open_file(second);
+    let first_fd = roxy_process::insert_open_file(first, false);
+    let second_fd = roxy_process::insert_open_file(second, false);
 
     let descriptors = if let (Ok(first), Ok(second)) = (
         i32::try_from(first_fd.as_u32()),

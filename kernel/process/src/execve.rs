@@ -27,10 +27,12 @@ pub fn execve_current(
 
     CurrentArchitectureBackend::without_interrupts(|| {
         let thread_id = scheduler::current_thread_id();
-        let _previous = PROCESS_TABLE
-            .lock()
-            .replace_addrspace(thread_id, image.addrspace.clone());
-        PROCESS_TABLE.lock().clear_signal_actions(thread_id);
+        {
+            let mut table = PROCESS_TABLE.lock();
+            let _previous = table.replace_addrspace(thread_id, image.addrspace.clone());
+            table.drop_close_on_exec_fds(thread_id);
+            table.clear_signal_actions(thread_id);
+        }
 
         image.addrspace.activate();
     });

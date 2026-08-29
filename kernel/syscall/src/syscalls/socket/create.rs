@@ -73,7 +73,7 @@ fn handle(domain: Domain, socket_type: SocketType, protocol: Protocol) -> Syscal
         (Domain::Unix, SocketType::Stream, Protocol::Default) => roxy_unix_socket::stream::socket(),
     };
 
-    let fd = roxy_process::insert_open_file(socket);
+    let fd = roxy_process::insert_open_file(socket, false);
 
     Ok(u64::from(fd.as_u32()))
 }

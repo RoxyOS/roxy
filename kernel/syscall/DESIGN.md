@@ -52,8 +52,10 @@ semantics, including terminal line boundaries, inside the owning file implementa
 Path-based `stat` and `open` copy the userspace byte string before passing it to the global VFS
 interface. The VFS leaves absolute paths independent of cwd and obtains the process-owned cwd
 through its registered provider only for relative paths. Syscall handlers do not duplicate path
-normalization or process-state lookup. Path-based `stat` accepts `AT_SYMLINK_NOFOLLOW` and uses the
-VFS link-metadata operation to report the final symbolic link instead of its target.
+normalization or process-state lookup. `open` records `O_CLOEXEC` as a close-on-exec descriptor
+flag, which `execve` honors by closing those descriptors when replacing the image. Path-based
+`stat` accepts `AT_SYMLINK_NOFOLLOW` and uses the VFS link-metadata operation to report the final
+symbolic link instead of its target.
 
 Filesystem mutation syscalls use the shared `Path` argument type, which copies the userspace
 string and rejects an empty path during argument parsing. The `mkdirat`, `unlinkat`, `readlinkat`,

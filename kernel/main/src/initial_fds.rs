@@ -2,7 +2,7 @@ use roxy_fd::{Fd, FdTable};
 
 pub(crate) fn inject(table: &mut FdTable) {
     for expected in [Fd::new(0), Fd::new(1), Fd::new(2)] {
-        let inserted = table.insert(roxy_tty::open());
+        let inserted = table.insert(roxy_tty::open(), false);
 
         assert_eq!(inserted, expected, "initial FD table was not empty");
     }

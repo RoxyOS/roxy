@@ -27,6 +27,7 @@ bitflags! {
         const TRUNCATE = 0o1000;
         const APPEND = 0o2000;
         const LARGE_FILE = 0o100_000;
+        const CLOEXEC = 0o2_000_000;
     }
 }
 
@@ -114,7 +115,10 @@ fn handle(path_address: UserAddress, flags: OpenFlags, mode: u64) -> SyscallResu
     let options = request.options()?;
 
     let file = roxy_vfs::open(path.into_inner(), options).map_err(map_vfs_error)?;
-    let fd = roxy_process::insert_open_file(OpenFile::new(Box::new(file)));
+    let fd = roxy_process::insert_open_file(
+        OpenFile::new(Box::new(file)),
+        flags.contains(OpenFlags::CLOEXEC),
+    );
 
     Ok(u64::from(fd.as_u32()))
 }

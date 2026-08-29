@@ -60,15 +60,17 @@ request numbers, errno policy, and raw userspace pointers remain exclusive to `r
 
 ## Process interaction and limits
 
-The process subsystem owns each `FdTable` and preserves it across `execve`; there is currently no
-`FD_CLOEXEC` state. Fork copies the table's references rather than duplicating open-file offsets.
-`OpenFile::poll` exposes ABI-neutral readiness for the syscall layer; each concrete object owns its
-readiness policy. `File::register_poll_listener` is a separate operation that returns an RAII
-registration for notification when readiness may have changed. The caller queries, registers, and
-prepares its block with interrupts disabled, then rechecks readiness after any wakeup. VFS files
-and directories report immediate read/write readiness, while devices such as the TTY derive it
-from their state and register their listeners with a shared device queue. Duplication syscalls and
-per-descriptor flags remain unsupported.
+The process subsystem owns each `FdTable` and preserves it across `execve`, closing descriptors
+marked close-on-exec. Each descriptor slot records whether it closes on `exec`; `open` sets the
+flag from `O_CLOEXEC`. Fork copies the table's references rather than duplicating open-file
+offsets, and the close-on-exec flag is inherited with the descriptor. `OpenFile::poll` exposes
+ABI-neutral readiness for the syscall layer; each concrete object owns its readiness policy.
+`File::register_poll_listener` is a separate operation that returns an RAII registration for
+notification when readiness may have changed. The caller queries, registers, and prepares its
+block with interrupts disabled, then rechecks readiness after any wakeup. VFS files and
+directories report immediate read/write readiness, while devices such as the TTY derive it from
+their state and register their listeners with a shared device queue. Duplication syscalls and
+other per-descriptor flags remain unsupported.
 
 The typed request set covers terminal attribute get/set operations with their application timing,
 terminal window-size get/set operations, and framebuffer screen-information get operations.

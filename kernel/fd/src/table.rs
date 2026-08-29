@@ -5,9 +5,19 @@ use alloc::{
 
 use crate::{Fd, OpenFile};
 
+/// A single descriptor slot: the open file it refers to plus whether it closes on `exec`.
+///
+/// Close-on-exec is a property of the descriptor, not of the open-file-description, so it lives
+/// here rather than on [`OpenFile`].
+#[derive(Clone)]
+struct FdEntry {
+    file: Arc<OpenFile>,
+    close_on_exec: bool,
+}
+
 #[derive(Clone, Default)]
 pub struct FdTable {
-    entries: BTreeMap<Fd, Arc<OpenFile>>,
+    entries: BTreeMap<Fd, FdEntry>,
 }
 
 impl FdTable {
@@ -20,17 +30,23 @@ impl FdTable {
 
     /// Inserts an open file at the lowest available descriptor number.
     ///
+    /// `close_on_exec` records whether `execve` should close the descriptor. `fork` inherits the
+    /// flag with the descriptor.
+    ///
     /// # Panics
     ///
     /// Panics when every `u32` descriptor number is occupied.
-    pub fn insert(&mut self, file: Arc<OpenFile>) -> Fd {
+    pub fn insert(&mut self, file: Arc<OpenFile>, close_on_exec: bool) -> Fd {
         let mut value = 0;
 
         loop {
             let fd = Fd::new(value);
 
             if let btree_map::Entry::Vacant(entry) = self.entries.entry(fd) {
-                entry.insert(file);
+                entry.insert(FdEntry {
+                    file,
+                    close_on_exec,
+                });
                 return fd;
             }
 
@@ -42,11 +58,16 @@ impl FdTable {
 
     #[must_use]
     pub fn get(&self, fd: Fd) -> Option<Arc<OpenFile>> {
-        self.entries.get(&fd).cloned()
+        self.entries.get(&fd).map(|entry| entry.file.clone())
     }
 
     pub fn remove(&mut self, fd: Fd) -> Option<Arc<OpenFile>> {
-        self.entries.remove(&fd)
+        self.entries.remove(&fd).map(|entry| entry.file)
+    }
+
+    /// Drops every descriptor marked close-on-exec.
+    pub fn drop_close_on_exec(&mut self) {
+        self.entries.retain(|_, entry| !entry.close_on_exec);
     }
 }
 
@@ -97,11 +118,11 @@ mod tests {
             let shared = file();
             let mut table = FdTable::new();
 
-            assert_eq!(table.insert(shared.clone()), Fd::new(0));
-            assert_eq!(table.insert(shared.clone()), Fd::new(1));
+            assert_eq!(table.insert(shared.clone(), false), Fd::new(0));
+            assert_eq!(table.insert(shared.clone(), false), Fd::new(1));
             assert!(table.remove(Fd::new(0)).is_some());
             assert!(table.remove(Fd::new(0)).is_none());
-            assert_eq!(table.insert(shared), Fd::new(0));
+            assert_eq!(table.insert(shared, false), Fd::new(0));
         }
     );
 
@@ -111,7 +132,7 @@ mod tests {
         {
             let shared = file();
             let mut table = FdTable::new();
-            let fd = table.insert(shared.clone());
+            let fd = table.insert(shared.clone(), false);
 
             assert!(Arc::ptr_eq(&table.get(fd).unwrap(), &shared));
             assert!(table.get(Fd::new(9)).is_none());
@@ -120,6 +141,39 @@ mod tests {
             assert!(table.get(fd).is_none());
             drop(removed);
             assert_eq!(Arc::strong_count(&shared), 1);
+        }
+    );
+
+    kernel_test!(
+        "roxy-fd::close-on-exec-drops-only-marked",
+        drops_only_the_close_on_exec_descriptor,
+        {
+            let mut table = FdTable::new();
+            let kept = table.insert(file(), false);
+            let dropped = table.insert(file(), true);
+            let also_kept = table.insert(file(), false);
+
+            table.drop_close_on_exec();
+
+            assert!(table.get(kept).is_some());
+            assert!(table.get(also_kept).is_some());
+            assert!(table.get(dropped).is_none());
+        }
+    );
+
+    kernel_test!(
+        "roxy-fd::fork-clones-close-on-exec-flag",
+        clone_inherits_the_close_on_exec_flag,
+        {
+            let mut table = FdTable::new();
+            let kept = table.insert(file(), false);
+            let dropped = table.insert(file(), true);
+
+            let mut child = table.clone();
+            child.drop_close_on_exec();
+
+            assert!(child.get(kept).is_some());
+            assert!(child.get(dropped).is_none());
         }
     );
 }

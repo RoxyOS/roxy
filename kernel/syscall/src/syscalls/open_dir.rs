@@ -14,7 +14,7 @@ fn handle(path: CString) -> SyscallResult {
 
     let directory = roxy_vfs::open_dir(path.into_inner()).map_err(map_vfs_error)?;
     let file = OpenFile::new(Box::new(directory));
-    let fd = roxy_process::insert_open_file(file);
+    let fd = roxy_process::insert_open_file(file, false);
 
     Ok(u64::from(fd.as_u32()))
 }

@@ -77,6 +77,14 @@ impl ProcessTable {
         process.signal_frames.clear();
     }
 
+    /// Closes every descriptor marked close-on-exec for `execve`.
+    pub(super) fn drop_close_on_exec_fds(&mut self, thread_id: ThreadId) {
+        let process_id = self.thread_owners[&thread_id];
+        let process = self.processes.get_mut(&process_id).unwrap();
+
+        process.fds.drop_close_on_exec();
+    }
+
     pub(super) fn activate_addrspace(&self, thread_id: ThreadId) {
         let process_id = self.thread_owners[&thread_id];
         let addrspace = self.processes[&process_id]
