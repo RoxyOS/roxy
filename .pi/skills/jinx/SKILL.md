@@ -42,6 +42,12 @@ programs and libraries Jinx builds — not the kernel's user-mode execution mode
   machine.
 - **Dependency kinds**: `deps` (runtime), `builddeps` (build-only), `hostdeps` (host tools),
   `imagedeps` (Debian packages in the build container).
+- **Bump revision when recipe output changes.** Any change to a recipe's local files, patches,
+  or `package()` logic that affects the produced XBPS package requires bumping the recipe's
+  `revision` (edit the `revision=` line in the recipe script). Without this, Jinx's incremental
+  build system skips the package and the change does not reach the rootfs. Use
+  `jinx revbump <pkg>` to bump dependents, but the package itself must be bumped manually or by
+  `jinx rebuild <pkg>`.
 
 ## Which guide to read
 
