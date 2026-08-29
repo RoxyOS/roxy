@@ -4,8 +4,6 @@
 
 - When changing a subsystem, also look for and follow a subsystem-local style guide such as
   `kernel/syscall/STYLE.md` when one exists.
-- Treat `agent-instructions/STYLE.md` as the sole source of truth for coding style; consult it
-  instead of duplicating style rules in other instruction files.
 - Repository policy is written in English. Always speak to the user in Chinese.
 
 ## User Handoff
@@ -82,8 +80,8 @@
 - Write design documents in English for long-term maintainers. Explain why the design exists and
   state durable contracts rather than walking through functions or restating the current code.
   Use compact diagrams or tables only when they clarify a relationship or sequence.
-- Do not duplicate `agent-instructions/STYLE.md`, API rustdoc, code comments, changelogs, temporary
-  plans, TODO lists, or source line references in `DESIGN.md`. Design documentation complements
+- Do not duplicate API rustdoc, code comments, changelogs, temporary plans, TODO lists, or
+  source line references in `DESIGN.md`. Design documentation complements
   local API, safety, and invariant comments; it does not replace them. Never rely on a maintainer
   having read `DESIGN.md` to understand source structure: the code and its nearby comments must
   explain non-obvious relationships on their own.
