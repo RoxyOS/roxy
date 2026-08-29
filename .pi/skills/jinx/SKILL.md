@@ -1,6 +1,6 @@
 ---
 name: jinx
-description: Use when a task involves the distro userland (the user programs and libraries built under `distro/`): viewing or patching package sources, adding a new package, or changing any packaged component's build, configuration, flags, dependencies, runtime libraries, or behavior. "Userland" here means the `distro/` package tree, not the kernel's user-mode execution model.
+description: "Use when a task involves the distro userland (the user programs and libraries built under `distro/`): viewing or patching package sources, adding a new package, or changing any packaged component's build, configuration, flags, dependencies, runtime libraries, or behavior. \"Userland\" here means the `distro/` package tree, not the kernel's user-mode execution model."
 ---
 
 # Jinx — Roxy OS distro package manager
