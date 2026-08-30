@@ -1,16 +1,19 @@
-use roxy_memory::UserAddress;
 use roxy_vfs::FilePermissions;
 
-use crate::{SyscallResult, args::CString, errno::Errno, numbers::SyscallNumber, syscall};
+use crate::{
+    SyscallResult,
+    args::CString,
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
+};
 
 syscall!(SyscallNumber::Chmod, handle(
-    path_address: UserAddress => Fault,
+    path: CString => Fault,
     permissions: FilePermissions => Invalid,
 ));
 
-fn handle(path_address: UserAddress, permissions: FilePermissions) -> SyscallResult {
-    let path = CString::from_address(path_address)?;
-
+fn handle(path: CString, permissions: FilePermissions) -> SyscallResult {
     if path.is_empty() {
         return Err(Errno::NotFound);
     }
