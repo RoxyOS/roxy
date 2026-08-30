@@ -1,4 +1,4 @@
-use roxy_fd::Fd;
+use roxy_fd::{Fd, StatusFlags};
 use roxy_process::{self, DescriptorError};
 
 use crate::{SyscallResult, args::SyscallArg, errno::Errno, numbers::SyscallNumber, syscall};
@@ -16,6 +16,7 @@ enum FcntlCommand {
     GetFd = 1,
     SetFd = 2,
     GetFl = 3,
+    SetFl = 4,
     DupFdCloexec = 1030,
 }
 
@@ -26,6 +27,7 @@ impl FcntlCommand {
             1 => Ok(Self::GetFd),
             2 => Ok(Self::SetFd),
             3 => Ok(Self::GetFl),
+            4 => Ok(Self::SetFl),
             1030 => Ok(Self::DupFdCloexec),
             _ => Err(unsupported("fcntl.command", raw)),
         }
@@ -43,6 +45,7 @@ fn handle(fd: Fd, command: FcntlCommand, argument: u64) -> SyscallResult {
         FcntlCommand::GetFd => handle_getfd(fd),
         FcntlCommand::SetFd => handle_setfd(fd, argument),
         FcntlCommand::GetFl => handle_getfl(fd),
+        FcntlCommand::SetFl => handle_setfl(fd, argument),
         FcntlCommand::DupFd => handle_dupfd(fd, argument, false),
         FcntlCommand::DupFdCloexec => handle_dupfd(fd, argument, true),
     }
@@ -69,6 +72,24 @@ fn handle_getfl(fd: Fd) -> SyscallResult {
     let file = roxy_process::current_open_file(fd).map_err(map_process_error)?;
 
     Ok(file.status_flags().bits())
+}
+
+/// Updates the file status flags of the open file description behind `fd`.
+///
+/// Only the bits in `StatusFlags::SETTABLE` are changed (currently append and large-file
+/// mode); access mode bits and other status flags are preserved. `O_NONBLOCK` is not yet
+/// modeled, so requesting it is silently ignored.
+fn handle_setfl(fd: Fd, argument: u64) -> SyscallResult {
+    let file = roxy_process::current_open_file(fd).map_err(map_process_error)?;
+
+    let requested = StatusFlags::from_bits_retain(argument);
+    let mut flags = file.status_flags();
+    flags.remove(StatusFlags::SETTABLE);
+    flags.insert(requested & StatusFlags::SETTABLE);
+
+    file.set_status_flags(flags);
+
+    Ok(0)
 }
 
 /// Duplicates `fd` to the lowest available descriptor at or above `argument`.
@@ -102,6 +123,7 @@ mod tests {
         assert_eq!(FcntlCommand::parse(1), Ok(FcntlCommand::GetFd));
         assert_eq!(FcntlCommand::parse(2), Ok(FcntlCommand::SetFd));
         assert_eq!(FcntlCommand::parse(3), Ok(FcntlCommand::GetFl));
+        assert_eq!(FcntlCommand::parse(4), Ok(FcntlCommand::SetFl));
         assert_eq!(FcntlCommand::parse(1030), Ok(FcntlCommand::DupFdCloexec));
     });
 
@@ -109,7 +131,6 @@ mod tests {
         "roxy-syscall::fcntl-command",
         rejects_unsupported_commands,
         {
-            assert_eq!(FcntlCommand::parse(4), Err(Errno::NotSupported));
             assert_eq!(FcntlCommand::parse(1000), Err(Errno::NotSupported));
         }
     );

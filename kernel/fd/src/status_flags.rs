@@ -13,5 +13,12 @@ bitflags! {
         const READ_WRITE = 0o2;
         const APPEND = 0o2000;
         const LARGE_FILE = 0o100_000;
+
+        /// The subset of status flags that `fcntl(F_SETFL)` may change.
+        ///
+        /// Access mode bits (`WRITE_ONLY`/`READ_WRITE`) are fixed at open time and cannot be
+        /// altered by `F_SETFL`; `O_NONBLOCK` is not yet modeled, so append and large-file mode
+        /// are the only modifiable bits.
+        const SETTABLE = Self::APPEND.bits() | Self::LARGE_FILE.bits();
     }
 }
