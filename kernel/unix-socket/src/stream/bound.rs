@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, collections::VecDeque, sync::Arc};
 
-use roxy_fd::OpenFile;
+use roxy_fd::{OpenFile, StatusFlags};
 use roxy_poll::{PollListener, PollListeners, PollRegistration};
 use roxy_thread::scheduler;
 use roxy_utils::Lock;
@@ -109,10 +109,12 @@ impl BoundSocket {
             }
 
             let connection = Arc::new(Connection::new());
-            pending.push_back(OpenFile::new(Box::new(Socket::connected(
+            let endpoint = OpenFile::new(Box::new(Socket::connected(
                 connection.clone(),
                 Side::Second,
-            ))));
+            )));
+            endpoint.set_status_flags(StatusFlags::READ_WRITE);
+            pending.push_back(endpoint);
 
             Some(Connected::new(connection, Side::First))
         };

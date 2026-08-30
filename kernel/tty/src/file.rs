@@ -4,7 +4,7 @@ use roxy_poll::{PollListener, PollRegistration};
 
 use roxy_fd::{
     File, FileError, FileMetadata, FileType, IoctlError, IoctlRequest, OpenFile, PollEvents,
-    SeekError, SeekFrom,
+    SeekError, SeekFrom, StatusFlags,
 };
 
 use crate::Tty;
@@ -56,7 +56,9 @@ impl File for TtyFile {
 impl TtyFile {
     #[must_use]
     pub(super) fn open(tty: Arc<Tty>) -> Arc<OpenFile> {
-        OpenFile::new(Box::new(Self { tty }))
+        let file = OpenFile::new(Box::new(Self { tty }));
+        file.set_status_flags(StatusFlags::READ_WRITE);
+        file
     }
 }
 

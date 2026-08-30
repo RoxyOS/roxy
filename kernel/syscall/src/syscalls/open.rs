@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
 use bitflags::bitflags;
-use roxy_fd::OpenFile;
+use roxy_fd::{OpenFile, StatusFlags};
 use roxy_memory::UserAddress;
 use roxy_vfs::{CreationMode, FilePermissions, OpenAccess, OpenOptions, VfsError};
 
@@ -89,6 +89,21 @@ impl OpenRequest {
 
         FilePermissions::new(bits).ok_or_else(|| unsupported("open.mode", self.mode))
     }
+
+    /// Returns the file status flags this open request implies, for `fcntl(F_GETFL)`.
+    fn status_flags(self) -> StatusFlags {
+        // `OpenRequest::options` already rejects an invalid access mode (3), so only 1 and 2
+        // can reach here; anything else stays read-only.
+        let access = match self.flags.bits() & ACCESS_MASK {
+            1 => StatusFlags::WRITE_ONLY.bits(),
+            2 => StatusFlags::READ_WRITE.bits(),
+            _ => 0,
+        };
+        let extra =
+            self.flags.bits() & (StatusFlags::APPEND.bits() | StatusFlags::LARGE_FILE.bits());
+
+        StatusFlags::from_bits_retain(access | extra)
+    }
 }
 
 impl SyscallArg for OpenFlags {
@@ -115,10 +130,9 @@ fn handle(path_address: UserAddress, flags: OpenFlags, mode: u64) -> SyscallResu
     let options = request.options()?;
 
     let file = roxy_vfs::open(path.into_inner(), options).map_err(map_vfs_error)?;
-    let fd = roxy_process::insert_open_file(
-        OpenFile::new(Box::new(file)),
-        flags.contains(OpenFlags::CLOEXEC),
-    );
+    let file = OpenFile::new(Box::new(file));
+    file.set_status_flags(request.status_flags());
+    let fd = roxy_process::insert_open_file(file, flags.contains(OpenFlags::CLOEXEC));
 
     Ok(u64::from(fd.as_u32()))
 }
@@ -184,4 +198,22 @@ mod tests {
             assert_eq!(read_only_append.options(), Err(Errno::Invalid));
         }
     );
+
+    kernel_test!("roxy-syscall::open-status-flags", reports_open_mode, {
+        use roxy_fd::StatusFlags;
+
+        let read_only = OpenRequest::new(OpenFlags::empty(), 0);
+        let write_only = OpenRequest::new(OpenFlags::WRITE_ONLY, 0);
+        let read_write = OpenRequest::new(
+            OpenFlags::READ_WRITE | OpenFlags::APPEND | OpenFlags::LARGE_FILE,
+            0,
+        );
+
+        assert_eq!(read_only.status_flags(), StatusFlags::empty());
+        assert_eq!(write_only.status_flags(), StatusFlags::WRITE_ONLY);
+        assert_eq!(
+            read_write.status_flags(),
+            StatusFlags::READ_WRITE | StatusFlags::APPEND | StatusFlags::LARGE_FILE
+        );
+    });
 }

@@ -8,7 +8,9 @@ use roxy_poll::{PollListener, PollListeners, PollRegistration};
 use roxy_thread::scheduler;
 use roxy_utils::Lock;
 
-use roxy_fd::{File, FileError, FileMetadata, FileType, OpenFile, PollEvents, SeekError, SeekFrom};
+use roxy_fd::{
+    File, FileError, FileMetadata, FileType, OpenFile, PollEvents, SeekError, SeekFrom, StatusFlags,
+};
 
 const CAPACITY: usize = 64 * 1024;
 
@@ -46,10 +48,14 @@ pub fn pair() -> (Arc<OpenFile>, Arc<OpenFile>) {
             state: state.clone(),
             role: PipeRole::Read,
         })),
-        OpenFile::new(Box::new(PipeEnd {
-            state,
-            role: PipeRole::Write,
-        })),
+        {
+            let end = OpenFile::new(Box::new(PipeEnd {
+                state,
+                role: PipeRole::Write,
+            }));
+            end.set_status_flags(StatusFlags::WRITE_ONLY);
+            end
+        },
     )
 }
 
