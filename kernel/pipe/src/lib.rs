@@ -31,6 +31,7 @@ enum PipeRole {
     Write,
 }
 
+#[must_use]
 pub fn pair() -> (Arc<OpenFile>, Arc<OpenFile>) {
     let state = Arc::new(Lock::new(PipeState {
         bytes: VecDeque::new(),
