@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=1.9.4
-revision=1
+revision=4
 
 tarball_url="https://www.x.org/releases/individual/driver/xf86-input-mouse-${version}.tar.xz"
 tarball_sha256="7f6f8551fc238abdddcf9f38906564c1f8c7dacb0ad947cfc110487aefbd8d4c"
@@ -21,6 +21,10 @@ prepare() {
 configure() {
 	autotools_configure \
 		--with-xorg-module-dir="$(pkg-config --variable=moduledir xorg-server)"
+}
+
+build() {
+	autotools_build
 }
 
 package() {

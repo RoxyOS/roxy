@@ -1,0 +1,13 @@
+diff --git xf86-input-mouse-clean/configure xf86-input-mouse-workdir/configure
+index e3df016..eee96b5 100755
+--- xf86-input-mouse-clean/configure
++++ xf86-input-mouse-workdir/configure
+@@ -19605,7 +19605,7 @@ fi
+ 
+ # Work out which OS mouse driver we need to build
+ case $host_os in
+-  linux*)
++  linux*|roxy*)
+     OS_MOUSE_NAME=lnx
+     ;;
+   freebsd*|kfreebsd*-gnu|dragonfly*|netbsd*|openbsd*)
