@@ -42,7 +42,7 @@ use hashbrown::HashMap;
 use roxy_fd::{DupError, Fd, FdTable, OpenFile};
 use roxy_signal::{Signal, SignalSet};
 use roxy_thread::ThreadId;
-use roxy_vfs::ResolvedPath;
+use roxy_vfs::{FilePermissions, ResolvedPath};
 use roxy_vm::AddrSpaceHandle;
 
 /// Long-lived process metadata owned by the process table.
@@ -55,6 +55,7 @@ struct Process {
     addrspace: Option<AddrSpaceHandle>,
     main_thread_id: ThreadId,
     working_directory: ResolvedPath,
+    umask: FilePermissions,
     fds: FdTable,
     pending_signals: Vec<PendingSignal>,
     masked_signals: SignalSet,
@@ -249,6 +250,38 @@ pub fn fcntl_dupfd(oldfd: Fd, minimum: Fd, close_on_exec: bool) -> Result<Fd, De
         .fds
         .dupfd(oldfd, minimum, close_on_exec)
         .map_err(map_dup_error)
+}
+
+/// Replaces the umask of the currently scheduled process with `new`, returning the previous value.
+///
+/// This backs the `umask(2)` syscall: the new value is stored and the old one is returned to the
+/// caller, matching the syscall's contract of returning the previous umask.
+///
+/// # Panics
+///
+/// Panics when the current scheduled thread is not owned by a running process.
+pub fn replace_current_umask(new: FilePermissions) -> FilePermissions {
+    let mut table = table::PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    let process = table.processes.get_mut(&process_id).unwrap();
+
+    core::mem::replace(&mut process.umask, new)
+}
+
+/// Returns the umask of the currently scheduled process.
+///
+/// This backs the `fcntl`/creation paths that apply the process umask to new files and
+/// directories.
+///
+/// # Panics
+///
+/// Panics when the current scheduled thread is not owned by a running process.
+pub fn current_umask() -> FilePermissions {
+    let table = table::PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    let process = table.processes.get(&process_id).unwrap();
+
+    process.umask
 }
 
 fn map_dup_error(error: DupError) -> DescriptorError {

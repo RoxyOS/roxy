@@ -127,7 +127,15 @@ fn handle(path_address: UserAddress, flags: OpenFlags, mode: u64) -> SyscallResu
         return Err(Errno::NotFound);
     }
 
-    let options = request.options()?;
+    let mut options = request.options()?;
+
+    // A file mode creation mask only affects newly created files; opening an existing file
+    // leaves its permissions untouched.
+    if !matches!(options.creation, roxy_vfs::CreationMode::OpenExisting) {
+        options.permissions = options
+            .permissions
+            .apply_umask(roxy_process::current_umask());
+    }
 
     let file = roxy_vfs::open(path.into_inner(), options).map_err(map_vfs_error)?;
     let file = OpenFile::new(Box::new(file));

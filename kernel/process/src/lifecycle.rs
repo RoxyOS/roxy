@@ -84,6 +84,7 @@ mod tests {
             child_thread.id(),
             child_addrspace.clone(),
             child_working_directory,
+            roxy_vfs::FilePermissions::DEFAULT_UMASK,
             roxy_fd::FdTable::new(),
             hashbrown::HashMap::new(),
         );

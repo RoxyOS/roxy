@@ -33,6 +33,7 @@ mod socket;
 mod socketpair;
 mod stat;
 mod tcb_set;
+mod umask;
 mod uname;
 mod vm;
 mod waitpid;
@@ -40,7 +41,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 58] = [
+pub(super) const SYSCALLS: [Syscall; 59] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -99,4 +100,5 @@ pub(super) const SYSCALLS: [Syscall; 58] = [
     pipe::SYSCALL,
     dup2::SYSCALL,
     fcntl::SYSCALL,
+    umask::SYSCALL,
 ];

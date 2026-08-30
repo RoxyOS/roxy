@@ -4,7 +4,7 @@ use roxy_signal::SignalSet;
 
 use hashbrown::HashMap;
 use roxy_thread::{Thread, ThreadCreateError, ThreadId, scheduler};
-use roxy_vfs::ResolvedPath;
+use roxy_vfs::{FilePermissions, ResolvedPath};
 use roxy_vm::AddrSpaceHandle;
 
 use crate::{
@@ -50,6 +50,7 @@ impl Process {
             addrspace: Some(addrspace),
             main_thread_id,
             working_directory: ResolvedPath::root(),
+            umask: FilePermissions::DEFAULT_UMASK,
             fds,
             pending_signals: Vec::new(),
             masked_signals: SignalSet::empty(),
@@ -64,6 +65,7 @@ impl Process {
         main_thread_id: ThreadId,
         addrspace: AddrSpaceHandle,
         working_directory: ResolvedPath,
+        umask: FilePermissions,
         fds: roxy_fd::FdTable,
         signal_actions: HashMap<roxy_signal::Signal, crate::SignalAction>,
     ) -> Self {
@@ -73,6 +75,7 @@ impl Process {
             addrspace: Some(addrspace),
             main_thread_id,
             working_directory,
+            umask,
             fds,
             pending_signals: Vec::new(),
             masked_signals: SignalSet::empty(),

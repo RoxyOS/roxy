@@ -244,6 +244,7 @@ mod tests {
             thread_id,
             AddrSpace::new().unwrap().into_handle(),
             ResolvedPath::root(),
+            roxy_vfs::FilePermissions::DEFAULT_UMASK,
             roxy_fd::FdTable::new(),
             hashbrown::HashMap::new(),
         );
