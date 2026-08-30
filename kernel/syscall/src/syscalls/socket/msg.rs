@@ -2,7 +2,6 @@ use alloc::vec::Vec;
 use core::mem::{offset_of, size_of};
 
 use bitflags::bitflags;
-use roxy_fd::FileError;
 use roxy_memory::UserAddress;
 
 use crate::{
@@ -152,12 +151,7 @@ impl SyscallArg for ParsedMsgHdr {
     }
 }
 
-// ── I/O helpers ────────────────────────────────────────────────────────────
-
-/// Maximum bytes to transfer in one gather/scatter pass.
-const SCRATCH_SIZE: usize = 4096;
-/// Upper bound for a single recvmsg scatter buffer.
-const MAX_RECV_BUFFER: usize = SCRATCH_SIZE * 16;
+// ── Shared parsing ─────────────────────────────────────────────────────────
 
 /// Reads the `iovec` array at `address` (count = `count`) from user space.
 ///
@@ -187,103 +181,6 @@ pub(crate) fn read_iovecs(address: UserAddress, count: i32) -> Result<Vec<Iovec>
     unsafe { user_memory::read_slice(address, &mut iovecs) }?;
 
     Ok(iovecs)
-}
-
-/// Gathers data from user-space iovecs into the file, honoring `nonblocking`.
-///
-/// Returns the total number of bytes written.
-///
-/// # Errors
-///
-/// Returns `FileError::Io` when a user buffer cannot be read, plus any error from the write.
-pub(crate) fn sendmsg_gather(
-    file: &roxy_fd::OpenFile,
-    iovecs: &[Iovec],
-    nonblocking: bool,
-) -> Result<usize, FileError> {
-    let mut written = 0usize;
-
-    for iov in iovecs {
-        let mut remaining = iov.length;
-
-        while remaining > 0 {
-            let chunk = remaining.min(SCRATCH_SIZE);
-            let mut buf = [0u8; SCRATCH_SIZE];
-
-            // SAFETY: u8 accepts every byte pattern; the slice is bounded by the iovec length.
-            unsafe { user_memory::read_slice(iov.base, &mut buf[..chunk]) }
-                .map_err(|_| FileError::Io)?;
-
-            let n = file.write_with_nonblocking(&buf[..chunk], nonblocking)?;
-            written += n;
-
-            if n < chunk {
-                // Partial write: the file (or nonblocking limit) cannot accept more right now.
-                return Ok(written);
-            }
-
-            remaining -= chunk;
-        }
-    }
-
-    Ok(written)
-}
-
-/// Reads through the file (honoring `nonblocking`), then scatters the bytes into user iovecs.
-///
-/// Returns the total number of bytes read.
-///
-/// # Errors
-///
-/// Returns `FileError::Io` when a user buffer cannot be written, plus any error from the read.
-pub(crate) fn recvmsg_scatter(
-    file: &roxy_fd::OpenFile,
-    iovecs: &[Iovec],
-    nonblocking: bool,
-) -> Result<usize, FileError> {
-    if iovecs.is_empty() {
-        return Ok(0);
-    }
-
-    let total_capacity: usize = iovecs.iter().map(|iov| iov.length).sum();
-
-    if total_capacity == 0 {
-        return Ok(0);
-    }
-
-    // Read into a local contiguous buffer (bounded), then scatter across iovecs.
-    let capacity = total_capacity.min(MAX_RECV_BUFFER);
-    let mut buf = Vec::<u8>::new();
-    buf.try_reserve_exact(capacity).map_err(|_| FileError::Io)?;
-    buf.resize(capacity, 0);
-
-    let read = file.read_with_nonblocking(&mut buf, nonblocking)?;
-
-    if read == 0 {
-        return Ok(0);
-    }
-
-    let mut offset = 0usize;
-    for iov in iovecs {
-        if offset >= read {
-            break;
-        }
-
-        let remaining = read - offset;
-        let chunk = remaining.min(iov.length);
-
-        if chunk == 0 {
-            continue;
-        }
-
-        // SAFETY: buf[offset..offset+chunk] is initialized from the read.
-        unsafe { user_memory::write_slice(iov.base, &buf[offset..offset + chunk]) }
-            .map_err(|_| FileError::Io)?;
-
-        offset += chunk;
-    }
-
-    Ok(read)
 }
 
 // ── Diagnostics ────────────────────────────────────────────────────────────
