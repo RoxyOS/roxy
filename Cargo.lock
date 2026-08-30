@@ -587,6 +587,7 @@ version = "0.1.0"
 dependencies = [
  "linkme",
  "roxy-fd",
+ "roxy-poll",
  "roxy-test",
  "roxy-utils",
  "roxy-vfs",
@@ -769,8 +770,12 @@ dependencies = [
  "linkme",
  "pc-keyboard",
  "roxy-arch",
+ "roxy-devfs",
+ "roxy-fd",
  "roxy-input",
  "roxy-interrupt",
+ "roxy-poll",
+ "roxy-serial",
  "roxy-test",
  "roxy-utils",
  "spin 0.12.2",
@@ -935,6 +940,7 @@ version = "0.1.0"
 dependencies = [
  "linkme",
  "roxy-fd",
+ "roxy-poll",
  "roxy-test",
  "roxy-utils",
  "spin 0.12.2",
