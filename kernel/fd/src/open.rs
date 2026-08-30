@@ -73,6 +73,62 @@ impl OpenFile {
         object.read(position, output, nonblocking)
     }
 
+    /// Reads through the serialized open-file state, with optional per-call nonblocking.
+    ///
+    /// When `nonblocking` is `true`, the read skips waiting even if `O_NONBLOCK` is not set on
+    /// the file description. Passing `false` defers to the file description's `O_NONBLOCK` flag.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying object's error.
+    pub fn read_with_nonblocking(
+        &self,
+        output: &mut [u8],
+        nonblocking: bool,
+    ) -> Result<usize, FileError> {
+        let mut state = self.state.lock();
+        let OpenFileState {
+            object,
+            position,
+            status_flags,
+        } = &mut *state;
+        let nonblocking = nonblocking || status_flags.contains(StatusFlags::NONBLOCK);
+
+        object.read(position, output, nonblocking)
+    }
+
+    /// Writes through the serialized open-file state, with optional per-call nonblocking.
+    ///
+    /// When `nonblocking` is `true`, the write skips waiting even if `O_NONBLOCK` is not set on
+    /// the file description. Passing `false` defers to the file description's `O_NONBLOCK` flag.
+    ///
+    /// When the open file description has `O_APPEND` set, the write position is forced to the
+    /// end of the file before writing, matching append semantics regardless of any prior seek.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying object's error.
+    pub fn write_with_nonblocking(
+        &self,
+        input: &[u8],
+        nonblocking: bool,
+    ) -> Result<usize, FileError> {
+        let mut state = self.state.lock();
+        let OpenFileState {
+            object,
+            position,
+            status_flags,
+        } = &mut *state;
+
+        if status_flags.contains(StatusFlags::APPEND) {
+            *position = object.seek(0, SeekFrom::End(0)).map_err(map_seek_error)?;
+        }
+
+        let nonblocking = nonblocking || status_flags.contains(StatusFlags::NONBLOCK);
+
+        object.write(position, input, nonblocking)
+    }
+
     /// Writes through the serialized open-file state.
     ///
     /// When the open file description has `O_APPEND` set, the write position is forced to the

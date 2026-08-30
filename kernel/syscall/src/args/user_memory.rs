@@ -58,7 +58,7 @@ pub(crate) unsafe fn write<T>(address: UserAddress, value: &T) -> Result<(), Err
 /// # Safety
 ///
 /// `T` must satisfy the safety requirements of `read`.
-pub(super) unsafe fn read_slice<T>(address: UserAddress, values: &mut [T]) -> Result<(), Errno> {
+pub(crate) unsafe fn read_slice<T>(address: UserAddress, values: &mut [T]) -> Result<(), Errno> {
     let addrspace = current_addrspace()?;
 
     // SAFETY: The caller guarantees that each complete T representation accepts arbitrary bytes,

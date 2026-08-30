@@ -4,14 +4,17 @@ mod connect;
 mod create;
 mod getsockopt;
 mod listen;
+mod msg;
 mod peername;
+mod recvmsg;
+mod sendmsg;
 mod shutdown;
 mod sockname;
 
 use alloc::vec::Vec;
 use core::mem::{align_of, offset_of, size_of};
 
-use roxy_fd::SocketError;
+use roxy_fd::{FileError, SocketError};
 use roxy_memory::UserAddress;
 use roxy_vfs::{ResolvedPath, VfsError};
 
@@ -27,7 +30,19 @@ pub(super) const SHUTDOWN_SYSCALL: crate::Syscall = shutdown::SYSCALL;
 pub(super) const GETSOCKNAME_SYSCALL: crate::Syscall = sockname::SYSCALL;
 pub(super) const GETPEERNAME_SYSCALL: crate::Syscall = peername::SYSCALL;
 pub(super) const GETSOCKOPT_SYSCALL: crate::Syscall = getsockopt::SYSCALL;
+pub(super) const RECVMSG_SYSCALL: crate::Syscall = recvmsg::SYSCALL;
+pub(super) const SENDMSG_SYSCALL: crate::Syscall = sendmsg::SYSCALL;
 
+/// Maps a `File` I/O error to its errno value for the `recvmsg`/`sendmsg` syscalls.
+fn map_file_error(error: FileError) -> Errno {
+    match error {
+        FileError::WouldBlock => Errno::Again,
+        FileError::BadOperation => Errno::BadFd,
+        FileError::BrokenPipe => Errno::Pipe,
+        FileError::NotConnected => Errno::NotConnected,
+        FileError::Io => Errno::Io,
+    }
+}
 const FAMILY_UNIX: u16 = 1;
 const FAMILY_LENGTH: usize = size_of::<u16>();
 const PATH_MAX: usize = 108;
