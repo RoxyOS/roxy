@@ -1,0 +1,13 @@
+diff --git xorg-server-clean/dix/dispatch.c xorg-server-workdir/dix/dispatch.c
+index 15e63e2..5f6d285 100644
+--- xorg-server-clean/dix/dispatch.c
++++ xorg-server-workdir/dix/dispatch.c
+@@ -241,7 +241,7 @@ UpdateCurrentTimeIf(void)
+ #define SMART_SCHEDULE_MAX_SLICE	15
+ 
+ #ifdef HAVE_SETITIMER
+-Bool SmartScheduleSignalEnable = TRUE;
++Bool SmartScheduleSignalEnable = FALSE;
+ #endif
+ 
+ long SmartScheduleSlice = SMART_SCHEDULE_DEFAULT_INTERVAL;
