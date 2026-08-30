@@ -1,0 +1,13 @@
+diff --git xf86-input-mouse-clean/src/lnx_mouse.c xf86-input-mouse-workdir/src/lnx_mouse.c
+index 0611e2b..cab5f61 100644
+--- xf86-input-mouse-clean/src/lnx_mouse.c
++++ xf86-input-mouse-workdir/src/lnx_mouse.c
+@@ -145,7 +145,7 @@ lnxMouseMagic(InputInfoPtr pInfo)
+     if (strcmp(realdev, DEFAULT_MOUSE_DEV) == 0)
+         proto = MOUSE_PROTO_EXPPS2;
+     else if (strcmp(realdev, DEFAULT_PS2_DEV) == 0)
+-        proto = MOUSE_PROTO_EXPPS2;
++        proto = MOUSE_PROTO_PS2;
+     else if (strcmp(realdev, DEFAULT_GPM_DATA_DEV) == 0)
+         proto = MOUSE_PROTO_MSC;
+     else if (strcmp(realdev, DEFAULT_GPM_CTL_DEV) == 0)

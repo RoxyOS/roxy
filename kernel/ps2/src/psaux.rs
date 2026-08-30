@@ -29,8 +29,8 @@ impl Device for PsauxDevice {
         FileMetadata {
             file_id: PSAUX_FILE_ID,
             file_type: FileType::CharacterDevice,
-            // Read-only for root: the mouse is an input-only device with no writable interface.
-            permissions: 0o400,
+            // Xorg sends PS/2 control commands through the device before reading packets.
+            permissions: 0o600,
             size: 0,
             hard_links: 1,
         }
@@ -42,6 +42,14 @@ impl Device for PsauxDevice {
             readable: !MOUSE_INPUT.lock().is_empty(),
             ..PollEvents::default()
         }
+    }
+
+    /// Forwards PS/2 device commands to the auxiliary port.
+    fn write(&self, input: &[u8]) -> Result<usize, FileError> {
+        for &byte in input {
+            crate::i8042::I8042SecondPort::write_mouse_byte(byte).map_err(|_| FileError::Io)?;
+        }
+        Ok(input.len())
     }
 
     /// Copies queued raw mouse bytes into `output`.
@@ -123,7 +131,7 @@ mod tests {
         let metadata = device().metadata();
         assert_eq!(metadata.file_id, PSAUX_FILE_ID);
         assert_eq!(metadata.file_type, FileType::CharacterDevice);
-        assert_eq!(metadata.permissions, 0o400);
+        assert_eq!(metadata.permissions, 0o600);
         assert_eq!(metadata.size, 0);
     });
 

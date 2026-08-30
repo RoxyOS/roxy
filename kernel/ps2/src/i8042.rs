@@ -23,6 +23,7 @@ const MOUSE_RESET: u8 = 0xff;
 const MOUSE_ENABLE_REPORTING: u8 = 0xf4;
 const MOUSE_ACK: u8 = 0xfa;
 const MOUSE_BAT_OK: u8 = 0xaa;
+const MOUSE_STANDARD_ID: u8 = 0x00;
 const TIMEOUT: usize = 100_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -274,6 +275,11 @@ impl I8042SecondPort {
         self.write_data(command)
     }
 
+    pub(crate) fn write_mouse_byte(byte: u8) -> Result<(), InitError> {
+        let mut port = Self::new();
+        port.write_mouse_command(byte)
+    }
+
     fn write_data(&mut self, data: u8) -> Result<(), InitError> {
         self.wait_input_clear()?;
         // SAFETY: The data port is fixed by the i8042 specification and exclusively owned here.
@@ -297,6 +303,12 @@ impl I8042SecondPort {
             if response == MOUSE_ACK {
                 acknowledged = true;
             } else if acknowledged && response == MOUSE_BAT_OK {
+                // A standard PS/2 mouse sends its device ID after BAT. Consume it as
+                // part of the reset handshake so it cannot be mistaken for a later ACK.
+                let device_id = self.read_response()?;
+                if device_id != MOUSE_STANDARD_ID {
+                    return Err(InitError::ResetFailed);
+                }
                 return Ok(());
             }
         }
