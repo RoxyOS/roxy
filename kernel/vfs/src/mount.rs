@@ -2,7 +2,7 @@ use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 
 use roxy_utils::Lock;
 
-use crate::{FilePermissions, FileSystem, ResolvedPath, VfsError, file::ActiveHandles};
+use crate::{AccessMode, FilePermissions, FileSystem, ResolvedPath, VfsError, file::ActiveHandles};
 
 struct Mount {
     filesystem: Arc<dyn FileSystem>,
@@ -88,6 +88,21 @@ impl Vfs {
         resolved
             .filesystem
             .set_permissions(&resolved.local_path, permissions)
+    }
+
+    /// Checks whether the current process may access `path` for the requested `mode`.
+    ///
+    /// The caller's access rights are always those of root (real uid/gid are 0), so read and
+    /// write are always permitted when the entry exists; only execute requires an execute bit.
+    /// An empty mode slice tests only for existence (`F_OK`).
+    pub fn access(&self, path: &ResolvedPath, mode: &[AccessMode]) -> Result<(), VfsError> {
+        let metadata = self.metadata(path)?;
+
+        if mode.contains(&AccessMode::Execute) && metadata.permissions.bits() & 0o111 == 0 {
+            return Err(VfsError::PermissionDenied);
+        }
+
+        Ok(())
     }
 
     pub(crate) fn resolve(&self, path: &ResolvedPath) -> Result<ResolvedMount, VfsError> {

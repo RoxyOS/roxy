@@ -1,3 +1,4 @@
+mod access;
 mod anon_allocate;
 mod anon_free;
 mod chdir;
@@ -43,7 +44,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 65] = [
+pub(super) const SYSCALLS: [Syscall; 66] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -109,4 +110,5 @@ pub(super) const SYSCALLS: [Syscall; 65] = [
     umask::SYSCALL,
     chmod::SYSCALL,
     fchmod::SYSCALL,
+    access::SYSCALL,
 ];

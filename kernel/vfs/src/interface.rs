@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
 use crate::{
-    DirEntry, FilePermissions, Metadata, OpenOptions, ResolvedPath, VfsDirectory, VfsError,
-    VfsFile, global_vfs,
+    AccessMode, DirEntry, FilePermissions, Metadata, OpenOptions, ResolvedPath, VfsDirectory,
+    VfsError, VfsFile, global_vfs,
 };
 
 pub fn open(path: impl AsRef<[u8]>, options: OpenOptions) -> Result<VfsFile, VfsError> {
@@ -120,4 +120,11 @@ pub fn chmod(path: impl AsRef<[u8]>, permissions: FilePermissions) -> Result<(),
     let path = ResolvedPath::resolve(path)?;
 
     vfs.set_permissions(&path, permissions)
+}
+
+pub fn access(path: impl AsRef<[u8]>, mode: &[AccessMode]) -> Result<(), VfsError> {
+    let vfs = global_vfs()?;
+    let path = ResolvedPath::resolve(path)?;
+
+    vfs.access(&path, mode)
 }

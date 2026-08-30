@@ -41,12 +41,12 @@ pub use directory::{DirEntry, VfsDirectory};
 pub use error::VfsError;
 pub use file::{CreationMode, OpenAccess, OpenOptions, SeekFrom, VfsFile};
 pub use interface::{
-    chmod, create, hard_link, metadata, mkdir, open, open_dir, read, read_dir, read_link, rename,
-    rmdir, symlink, symlink_metadata, sync, unlink, write,
+    access, chmod, create, hard_link, metadata, mkdir, open, open_dir, read, read_dir, read_link,
+    rename, rmdir, symlink, symlink_metadata, sync, unlink, write,
 };
 pub use metadata::{FileType, Metadata};
 pub use mount::Vfs;
 pub use path::{ResolvedPath, WorkingDirectoryProvider, register_working_directory_provider};
-pub use permissions::FilePermissions;
+pub use permissions::{AccessMode, FilePermissions};
 pub use traits::{FileHandle, FileSystem};
 pub use umask::register_umask_provider;

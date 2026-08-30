@@ -30,6 +30,21 @@ impl FilePermissions {
     }
 }
 
+/// One access right checked by `access(2)` / `faccessat(2)`.
+///
+/// The requested mode is expressed as a list of these rights; an empty list tests only for
+/// existence (`F_OK`). Values are intentionally ABI-neutral — raw bit decoding happens in the
+/// syscall layer, not here.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AccessMode {
+    /// Test for read permission (`R_OK`).
+    Read,
+    /// Test for write permission (`W_OK`).
+    Write,
+    /// Test for execute permission (`X_OK`).
+    Execute,
+}
+
 #[cfg(feature = "kernel-test")]
 mod tests {
     use super::FilePermissions;
