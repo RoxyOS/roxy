@@ -74,11 +74,22 @@ fn handle_getfl(fd: Fd) -> SyscallResult {
     Ok(file.status_flags().bits())
 }
 
+/// Common `O_*` file status flags that are not yet modeled by the kernel. Each is reported
+/// through `unsupported()` when requested via `F_SETFL`, rather than being dropped silently.
+const UNIMPLEMENTED_STATUS_FLAGS: [u64; 5] = [
+    0o4000,       // O_NONBLOCK
+    0o20000,      // O_ASYNC
+    0o40000,      // O_DIRECT
+    0o1_000_000,  // O_NOATIME
+    0o10_000_000, // O_SYNC
+];
+
 /// Updates the file status flags of the open file description behind `fd`.
 ///
 /// Only the bits in `StatusFlags::SETTABLE` are changed (currently append and large-file
-/// mode); access mode bits and other status flags are preserved. `O_NONBLOCK` is not yet
-/// modeled, so requesting it is silently ignored.
+/// mode); access mode bits are preserved as legitimate, non-modifiable flags. Any other bit
+/// (e.g. `O_NONBLOCK`) is unimplemented and is reported through `unsupported()` rather than
+/// dropped silently.
 fn handle_setfl(fd: Fd, argument: u64) -> SyscallResult {
     let file = roxy_process::current_open_file(fd).map_err(map_process_error)?;
 
@@ -88,6 +99,16 @@ fn handle_setfl(fd: Fd, argument: u64) -> SyscallResult {
     flags.insert(requested & StatusFlags::SETTABLE);
 
     file.set_status_flags(flags);
+
+    // Report every unimplemented flag bit rather than silently ignoring it. Access mode bits
+    // (WRITE_ONLY/READ_WRITE) are excluded: F_SETFL legally preserves them.
+    let access_mode = StatusFlags::WRITE_ONLY.bits() | StatusFlags::READ_WRITE.bits();
+    let unsupported_bits = argument & !StatusFlags::SETTABLE.bits() & !access_mode;
+    for bit in UNIMPLEMENTED_STATUS_FLAGS {
+        if unsupported_bits & bit != 0 {
+            unsupported("fcntl.setfl", bit);
+        }
+    }
 
     Ok(0)
 }
