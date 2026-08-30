@@ -4,6 +4,9 @@
 
 extern crate alloc;
 
+#[cfg(not(feature = "kernel-test"))]
+use alloc::vec::Vec;
+
 mod exception;
 mod initial_fds;
 mod misc;
@@ -20,6 +23,11 @@ use roxy_serial::e_println;
 
 #[cfg(not(feature = "kernel-test"))]
 const INIT: &[u8] = b"/usr/bin/bash";
+
+/// Environment for the init process. `HOME` is required so login shells (xinit and its
+/// `.xinitrc` lookup) can resolve the user's home directory.
+#[cfg(not(feature = "kernel-test"))]
+const INIT_ENV: &[&[u8]] = &[b"HOME=/root", b"PATH=/usr/bin:/bin", b"TERM=linux"];
 
 #[unsafe(no_mangle)]
 #[allow(clippy::missing_panics_doc)]
@@ -90,7 +98,11 @@ fn select_kernel_terminal(boot_info: &BootInfo) {
 
 #[cfg(not(feature = "kernel-test"))]
 fn kernel_main() -> ! {
-    roxy_process::spawn(INIT).expect("spawn init process");
+    roxy_process::spawn(
+        INIT,
+        &INIT_ENV.iter().map(|s| s.to_vec()).collect::<Vec<_>>(),
+    )
+    .expect("spawn init process");
 
     roxy_thread::scheduler::start()
 }

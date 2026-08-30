@@ -21,9 +21,9 @@ static NEXT_PROCESS_ID: AtomicU64 = AtomicU64::new(1);
 /// # Panics
 ///
 /// Panics when the process subsystem has no registered initial-FD injector.
-pub fn spawn(path: impl AsRef<[u8]>) -> Result<ProcessId, ProcessError> {
+pub fn spawn(path: impl AsRef<[u8]>, envp: &[Vec<u8>]) -> Result<ProcessId, ProcessError> {
     let path = path.as_ref();
-    let image = image::build(path, &[path.to_vec()], &[])?;
+    let image = image::build(path, &[path.to_vec()], envp)?;
     let main_thread = Thread::new_user(image.entry, image.stack_pointer).map_err(thread_error)?;
     let mut fds = roxy_fd::FdTable::new();
 
@@ -103,7 +103,7 @@ mod tests {
     kernel_test!("roxy-process::reject-invalid-elf", reject_invalid_elf, {
         let baseline = statistics().allocated_frames;
 
-        assert_eq!(spawn([]), Err(ProcessError::InvalidElf));
+        assert_eq!(spawn([], &[]), Err(ProcessError::InvalidElf));
         assert_eq!(statistics().allocated_frames, baseline);
     });
 }
