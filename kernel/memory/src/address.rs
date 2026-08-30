@@ -73,6 +73,13 @@ impl UserAddress {
             None
         }
     }
+
+    /// Returns a fixed, valid sentinel address used to initialize pointer-shaped fields that are
+    /// overwritten from user memory before use. Never dereferenced.
+    #[must_use]
+    pub const fn sentinel() -> Self {
+        Self(USER_ADDRESS_MIN)
+    }
 }
 
 impl UserPage {

@@ -132,13 +132,13 @@ impl SyscallArg for ParsedMsgHdr {
     fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
         let source = UserAddress::parse(raw, error)?;
         let mut header = MsgHdr {
-            msg_name: UserAddress::new(0).unwrap(),
+            msg_name: UserAddress::sentinel(),
             msg_namelen: 0,
             _pad0: 0,
-            msg_iov: UserAddress::new(0).unwrap(),
+            msg_iov: UserAddress::sentinel(),
             msg_iovlen: 0,
             _pad1: 0,
-            msg_control: UserAddress::new(0).unwrap(),
+            msg_control: UserAddress::sentinel(),
             msg_controllen: 0,
             _pad2: 0,
             msg_flags: 0,
@@ -178,7 +178,7 @@ pub(crate) fn read_iovecs(address: UserAddress, count: i32) -> Result<Vec<Iovec>
     iovecs.resize(
         count,
         Iovec {
-            base: UserAddress::new(0).unwrap(),
+            base: UserAddress::sentinel(),
             length: 0,
         },
     );
