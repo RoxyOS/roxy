@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=1.4.2
-revision=1
+revision=3
 
 tarball_url="https://www.x.org/releases/individual/app/xinit-${version}.tar.xz"
 tarball_sha256="b7d8dc8d22ef9f15985a10b606ee4f2aad6828befa437359934647e88d331f23"
@@ -28,4 +28,8 @@ build() {
 
 package() {
 	autotools_install
+
+	# Use custom xinitrc
+	install -D -m 755 "${base_dir}/recipes/xinit/xinitrc" \
+		"${dest_dir}/root/.xinitrc"
 }
