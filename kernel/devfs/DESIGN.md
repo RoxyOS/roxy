@@ -7,10 +7,10 @@ path-scoped device registry, and a read-only `FileSystem` implementation mounted
 owns name lookup and descriptor adaptation only; device semantics, state, and hardware ownership
 remain in driver subsystems such as `roxy-fbdev`.
 
-The filesystem is intentionally narrow. It exposes no node creation, removal, renaming, or
-permission management because the device set is fixed by kernel registration, not by userspace
-namespace operations. Block devices, fifos, and sockets are out of scope; `Device` currently
-describes character devices only.
+The null sink pseudo-device (`/dev/null`) is an exception: it has no hardware, driver, or state,
+so it is implemented as a built-in device within this crate. The composition root registers it
+unconditionally alongside hardware drivers. Block devices, fifos, and sockets are out of scope;
+`Device` currently describes character devices only.
 
 ## Ownership model
 
@@ -19,6 +19,10 @@ describes character devices only.
 removes entries; the registry and its devices therefore live for the kernel lifetime. The
 composition root (`kernel-main`) creates one registry, hands it to `DevFs` for the `/dev` mount,
 and passes the same `Arc` to drivers that register their devices.
+
+The null sink (`NullDevice`) is an intrinsic pseudo-device defined in this crate. The composition
+root calls `register_null` to register it under `null`; unlike `fb0` this registration is
+unconditional because `/dev/null` must always exist regardless of hardware.
 
 `DevFs` implements `FileSystem` against that registry. Its mount root is a directory whose
 entries are the registered device names; every other path either resolves to a registered device
@@ -33,15 +37,21 @@ across open and directory listing.
 open("/dev/fb0")
   → VFS mount routing → DevFs::open → registry lookup → DeviceFile { device }
   → VfsFile → descriptor-layer File
+
+open("/dev/null")
+  → (same path, NullDevice)
 ```
 
 - `Device::metadata` returns the character-device metadata including a stable per-device file ID.
+  `NullDevice` reports file ID 2, character-device type, mode 0666, and zero size.
 - `Device::ioctl` receives the same typed `IoctlRequest` the descriptor layer dispatches; the
   device returns `IoctlError` values that the syscall layer maps to errno.
 - `Device::mmap(size, offset)` describes the device's physical memory for a file-backed `mmap`;
   the mapping itself is installed by the VM layer, never by the device.
 - `Device::poll` defaults to immediate readiness; stream devices override it.
 - `Device::read`/`write` default to `BadOperation`; framebuffer-style devices keep the default.
+  `NullDevice` overrides: `read` returns EOF (zero bytes) and `write` accepts-and-discards all
+  input, reporting the full length as successful.
 
 ## Invariants and limits
 
