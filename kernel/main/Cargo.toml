@@ -69,6 +69,7 @@ roxy-poll.workspace = true
 roxy-process.workspace = true
 roxy-ps2.workspace = true
 roxy-serial.workspace = true
+roxy-signal.workspace = true
 roxy-syscall.workspace = true
 roxy-terminal.workspace = true
 roxy-test = { workspace = true, optional = true }

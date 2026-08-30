@@ -387,6 +387,7 @@ dependencies = [
  "roxy-process",
  "roxy-ps2",
  "roxy-serial",
+ "roxy-signal",
  "roxy-syscall",
  "roxy-terminal",
  "roxy-test",

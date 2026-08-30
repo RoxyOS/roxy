@@ -135,18 +135,16 @@ impl Signal {
             | Self::RealTime28
             | Self::RealTime29
             | Self::RealTime30
-            | Self::RealTime31 => DefaultAction::Terminate,
-            Self::Child | Self::WindowChanged | Self::Urgent => DefaultAction::Ignore,
-            Self::Quit
+            | Self::RealTime31
+            // POSIX mandates that a core-dump fault signal terminates.
+            | Self::Quit
             | Self::IllegalInstruction
             | Self::BusError
             | Self::Abort
             | Self::FloatingPointException
-            | Self::SegmentationFault
-            | Self::Continue
-            | Self::Stop
-            | Self::TerminalStop
-            | Self::TerminalInput
+            | Self::SegmentationFault => DefaultAction::Terminate,
+            Self::Child | Self::WindowChanged | Self::Urgent => DefaultAction::Ignore,
+            Self::Continue | Self::Stop | Self::TerminalStop | Self::TerminalInput
             | Self::TerminalOutput => DefaultAction::Unsupported,
         }
     }
@@ -183,6 +181,12 @@ mod tests {
                 Signal::Io,
                 Signal::PowerFailure,
                 Signal::SystemCall,
+                Signal::Quit,
+                Signal::IllegalInstruction,
+                Signal::BusError,
+                Signal::Abort,
+                Signal::FloatingPointException,
+                Signal::SegmentationFault,
             ],
             DefaultAction::Terminate,
         );
@@ -192,12 +196,6 @@ mod tests {
         );
         assert_actions(
             &[
-                Signal::Quit,
-                Signal::IllegalInstruction,
-                Signal::BusError,
-                Signal::Abort,
-                Signal::FloatingPointException,
-                Signal::SegmentationFault,
                 Signal::Continue,
                 Signal::Stop,
                 Signal::TerminalStop,
