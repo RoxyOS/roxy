@@ -67,7 +67,6 @@ pub fn mkdir(path: impl AsRef<[u8]>, permissions: FilePermissions) -> Result<(),
 
     vfs.mkdir(&path, permissions)
 }
-
 pub fn rmdir(path: impl AsRef<[u8]>) -> Result<(), VfsError> {
     let vfs = global_vfs()?;
     let path = ResolvedPath::resolve(path)?;
@@ -114,4 +113,11 @@ pub fn rename(source: impl AsRef<[u8]>, destination: impl AsRef<[u8]>) -> Result
 
 pub fn sync() -> Result<(), VfsError> {
     global_vfs()?.sync()
+}
+
+pub fn chmod(path: impl AsRef<[u8]>, permissions: FilePermissions) -> Result<(), VfsError> {
+    let vfs = global_vfs()?;
+    let path = ResolvedPath::resolve(path)?;
+
+    vfs.set_permissions(&path, permissions)
 }

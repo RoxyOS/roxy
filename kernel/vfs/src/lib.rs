@@ -41,8 +41,8 @@ pub use directory::{DirEntry, VfsDirectory};
 pub use error::VfsError;
 pub use file::{CreationMode, OpenAccess, OpenOptions, SeekFrom, VfsFile};
 pub use interface::{
-    create, hard_link, metadata, mkdir, open, open_dir, read, read_dir, read_link, rename, rmdir,
-    symlink, symlink_metadata, sync, unlink, write,
+    chmod, create, hard_link, metadata, mkdir, open, open_dir, read, read_dir, read_link, rename,
+    rmdir, symlink, symlink_metadata, sync, unlink, write,
 };
 pub use metadata::{FileType, Metadata};
 pub use mount::Vfs;

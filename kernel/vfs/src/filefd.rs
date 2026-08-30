@@ -4,7 +4,7 @@ use roxy_fd::{
     SeekError as FdSeekError, SeekFrom as FdSeekFrom, TruncateError as FdTruncateError,
 };
 
-use crate::{SeekFrom as VfsSeekFrom, VfsError, VfsFile};
+use crate::{FilePermissions, SeekFrom as VfsSeekFrom, VfsError, VfsFile};
 
 // Calls to `self.{seek, read, write}` are calling `VfsFile::{seek, read, write}`,
 // not to be confused with `FdFile::{seek, read, write}`
@@ -61,6 +61,11 @@ impl FdFile for VfsFile {
 
     fn truncate(&mut self, size: u64) -> Result<(), FdTruncateError> {
         self.truncate(size).map_err(map_truncate_error)
+    }
+
+    fn set_permissions(&mut self, permissions: u16) -> Result<(), FdFileError> {
+        let permissions = FilePermissions::new(permissions).ok_or(FdFileError::BadOperation)?;
+        self.set_permissions(permissions).map_err(map_file_error)
     }
 
     fn seek(&mut self, current: u64, position: FdSeekFrom) -> Result<u64, FdSeekError> {
@@ -209,6 +214,14 @@ mod tests {
             Err(VfsError::Unsupported)
         }
 
+        fn set_permissions(
+            &self,
+            _path: &ResolvedPath,
+            _permissions: FilePermissions,
+        ) -> Result<(), VfsError> {
+            Err(VfsError::Unsupported)
+        }
+
         fn sync(&self) -> Result<(), VfsError> {
             Ok(())
         }
@@ -271,6 +284,10 @@ mod tests {
 
         fn sync(&mut self) -> Result<(), VfsError> {
             Ok(())
+        }
+
+        fn set_permissions(&mut self, _permissions: FilePermissions) -> Result<(), VfsError> {
+            Err(VfsError::Unsupported)
         }
     }
 

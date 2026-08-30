@@ -1,14 +1,15 @@
 use alloc::sync::Arc;
 
-use ext4plus::file::File;
+use ext4plus::{Ext4, file::File, inode::InodeMode};
 use roxy_block::BlockDevice;
 use roxy_utils::Lock;
-use roxy_vfs::{FileHandle, Metadata, OpenOptions, SeekFrom, VfsError};
+use roxy_vfs::{FileHandle, FilePermissions, Metadata, OpenOptions, SeekFrom, VfsError};
 
 use crate::{error::map_ext4, metadata};
 
 pub(crate) struct Ext4File {
     pub(crate) file: File,
+    pub(crate) filesystem: Ext4,
     pub(crate) options: OpenOptions,
     pub(crate) mutation: Arc<Lock<()>>,
     pub(crate) device: &'static dyn BlockDevice,
@@ -62,6 +63,21 @@ impl FileHandle for Ext4File {
 
     fn metadata(&self) -> Result<Metadata, VfsError> {
         Ok(metadata::from_inode(self.file.inode()))
+    }
+
+    fn set_permissions(&mut self, permissions: FilePermissions) -> Result<(), VfsError> {
+        let _mutation = self.mutation.lock();
+
+        // Preserve the file-type bits and replace only the permission bits (0o7777).
+        let current = self.file.inode().mode();
+        let mode = InodeMode::from_bits_retain(current.bits() & !0o7777 | permissions.bits());
+
+        self.file.inode_mut().set_mode(mode).map_err(map_ext4)?;
+        self.file
+            .inode_mut()
+            .write(&self.filesystem)
+            .map_err(map_ext4)?;
+        self.device.flush().map_err(|_| VfsError::Io)
     }
 
     fn sync(&mut self) -> Result<(), VfsError> {

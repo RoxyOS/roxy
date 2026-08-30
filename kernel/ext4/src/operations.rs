@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use ext4plus::file::File;
+use ext4plus::{file::File, inode::InodeMode};
 use roxy_vfs::{
     CreationMode, DirEntry, FileHandle, FilePermissions, FileSystem, Metadata, OpenOptions,
     ResolvedPath, VfsError,
@@ -42,6 +42,7 @@ impl FileSystem for Ext4FileSystem {
 
         Ok(Box::new(Ext4File {
             file,
+            filesystem: self.filesystem.clone(),
             options,
             mutation: self.mutation.clone(),
             device: self.device,
@@ -79,6 +80,22 @@ impl FileSystem for Ext4FileSystem {
         let _mutation = self.mutation.lock();
 
         self.rmdir_inner(path)
+    }
+
+    fn set_permissions(
+        &self,
+        path: &ResolvedPath,
+        permissions: FilePermissions,
+    ) -> Result<(), VfsError> {
+        let _mutation = self.mutation.lock();
+
+        let mut inode = self.resolve_inode(path, true)?;
+        let current = inode.mode();
+        let mode = InodeMode::from_bits_retain(current.bits() & !0o7777 | permissions.bits());
+
+        inode.set_mode(mode).map_err(map_ext4)?;
+        inode.write(&self.filesystem).map_err(map_ext4)?;
+        self.device.flush().map_err(|_| VfsError::Io)
     }
 
     fn unlink(&self, path: &ResolvedPath) -> Result<(), VfsError> {

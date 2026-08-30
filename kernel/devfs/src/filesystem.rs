@@ -118,6 +118,14 @@ impl FileSystem for DevFs {
         Err(VfsError::ReadOnly)
     }
 
+    fn set_permissions(
+        &self,
+        _path: &ResolvedPath,
+        _permissions: FilePermissions,
+    ) -> Result<(), VfsError> {
+        Err(VfsError::ReadOnly)
+    }
+
     fn sync(&self) -> Result<(), VfsError> {
         Ok(())
     }
@@ -157,6 +165,10 @@ impl FileHandle for DeviceFile {
 
     fn sync(&mut self) -> Result<(), VfsError> {
         Ok(())
+    }
+
+    fn set_permissions(&mut self, _permissions: FilePermissions) -> Result<(), VfsError> {
+        Err(VfsError::ReadOnly)
     }
 
     fn ioctl(&mut self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {

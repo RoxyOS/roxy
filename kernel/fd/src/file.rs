@@ -76,6 +76,19 @@ pub trait File: Send {
         Err(TruncateError::BadOperation)
     }
 
+    /// Sets the permission bits of this open object.
+    ///
+    /// The default implementation rejects non-file objects. Concrete implementations for
+    /// filesystem-backed files delegate to the underlying file system.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-operation error when the object does not support permission
+    /// changes.
+    fn set_permissions(&mut self, _permissions: u16) -> Result<(), FileError> {
+        Err(FileError::BadOperation)
+    }
+
     /// Returns the absolute byte offset to seek to.
     ///
     /// # Errors

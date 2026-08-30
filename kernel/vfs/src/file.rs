@@ -166,6 +166,10 @@ impl VfsFile {
         self.handle.sync()
     }
 
+    pub fn set_permissions(&mut self, permissions: FilePermissions) -> Result<(), VfsError> {
+        self.handle.set_permissions(permissions)
+    }
+
     pub fn ioctl(&mut self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
         self.handle.ioctl(request)
     }

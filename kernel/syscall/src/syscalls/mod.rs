@@ -1,11 +1,13 @@
 mod anon_allocate;
 mod anon_free;
 mod chdir;
+mod chmod;
 mod clock_get;
 mod close;
 mod dup2;
 mod execve;
 mod exit;
+mod fchmod;
 mod fcntl;
 mod fork;
 mod fs;
@@ -41,7 +43,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 59] = [
+pub(super) const SYSCALLS: [Syscall; 61] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -101,4 +103,6 @@ pub(super) const SYSCALLS: [Syscall; 59] = [
     dup2::SYSCALL,
     fcntl::SYSCALL,
     umask::SYSCALL,
+    chmod::SYSCALL,
+    fchmod::SYSCALL,
 ];

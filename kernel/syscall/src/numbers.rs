@@ -60,6 +60,8 @@ pub(crate) enum SyscallNumber {
     Dup2 = 56,
     Fcntl = 57,
     Umask = 58,
+    Chmod = 59,
+    Fchmod = 60,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -126,6 +128,8 @@ impl TryFrom<u64> for SyscallNumber {
             56 => Ok(Self::Dup2),
             57 => Ok(Self::Fcntl),
             58 => Ok(Self::Umask),
+            59 => Ok(Self::Chmod),
+            60 => Ok(Self::Fchmod),
             _ => Err(()),
         }
     }
@@ -196,6 +200,8 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(56), Ok(SyscallNumber::Dup2));
         assert_eq!(SyscallNumber::try_from(57), Ok(SyscallNumber::Fcntl));
         assert_eq!(SyscallNumber::try_from(58), Ok(SyscallNumber::Umask));
-        assert!(SyscallNumber::try_from(59).is_err());
+        assert_eq!(SyscallNumber::try_from(59), Ok(SyscallNumber::Chmod));
+        assert_eq!(SyscallNumber::try_from(60), Ok(SyscallNumber::Fchmod));
+        assert!(SyscallNumber::try_from(61).is_err());
     });
 }

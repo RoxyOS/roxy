@@ -104,6 +104,16 @@ impl FileSystem for MockFileSystem {
         Ok(())
     }
 
+    fn set_permissions(
+        &self,
+        path: &ResolvedPath,
+        _permissions: FilePermissions,
+    ) -> Result<(), VfsError> {
+        *self.last_path.lock() = path.as_bytes().into();
+
+        Ok(())
+    }
+
     fn sync(&self) -> Result<(), VfsError> {
         self.syncs.fetch_add(1, Ordering::Relaxed);
 
@@ -128,6 +138,12 @@ impl FileHandle for MockFile {
 
     fn truncate(&mut self, size: u64) -> Result<(), VfsError> {
         self.0.size = size;
+
+        Ok(())
+    }
+
+    fn set_permissions(&mut self, permissions: FilePermissions) -> Result<(), VfsError> {
+        self.0.permissions = permissions;
 
         Ok(())
     }

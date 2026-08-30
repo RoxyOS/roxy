@@ -102,6 +102,15 @@ impl OpenFile {
         self.state.lock().object.sync()
     }
 
+    /// Sets the permission bits of the serialized open-file object.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying object's error.
+    pub fn set_permissions(&self, permissions: u16) -> Result<(), FileError> {
+        self.state.lock().object.set_permissions(permissions)
+    }
+
     /// Reports readiness through the serialized open-file object.
     ///
     /// # Errors

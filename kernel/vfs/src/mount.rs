@@ -2,7 +2,7 @@ use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 
 use roxy_utils::Lock;
 
-use crate::{FileSystem, ResolvedPath, VfsError, file::ActiveHandles};
+use crate::{FilePermissions, FileSystem, ResolvedPath, VfsError, file::ActiveHandles};
 
 struct Mount {
     filesystem: Arc<dyn FileSystem>,
@@ -76,6 +76,18 @@ impl Vfs {
         }
 
         Ok(())
+    }
+
+    pub fn set_permissions(
+        &self,
+        path: &ResolvedPath,
+        permissions: FilePermissions,
+    ) -> Result<(), VfsError> {
+        let resolved = self.resolve(path)?;
+
+        resolved
+            .filesystem
+            .set_permissions(&resolved.local_path, permissions)
     }
 
     pub(crate) fn resolve(&self, path: &ResolvedPath) -> Result<ResolvedMount, VfsError> {
