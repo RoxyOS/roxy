@@ -32,15 +32,6 @@
 
 ## Architecture and Dependencies
 
-- Before implementing functionality, search crates.io, lib.rs, and relevant upstream projects for
-  an existing crate.
-- Prefer declaring dependencies in the root `[workspace.dependencies]` table and inheriting them
-  with `dependency.workspace = true` from member crates.
-- Keep manifest version requirements broad when compatible releases are acceptable, for example
-  `clap = "4"`; rely on `Cargo.lock` for reproducible exact resolution.
-- Document why dependencies were selected.
-- Keep third-party types inside the owning subsystem or adapter. Do not expose them through an
-  unrelated subsystem's public API.
 - Do not copy kernel code from Seele. Seele may only be consulted as a behavioral reference or an
   architectural failure case.
 - Do not create placeholder crates, speculative abstractions, compatibility shims, silent stubs,
@@ -52,11 +43,6 @@
   needed. Do not guess at its behavior or attempt to infer it from the binary alone when source is
   available; use disassembly or other binary analysis only when the source is unavailable or the
   investigation specifically requires it.
-
-## Module Layout
-
-- Do not place a `foo.rs` file beside a `foo/` directory. Use `foo/mod.rs` as the module entry
-  point and place sibling modules such as `foo/bar.rs` inside that directory.
 
 ## Subsystem Design
 
@@ -88,8 +74,6 @@
 
 ## Design and Safety
 
-- Keep unsafe code local. Every unsafe block or unsafe implementation must have a nearby `SAFETY`
-  explanation covering the relevant caller obligations and invariants.
 - Userspace ABI layouts belong exclusively to the syscall subsystem. Define userspace-facing
   `#[repr(C)]` records, explicit ABI padding, size/offset assertions, request numbers, and raw
   pointer interpretation only under `kernel/syscall`; never expose those records through a shared
@@ -111,6 +95,4 @@
   syscalls and partially implemented interfaces, must use the repository's centralized
   unsupported-operation helper. Direct returns of `ENOSYS`, `ENOTSUP`, or `EOPNOTSUPP` are
   forbidden and must be rejected by tests or static checks.
-- Update tests together with behavior changes.
-- Remove temporary instrumentation, debugging paths, and experimental workarounds before
-  completing a change.
+
