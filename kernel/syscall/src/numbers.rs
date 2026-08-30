@@ -56,6 +56,7 @@ pub(crate) enum SyscallNumber {
     Accept = 52,
     Connect = 53,
     Sigreturn = 54,
+    Pipe = 55,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -118,6 +119,7 @@ impl TryFrom<u64> for SyscallNumber {
             52 => Ok(Self::Accept),
             53 => Ok(Self::Connect),
             54 => Ok(Self::Sigreturn),
+            55 => Ok(Self::Pipe),
             _ => Err(()),
         }
     }

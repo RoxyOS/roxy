@@ -20,6 +20,7 @@ mod ioctl;
 mod isatty;
 mod open;
 mod open_dir;
+mod pipe;
 mod poll;
 mod read;
 mod read_entries;
@@ -37,7 +38,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 55] = [
+pub(super) const SYSCALLS: [Syscall; 56] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -93,4 +94,5 @@ pub(super) const SYSCALLS: [Syscall; 55] = [
     socket::CONNECT_SYSCALL,
     socketpair::SYSCALL,
     signal::SIGRETURN_SYSCALL,
+    pipe::SYSCALL,
 ];

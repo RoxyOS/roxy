@@ -719,6 +719,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-pipe"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-fd",
+ "roxy-poll",
+ "roxy-test",
+ "roxy-thread",
+ "roxy-utils",
+]
+
+[[package]]
 name = "roxy-poll"
 version = "0.1.0"
 dependencies = [
@@ -795,6 +807,7 @@ dependencies = [
  "roxy-fd",
  "roxy-futex",
  "roxy-memory",
+ "roxy-pipe",
  "roxy-poll",
  "roxy-process",
  "roxy-signal",
