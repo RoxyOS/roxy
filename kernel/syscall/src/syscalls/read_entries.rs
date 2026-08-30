@@ -83,6 +83,7 @@ const fn encode_file_type(file_type: FileType) -> u8 {
 
 fn map_file_error(error: FileError) -> Errno {
     match error {
+        FileError::WouldBlock => Errno::Again,
         FileError::BadOperation => Errno::NotDirectory,
         FileError::BrokenPipe => Errno::Pipe,
         FileError::NotConnected => Errno::NotConnected,

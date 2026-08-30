@@ -103,20 +103,30 @@ impl File for Socket {
         })
     }
 
-    fn read(&mut self, _position: &mut u64, output: &mut [u8]) -> Result<usize, FileError> {
+    fn read(
+        &mut self,
+        _position: &mut u64,
+        output: &mut [u8],
+        nonblocking: bool,
+    ) -> Result<usize, FileError> {
         let mut inner = self.inner.lock();
 
         match &mut *inner {
-            SocketInner::Connected(connected) => connected.read(output),
+            SocketInner::Connected(connected) => connected.read(output, nonblocking),
             SocketInner::Initial | SocketInner::Bound(_) => Err(FileError::NotConnected),
         }
     }
 
-    fn write(&mut self, _position: &mut u64, input: &[u8]) -> Result<usize, FileError> {
+    fn write(
+        &mut self,
+        _position: &mut u64,
+        input: &[u8],
+        nonblocking: bool,
+    ) -> Result<usize, FileError> {
         let mut inner = self.inner.lock();
 
         match &mut *inner {
-            SocketInner::Connected(connected) => connected.write(input),
+            SocketInner::Connected(connected) => connected.write(input, nonblocking),
             SocketInner::Initial | SocketInner::Bound(_) => Err(FileError::NotConnected),
         }
     }
@@ -293,7 +303,7 @@ mod tests {
             let connection = server.accept().unwrap();
             let mut output = [0; 4];
 
-            assert_eq!(client.write(&mut 0, b"ping"), Ok(4));
+            assert_eq!(client.write(&mut 0, b"ping", false), Ok(4));
             assert_eq!(connection.read(&mut output), Ok(4));
             assert_eq!(&output, b"ping");
         }
@@ -409,10 +419,13 @@ mod tests {
         let mut unbound = socket();
 
         assert_eq!(
-            unbound.read(&mut 0, &mut [0; 1]),
+            unbound.read(&mut 0, &mut [0; 1], false),
             Err(FileError::NotConnected)
         );
-        assert_eq!(unbound.write(&mut 0, b"x"), Err(FileError::NotConnected));
+        assert_eq!(
+            unbound.write(&mut 0, b"x", false),
+            Err(FileError::NotConnected)
+        );
     });
 
     kernel_test!(

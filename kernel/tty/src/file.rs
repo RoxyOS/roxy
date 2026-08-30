@@ -28,7 +28,12 @@ impl File for TtyFile {
         })
     }
 
-    fn read(&mut self, _position: &mut u64, output: &mut [u8]) -> Result<usize, FileError> {
+    fn read(
+        &mut self,
+        _position: &mut u64,
+        output: &mut [u8],
+        _nonblocking: bool,
+    ) -> Result<usize, FileError> {
         self.tty.read(output)
     }
 
@@ -40,7 +45,12 @@ impl File for TtyFile {
         self.tty.register_poll_listener(listener)
     }
 
-    fn write(&mut self, _position: &mut u64, input: &[u8]) -> Result<usize, FileError> {
+    fn write(
+        &mut self,
+        _position: &mut u64,
+        input: &[u8],
+        _nonblocking: bool,
+    ) -> Result<usize, FileError> {
         self.tty.write(input)
     }
 

@@ -37,11 +37,21 @@ mod tests {
             Err(FileError::BadOperation)
         }
 
-        fn read(&mut self, _position: &mut u64, _output: &mut [u8]) -> Result<usize, FileError> {
+        fn read(
+            &mut self,
+            _position: &mut u64,
+            _output: &mut [u8],
+            _nonblocking: bool,
+        ) -> Result<usize, FileError> {
             Err(FileError::BadOperation)
         }
 
-        fn write(&mut self, _position: &mut u64, _input: &[u8]) -> Result<usize, FileError> {
+        fn write(
+            &mut self,
+            _position: &mut u64,
+            _input: &[u8],
+            _nonblocking: bool,
+        ) -> Result<usize, FileError> {
             Err(FileError::BadOperation)
         }
 

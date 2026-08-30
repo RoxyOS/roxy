@@ -207,7 +207,9 @@ fn map_file_type(file_type: FdFileType) -> roxy_vfs::FileType {
 fn map_device_error(error: FileError) -> VfsError {
     match error {
         FileError::BadOperation => VfsError::Unsupported,
-        FileError::Io | FileError::BrokenPipe | FileError::NotConnected => VfsError::Io,
+        FileError::WouldBlock | FileError::Io | FileError::BrokenPipe | FileError::NotConnected => {
+            VfsError::Io
+        }
     }
 }
 

@@ -33,7 +33,12 @@ impl FdFile for VfsFile {
         })
     }
 
-    fn read(&mut self, position: &mut u64, output: &mut [u8]) -> Result<usize, FdFileError> {
+    fn read(
+        &mut self,
+        position: &mut u64,
+        output: &mut [u8],
+        _nonblocking: bool,
+    ) -> Result<usize, FdFileError> {
         self.seek(VfsSeekFrom::Start(*position))
             .map_err(map_file_error)?;
 
@@ -44,7 +49,12 @@ impl FdFile for VfsFile {
         Ok(read)
     }
 
-    fn write(&mut self, position: &mut u64, input: &[u8]) -> Result<usize, FdFileError> {
+    fn write(
+        &mut self,
+        position: &mut u64,
+        input: &[u8],
+        _nonblocking: bool,
+    ) -> Result<usize, FdFileError> {
         self.seek(VfsSeekFrom::Start(*position))
             .map_err(map_file_error)?;
 

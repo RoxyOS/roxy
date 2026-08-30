@@ -33,11 +33,21 @@ impl FdFile for VfsDirectory {
         })
     }
 
-    fn read(&mut self, _position: &mut u64, _output: &mut [u8]) -> Result<usize, FdFileError> {
+    fn read(
+        &mut self,
+        _position: &mut u64,
+        _output: &mut [u8],
+        _nonblocking: bool,
+    ) -> Result<usize, FdFileError> {
         Err(FdFileError::BadOperation)
     }
 
-    fn write(&mut self, _position: &mut u64, _input: &[u8]) -> Result<usize, FdFileError> {
+    fn write(
+        &mut self,
+        _position: &mut u64,
+        _input: &[u8],
+        _nonblocking: bool,
+    ) -> Result<usize, FdFileError> {
         Err(FdFileError::BadOperation)
     }
 

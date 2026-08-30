@@ -43,20 +43,36 @@ pub trait File: Send {
     /// `position` is owned by `OpenFile`; seekable implementations advance it by the consumed
     /// byte count, while stream-like implementations may leave it unchanged.
     ///
+    /// When `nonblocking` is true, implementations should return `Err(FileError::WouldBlock)`
+    /// instead of blocking when the requested data is not immediately available.
+    ///
     /// # Errors
     ///
     /// Returns an object-specific I/O or unsupported-operation error.
-    fn read(&mut self, position: &mut u64, output: &mut [u8]) -> Result<usize, FileError>;
+    fn read(
+        &mut self,
+        position: &mut u64,
+        output: &mut [u8],
+        nonblocking: bool,
+    ) -> Result<usize, FileError>;
 
     /// Writes data to this open object.
     ///
     /// `position` is owned by `OpenFile`; seekable implementations advance it by the produced
     /// byte count, while stream-like implementations may leave it unchanged.
     ///
+    /// When `nonblocking` is true, implementations should return `Err(FileError::WouldBlock)`
+    /// instead of blocking when the output cannot be accepted immediately.
+    ///
     /// # Errors
     ///
     /// Returns an object-specific I/O or unsupported-operation error.
-    fn write(&mut self, position: &mut u64, input: &[u8]) -> Result<usize, FileError>;
+    fn write(
+        &mut self,
+        position: &mut u64,
+        input: &[u8],
+        nonblocking: bool,
+    ) -> Result<usize, FileError>;
 
     /// Flushes this open object's durable state when the object supports synchronization.
     ///
@@ -170,6 +186,7 @@ pub enum FileType {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileError {
+    WouldBlock,
     BadOperation,
     BrokenPipe,
     NotConnected,

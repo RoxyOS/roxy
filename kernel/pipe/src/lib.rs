@@ -120,7 +120,12 @@ impl File for PipeEnd {
         })
     }
 
-    fn read(&mut self, _position: &mut u64, output: &mut [u8]) -> Result<usize, FileError> {
+    fn read(
+        &mut self,
+        _position: &mut u64,
+        output: &mut [u8],
+        nonblocking: bool,
+    ) -> Result<usize, FileError> {
         if !matches!(self.role, PipeRole::Read) {
             return Err(FileError::BadOperation);
         }
@@ -151,6 +156,10 @@ impl File for PipeEnd {
                 if state.writers == 0 {
                     return Ok(0);
                 }
+
+                if nonblocking {
+                    return Err(FileError::WouldBlock);
+                }
             }
 
             let (pending, registration) = self.wait();
@@ -159,7 +168,12 @@ impl File for PipeEnd {
         }
     }
 
-    fn write(&mut self, _position: &mut u64, input: &[u8]) -> Result<usize, FileError> {
+    fn write(
+        &mut self,
+        _position: &mut u64,
+        input: &[u8],
+        nonblocking: bool,
+    ) -> Result<usize, FileError> {
         if !matches!(self.role, PipeRole::Write) {
             return Err(FileError::BadOperation);
         }
@@ -184,6 +198,10 @@ impl File for PipeEnd {
                 listeners.notify();
 
                 return Ok(count);
+            }
+
+            if nonblocking {
+                return Err(FileError::WouldBlock);
             }
 
             drop(state);

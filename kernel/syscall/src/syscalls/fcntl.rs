@@ -76,8 +76,7 @@ fn handle_getfl(fd: Fd) -> SyscallResult {
 
 /// Common `O_*` file status flags that are not yet modeled by the kernel. Each is reported
 /// through `unsupported()` when requested via `F_SETFL`, rather than being dropped silently.
-const UNIMPLEMENTED_STATUS_FLAGS: [u64; 5] = [
-    0o4000,       // O_NONBLOCK
+const UNIMPLEMENTED_STATUS_FLAGS: [u64; 4] = [
     0o20000,      // O_ASYNC
     0o40000,      // O_DIRECT
     0o1_000_000,  // O_NOATIME

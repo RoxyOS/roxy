@@ -64,10 +64,13 @@ impl OpenFile {
     pub fn read(&self, output: &mut [u8]) -> Result<usize, FileError> {
         let mut state = self.state.lock();
         let OpenFileState {
-            object, position, ..
+            object,
+            position,
+            status_flags,
         } = &mut *state;
+        let nonblocking = status_flags.contains(StatusFlags::NONBLOCK);
 
-        object.read(position, output)
+        object.read(position, output, nonblocking)
     }
 
     /// Writes through the serialized open-file state.
@@ -90,7 +93,11 @@ impl OpenFile {
             *position = object.seek(0, SeekFrom::End(0)).map_err(map_seek_error)?;
         }
 
-        object.write(position, input)
+        object.write(
+            position,
+            input,
+            status_flags.contains(StatusFlags::NONBLOCK),
+        )
     }
 
     /// Flushes the serialized open-file object.
@@ -206,11 +213,21 @@ mod tests {
             Err(FileError::BadOperation)
         }
 
-        fn read(&mut self, _position: &mut u64, _output: &mut [u8]) -> Result<usize, FileError> {
+        fn read(
+            &mut self,
+            _position: &mut u64,
+            _output: &mut [u8],
+            _nonblocking: bool,
+        ) -> Result<usize, FileError> {
             Err(FileError::BadOperation)
         }
 
-        fn write(&mut self, _position: &mut u64, _input: &[u8]) -> Result<usize, FileError> {
+        fn write(
+            &mut self,
+            _position: &mut u64,
+            _input: &[u8],
+            _nonblocking: bool,
+        ) -> Result<usize, FileError> {
             Err(FileError::BadOperation)
         }
 
@@ -242,7 +259,12 @@ mod tests {
             })
         }
 
-        fn read(&mut self, position: &mut u64, output: &mut [u8]) -> Result<usize, FileError> {
+        fn read(
+            &mut self,
+            position: &mut u64,
+            output: &mut [u8],
+            _nonblocking: bool,
+        ) -> Result<usize, FileError> {
             let available = self.length.saturating_sub(*position);
             let available = usize::try_from(available).unwrap_or(usize::MAX);
             let read = output.len().min(available);
@@ -251,7 +273,12 @@ mod tests {
             Ok(read)
         }
 
-        fn write(&mut self, position: &mut u64, input: &[u8]) -> Result<usize, FileError> {
+        fn write(
+            &mut self,
+            position: &mut u64,
+            input: &[u8],
+            _nonblocking: bool,
+        ) -> Result<usize, FileError> {
             let written = u64::try_from(input.len()).map_err(|_| FileError::Io)?;
             *position = position.checked_add(written).ok_or(FileError::Io)?;
             self.length = self.length.max(*position);

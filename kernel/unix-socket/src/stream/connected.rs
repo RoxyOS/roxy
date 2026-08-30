@@ -24,7 +24,11 @@ impl Connected {
         Self { connection, side }
     }
 
-    pub(super) fn read(&mut self, output: &mut [u8]) -> Result<usize, FileError> {
+    pub(super) fn read(
+        &mut self,
+        output: &mut [u8],
+        nonblocking: bool,
+    ) -> Result<usize, FileError> {
         if output.is_empty() {
             return Ok(0);
         }
@@ -62,6 +66,10 @@ impl Connected {
                     return Ok(0);
                 }
 
+                if nonblocking {
+                    return Err(FileError::WouldBlock);
+                }
+
                 self.prepare_wait(&states)
             };
 
@@ -70,7 +78,7 @@ impl Connected {
         }
     }
 
-    pub(super) fn write(&mut self, input: &[u8]) -> Result<usize, FileError> {
+    pub(super) fn write(&mut self, input: &[u8], nonblocking: bool) -> Result<usize, FileError> {
         if input.is_empty() {
             return Ok(0);
         }
@@ -99,6 +107,10 @@ impl Connected {
                     peer_listener.notify();
 
                     return Ok(count);
+                }
+
+                if nonblocking {
+                    return Err(FileError::WouldBlock);
                 }
 
                 self.prepare_wait(&states)

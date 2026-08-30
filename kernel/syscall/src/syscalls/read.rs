@@ -33,6 +33,7 @@ fn map_process_error(_: DescriptorError) -> Errno {
 
 fn map_file_error(error: FileError) -> Errno {
     match error {
+        FileError::WouldBlock => Errno::Again,
         FileError::BadOperation => Errno::BadFd,
         FileError::BrokenPipe => Errno::Pipe,
         FileError::NotConnected => Errno::NotConnected,

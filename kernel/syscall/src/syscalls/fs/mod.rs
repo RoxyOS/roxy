@@ -41,6 +41,7 @@ impl SyscallArg for DirectoryFd {
 
 fn map_file_error(error: FileError) -> Errno {
     match error {
+        FileError::WouldBlock => Errno::Again,
         FileError::BadOperation => unsupported("fsync.fd-object", 0),
         FileError::BrokenPipe => Errno::Pipe,
         FileError::NotConnected => Errno::NotConnected,
