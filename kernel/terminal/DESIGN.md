@@ -48,3 +48,10 @@ do not depend on the selected endpoint or its locks.
 Implementations must serialize mutable display state without holding unrelated process or
 descriptor-table locks across I/O or window-size queries. Physical endpoints such as serial and
 `fbterm`, along with future display endpoints, implement the same output-and-size contract.
+
+`TeeOutput` is a composite endpoint that mirrors every write the primary endpoint accepts onto a
+secondary endpoint. The primary is authoritative for both `write` progress and `window_size`; the
+mirror receives exactly the bytes the primary accepted and is best-effort, so a failing mirror
+never suppresses ordinary kernel output. Core uses it to keep a serial mirror of the framebuffer
+terminal so boot and userspace diagnostics remain visible on the serial console after a display
+server (for example Xorg) takes over the framebuffer.

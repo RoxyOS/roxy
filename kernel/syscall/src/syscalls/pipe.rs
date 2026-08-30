@@ -27,15 +27,14 @@ impl PipesOut {
     ///
     /// On any failure the already-inserted descriptors are closed so they do not leak.
     fn write_pipes(self, read_fd: Fd, write_fd: Fd) -> Result<(), Errno> {
-        let descriptors = match (
+        let descriptors = if let (Ok(read), Ok(write)) = (
             i32::try_from(read_fd.as_u32()),
             i32::try_from(write_fd.as_u32()),
         ) {
-            (Ok(read), Ok(write)) => [read, write],
-            _ => {
-                close_pair(read_fd, write_fd);
-                return Err(Errno::Overflow);
-            }
+            [read, write]
+        } else {
+            close_pair(read_fd, write_fd);
+            return Err(Errno::Overflow);
         };
 
         // SAFETY: the array is fully initialized and has no padding.

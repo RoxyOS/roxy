@@ -69,8 +69,15 @@ fn select_kernel_terminal(_boot_info: &BootInfo) {
 
 #[cfg(not(feature = "kernel-test"))]
 fn select_kernel_terminal(boot_info: &BootInfo) {
+    use alloc::sync::Arc;
+
     let terminal = match roxy_fbterm::initialize(boot_info) {
-        Ok(()) => roxy_fbterm::terminal().expect("initialized fbterm must publish its endpoint"),
+        Ok(()) => {
+            let fb = roxy_fbterm::terminal().expect("initialized fbterm must publish its endpoint");
+            let serial = roxy_serial::terminal();
+            Arc::new(roxy_terminal::TeeOutput::new(fb, serial))
+                as Arc<dyn roxy_terminal::TerminalOutput>
+        }
         Err(error) => {
             roxy_serial::e_println!("fbterm unavailable: {error:?}; using serial terminal");
             roxy_serial::terminal()
