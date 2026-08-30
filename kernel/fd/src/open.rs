@@ -72,14 +72,23 @@ impl OpenFile {
 
     /// Writes through the serialized open-file state.
     ///
+    /// When the open file description has `O_APPEND` set, the write position is forced to the
+    /// end of the file before writing, matching append semantics regardless of any prior seek.
+    ///
     /// # Errors
     ///
     /// Returns the underlying object's error.
     pub fn write(&self, input: &[u8]) -> Result<usize, FileError> {
         let mut state = self.state.lock();
         let OpenFileState {
-            object, position, ..
+            object,
+            position,
+            status_flags,
         } = &mut *state;
+
+        if status_flags.contains(StatusFlags::APPEND) {
+            *position = object.seek(0, SeekFrom::End(0)).map_err(map_seek_error)?;
+        }
 
         object.write(position, input)
     }
@@ -152,6 +161,10 @@ impl OpenFile {
 
         Some(operation(socket))
     }
+}
+
+fn map_seek_error(_: SeekError) -> FileError {
+    FileError::Io
 }
 
 #[cfg(feature = "kernel-test")]
@@ -325,5 +338,19 @@ mod tests {
         let flags = crate::StatusFlags::READ_WRITE | crate::StatusFlags::APPEND;
         file.set_status_flags(flags);
         assert_eq!(file.status_flags(), flags);
+    });
+
+    kernel_test!("roxy-fd::append-write", appends_at_end_of_file, {
+        let file = OpenFile::new(Box::new(Cursor { length: 4 }));
+        file.set_status_flags(crate::StatusFlags::APPEND);
+
+        // Seek away from the end, then write; APPEND must force the position back to the end.
+        assert_eq!(file.seek(SeekFrom::Start(1)), Ok(1));
+        assert_eq!(file.write(b"ab"), Ok(2));
+
+        assert_eq!(file.seek(SeekFrom::Current(0)), Ok(6));
+        assert_eq!(file.seek(SeekFrom::Start(2)), Ok(2));
+        assert_eq!(file.write(b"c"), Ok(1));
+        assert_eq!(file.seek(SeekFrom::Current(0)), Ok(7));
     });
 }
