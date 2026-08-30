@@ -39,7 +39,7 @@ pub use wait::{WaitError, WaitResult, WaitTarget, wait_current};
 use alloc::{sync::Arc, vec::Vec};
 
 use hashbrown::HashMap;
-use roxy_fd::{Fd, FdTable, OpenFile};
+use roxy_fd::{DupError, Fd, FdTable, OpenFile};
 use roxy_signal::{Signal, SignalSet};
 use roxy_thread::ThreadId;
 use roxy_vfs::ResolvedPath;
@@ -166,6 +166,33 @@ pub fn close_file(fd: Fd) -> Result<(), DescriptorError> {
     drop(file);
 
     Ok(())
+}
+
+/// Makes `newfd` refer to the same open file description as `oldfd` in the currently
+/// scheduled process.
+///
+/// `close_on_exec` records whether `execve` should close the new descriptor.
+///
+/// # Errors
+///
+/// Returns an error when `oldfd` is not open.
+///
+/// # Panics
+///
+/// Panics when the current scheduled thread is not owned by a running process.
+pub fn dup2_current(oldfd: Fd, newfd: Fd, close_on_exec: bool) -> Result<(), DescriptorError> {
+    let mut table = table::PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    let process = table.processes.get_mut(&process_id).unwrap();
+
+    process
+        .fds
+        .dup2(oldfd, newfd, close_on_exec)
+        .map_err(map_dup_error)
+}
+
+fn map_dup_error(_: DupError) -> DescriptorError {
+    DescriptorError::NotOpen
 }
 
 /// Clones the user address space belonging to the currently scheduled process.

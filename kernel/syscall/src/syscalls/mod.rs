@@ -3,6 +3,7 @@ mod anon_free;
 mod chdir;
 mod clock_get;
 mod close;
+mod dup2;
 mod execve;
 mod exit;
 mod fork;
@@ -38,7 +39,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 56] = [
+pub(super) const SYSCALLS: [Syscall; 57] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -95,4 +96,5 @@ pub(super) const SYSCALLS: [Syscall; 56] = [
     socketpair::SYSCALL,
     signal::SIGRETURN_SYSCALL,
     pipe::SYSCALL,
+    dup2::SYSCALL,
 ];

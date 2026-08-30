@@ -32,3 +32,7 @@ call it from the handler after validation succeeds.
   that syscall.
 - Syscall handlers receive parsed domain values only. Do not use `raw_*` parameters or decode raw
   ABI words in handler bodies.
+- Represent every flags / bit-mask argument with a `bitflags!` type that implements `SyscallArg`,
+  following the `OpenFlags` pattern in `syscalls/open.rs`. Do not decode flag words with hand-written
+  integer constants and `&`/`!` arithmetic in handler bodies; keep unknown-bit rejection inside the
+  `SyscallArg::parse` implementation.

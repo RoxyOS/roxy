@@ -21,4 +21,5 @@ pub use ioctl::{
 };
 pub use open::OpenFile;
 pub use socket::{SocketError, SocketOps};
+pub use table::DupError;
 pub use table::FdTable;

@@ -20,6 +20,12 @@ pub struct FdTable {
     entries: BTreeMap<Fd, FdEntry>,
 }
 
+/// An error from duplicating a descriptor.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DupError {
+    NotOpen,
+}
+
 impl FdTable {
     #[must_use]
     pub const fn new() -> Self {
@@ -63,6 +69,41 @@ impl FdTable {
 
     pub fn remove(&mut self, fd: Fd) -> Option<Arc<OpenFile>> {
         self.entries.remove(&fd).map(|entry| entry.file)
+    }
+
+    /// Makes `newfd` refer to the same open file description as `oldfd`.
+    ///
+    /// If `newfd` is already open it is closed first, dropping its previous open file description.
+    /// Both descriptors then share the same `Arc<OpenFile>`, so the file position and other
+    /// open-file-description state are shared. `close_on_exec` records whether `execve` should
+    /// close the new descriptor.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DupError::NotOpen` when `oldfd` is not open. `oldfd == newfd` succeeds without
+    /// changing anything, matching `dup2` semantics.
+    pub fn dup2(&mut self, oldfd: Fd, newfd: Fd, close_on_exec: bool) -> Result<(), DupError> {
+        let file = self
+            .entries
+            .get(&oldfd)
+            .ok_or(DupError::NotOpen)?
+            .file
+            .clone();
+
+        if oldfd == newfd {
+            return Ok(());
+        }
+
+        self.entries.remove(&newfd);
+        self.entries.insert(
+            newfd,
+            FdEntry {
+                file,
+                close_on_exec,
+            },
+        );
+
+        Ok(())
     }
 
     /// Drops every descriptor marked close-on-exec.
@@ -176,4 +217,58 @@ mod tests {
             assert!(child.get(dropped).is_none());
         }
     );
+
+    kernel_test!("roxy-fd::dup2", shares_open_file_reference, {
+        let shared = file();
+        let mut table = FdTable::new();
+        let oldfd = table.insert(shared.clone(), false);
+
+        assert_eq!(table.dup2(oldfd, Fd::new(5), false), Ok(()));
+        assert!(Arc::ptr_eq(&table.get(oldfd).unwrap(), &shared));
+        assert!(Arc::ptr_eq(&table.get(Fd::new(5)).unwrap(), &shared));
+        assert_eq!(Arc::strong_count(&shared), 3);
+    });
+
+    kernel_test!("roxy-fd::dup2", replaces_open_descriptor, {
+        let old = file();
+        let replaced = file();
+        let mut table = FdTable::new();
+        let oldfd = table.insert(old.clone(), false);
+        let occupied = table.insert(replaced.clone(), false);
+
+        assert_eq!(table.dup2(oldfd, occupied, false), Ok(()));
+        assert!(Arc::ptr_eq(&table.get(occupied).unwrap(), &old));
+        assert_eq!(Arc::strong_count(&replaced), 1);
+    });
+
+    kernel_test!("roxy-fd::dup2", rejects_missing_source, {
+        let mut table = FdTable::new();
+
+        assert_eq!(
+            table.dup2(Fd::new(3), Fd::new(4), false),
+            Err(crate::DupError::NotOpen)
+        );
+    });
+
+    kernel_test!("roxy-fd::dup2", same_descriptor_is_noop, {
+        let shared = file();
+        let mut table = FdTable::new();
+        let fd = table.insert(shared.clone(), false);
+
+        assert_eq!(table.dup2(fd, fd, false), Ok(()));
+        assert_eq!(Arc::strong_count(&shared), 2);
+    });
+
+    kernel_test!("roxy-fd::dup2", records_close_on_exec, {
+        let shared = file();
+        let mut table = FdTable::new();
+        let oldfd = table.insert(shared, false);
+        let newfd = Fd::new(7);
+
+        assert_eq!(table.dup2(oldfd, newfd, true), Ok(()));
+        table.drop_close_on_exec();
+
+        assert!(table.get(oldfd).is_some());
+        assert!(table.get(newfd).is_none());
+    });
 }
