@@ -2,7 +2,7 @@ use alloc::{sync::Arc, vec::Vec};
 
 use crate::{
     FilePermissions, FileSystem, FileType, Metadata, ResolvedPath, Vfs, VfsError,
-    file::ActiveHandles,
+    file::ActiveHandles, umask,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -56,6 +56,9 @@ impl Vfs {
     }
 
     pub fn mkdir(&self, path: &ResolvedPath, permissions: FilePermissions) -> Result<(), VfsError> {
+        // Apply the process file mode creation mask to every directory creation.
+        let permissions = permissions.apply_umask(umask::current_umask());
+
         self.with_path(path, |filesystem, local| {
             filesystem.mkdir(local, permissions)
         })

@@ -19,6 +19,7 @@ mod permissions;
 #[cfg(feature = "kernel-test")]
 mod test_utils;
 mod traits;
+mod umask;
 
 static GLOBAL_VFS: Once<Vfs> = Once::new();
 
@@ -48,3 +49,4 @@ pub use mount::Vfs;
 pub use path::{ResolvedPath, WorkingDirectoryProvider, register_working_directory_provider};
 pub use permissions::FilePermissions;
 pub use traits::{FileHandle, FileSystem};
+pub use umask::register_umask_provider;

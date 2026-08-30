@@ -1,7 +1,7 @@
 use roxy_thread::{ThreadId, scheduler};
 
 use crate::{
-    ExitStatus, InitialFdInjector, ProcessState, cwd, initial_fds,
+    ExitStatus, InitialFdInjector, ProcessState, current_umask, cwd, initial_fds,
     table::{PROCESS_TABLE, ProcessTable},
 };
 
@@ -14,6 +14,8 @@ pub fn initialize(initial_fd_injector: InitialFdInjector) {
     initial_fds::register(initial_fd_injector);
     roxy_vfs::register_working_directory_provider(cwd::current_working_directory)
         .expect("VFS working-directory provider already registered");
+    roxy_vfs::register_umask_provider(current_umask)
+        .expect("VFS umask provider already registered");
     scheduler::register_user_dispatch_hook(activate_addrspace);
     scheduler::register_reaped_handler(on_thread_reaped);
 }

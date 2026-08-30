@@ -44,8 +44,6 @@ mod mkdirat {
     fn handle(dirfd: DirectoryFd, path: Path, permissions: FilePermissions) -> SyscallResult {
         dirfd.require_cwd("mkdirat.dirfd")?;
 
-        let permissions = permissions.apply_umask(roxy_process::current_umask());
-
         roxy_vfs::mkdir(path.into_inner(), permissions).map_err(map_vfs_error)?;
 
         Ok(0)

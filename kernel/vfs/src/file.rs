@@ -3,7 +3,7 @@ use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
 use roxy_fd::{IoctlError, IoctlRequest, MmapError, MmapTarget};
 use roxy_utils::Lock;
 
-use crate::{FileHandle, FilePermissions, Metadata, ResolvedPath, Vfs, VfsError};
+use crate::{FileHandle, FilePermissions, Metadata, ResolvedPath, Vfs, VfsError, umask};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum OpenAccess {
@@ -178,6 +178,19 @@ impl VfsFile {
 impl Vfs {
     pub fn open(&self, path: &ResolvedPath, options: OpenOptions) -> Result<VfsFile, VfsError> {
         options.validate()?;
+
+        // A file mode creation mask only affects newly created files; opening an existing file
+        // leaves its permissions untouched. Applying the mask here centralizes the semantics so
+        // every creation path through VFS gets it automatically.
+        let options = if options.creation == CreationMode::OpenExisting {
+            options
+        } else {
+            OpenOptions {
+                permissions: options.permissions.apply_umask(umask::current_umask()),
+                ..options
+            }
+        };
+
         let resolved = self.resolve(path)?;
         let handle = resolved.filesystem.open(&resolved.local_path, options)?;
         let file_id = handle.metadata()?.file_id;
