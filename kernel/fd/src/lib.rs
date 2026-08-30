@@ -21,7 +21,7 @@ pub use ioctl::{
     MmapTarget, Termios, WindowSize,
 };
 pub use open::OpenFile;
-pub use socket::{SocketError, SocketOps};
+pub use socket::{ShutdownHow, SocketError, SocketOps};
 pub use status_flags::StatusFlags;
 pub use table::DupError;
 pub use table::FdTable;

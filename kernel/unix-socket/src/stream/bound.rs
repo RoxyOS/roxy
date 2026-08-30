@@ -112,6 +112,7 @@ impl BoundSocket {
             let endpoint = OpenFile::new(Box::new(Socket::connected(
                 connection.clone(),
                 Side::Second,
+                Some(self.name.clone()),
             )));
             endpoint.set_status_flags(StatusFlags::READ_WRITE);
             pending.push_back(endpoint);

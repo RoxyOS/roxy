@@ -43,7 +43,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 61] = [
+pub(super) const SYSCALLS: [Syscall; 65] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -97,6 +97,10 @@ pub(super) const SYSCALLS: [Syscall; 61] = [
     socket::LISTEN_SYSCALL,
     socket::ACCEPT_SYSCALL,
     socket::CONNECT_SYSCALL,
+    socket::SHUTDOWN_SYSCALL,
+    socket::GETSOCKNAME_SYSCALL,
+    socket::GETPEERNAME_SYSCALL,
+    socket::GETSOCKOPT_SYSCALL,
     socketpair::SYSCALL,
     signal::SIGRETURN_SYSCALL,
     pipe::SYSCALL,

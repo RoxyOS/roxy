@@ -1,12 +1,6 @@
 use roxy_vfs::FilePermissions;
 
-use crate::{
-    SyscallResult,
-    args::CString,
-    errno::Errno,
-    numbers::SyscallNumber,
-    syscall,
-};
+use crate::{SyscallResult, args::CString, errno::Errno, numbers::SyscallNumber, syscall};
 
 syscall!(SyscallNumber::Chmod, handle(
     path: CString => Fault,

@@ -2,7 +2,11 @@ mod accept;
 mod bind;
 mod connect;
 mod create;
+mod getsockopt;
 mod listen;
+mod peername;
+mod shutdown;
+mod sockname;
 
 use alloc::vec::Vec;
 use core::mem::{align_of, offset_of, size_of};
@@ -19,6 +23,10 @@ pub(super) const BIND_SYSCALL: crate::Syscall = bind::SYSCALL;
 pub(super) const LISTEN_SYSCALL: crate::Syscall = listen::SYSCALL;
 pub(super) const ACCEPT_SYSCALL: crate::Syscall = accept::SYSCALL;
 pub(super) const CONNECT_SYSCALL: crate::Syscall = connect::SYSCALL;
+pub(super) const SHUTDOWN_SYSCALL: crate::Syscall = shutdown::SYSCALL;
+pub(super) const GETSOCKNAME_SYSCALL: crate::Syscall = sockname::SYSCALL;
+pub(super) const GETPEERNAME_SYSCALL: crate::Syscall = peername::SYSCALL;
+pub(super) const GETSOCKOPT_SYSCALL: crate::Syscall = getsockopt::SYSCALL;
 
 const FAMILY_UNIX: u16 = 1;
 const FAMILY_LENGTH: usize = size_of::<u16>();
@@ -96,6 +104,48 @@ fn decode_socket_path(address: UserAddress, length: u64) -> Result<Vec<u8>, Errn
     ResolvedPath::resolve(raw_path)
         .map(|resolved| resolved.as_bytes().to_vec())
         .map_err(map_vfs_error)
+}
+
+/// Encodes a normalized absolute path (or `None` for an unnamed socket) back into a `sockaddr_un`
+/// record in userspace, writing the `sun_family` field followed by the `sun_path` byte string.
+///
+/// The caller provides the maximum writable record length; the actual length written is returned
+/// so the syscall can report it through its `socklen_t` output. An unnamed socket writes only the
+/// family field (Linux reports the family for anonymous `AF_UNIX` endpoints).
+///
+/// # Errors
+///
+/// Returns `TooBig` when `max_length` cannot hold the full record, and `Fault` when the record
+/// cannot be written.
+fn encode_socket_path(
+    address: UserAddress,
+    max_length: u64,
+    path: Option<&[u8]>,
+) -> Result<usize, Errno> {
+    let max_length = usize::try_from(max_length).map_err(|_| Errno::Invalid)?;
+
+    let path_length = path.map_or(0, <[u8]>::len);
+    let total_length = FAMILY_LENGTH + path_length;
+
+    if total_length > max_length {
+        return Err(Errno::TooBig);
+    }
+
+    // SAFETY: u16 has a stable layout and every bit pattern is valid; the family field lies within
+    // the validated writable range.
+    let family = FAMILY_UNIX;
+    unsafe { user_memory::write(address, &family) }?;
+
+    if let Some(path) = path {
+        let path_address = address
+            .checked_add(u64::try_from(FAMILY_LENGTH).map_err(|_| Errno::Fault)?)
+            .ok_or(Errno::Fault)?;
+
+        // SAFETY: u8 accepts every byte pattern and the slice is bounded by `max_length`.
+        unsafe { user_memory::write_slice(path_address, path) }?;
+    }
+
+    Ok(total_length)
 }
 
 fn map_socket_error(error: SocketError) -> Errno {

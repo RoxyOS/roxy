@@ -11,7 +11,10 @@ pub(super) struct Connection {
 
 pub(super) struct State {
     pub(super) received_data: Buffer,
-    pub(super) open: bool,
+    /// This side can still receive data from the peer.
+    pub(super) open_read: bool,
+    /// This side can still send data to the peer.
+    pub(super) open_write: bool,
 
     /// Listeners listening for changes for this endpoint.
     pub(super) listeners: Arc<PollListeners>,
@@ -29,7 +32,8 @@ impl State {
     fn new() -> Self {
         Self {
             received_data: Buffer::new(),
-            open: true,
+            open_read: true,
+            open_write: true,
             listeners: Arc::new(PollListeners::new()),
         }
     }
@@ -48,7 +52,8 @@ mod tests {
             let connection = Connection::new();
             let states = connection.states.lock();
 
-            assert!(states.iter().all(|state| state.open));
+            assert!(states.iter().all(|state| state.open_read));
+            assert!(states.iter().all(|state| state.open_write));
             assert!(states.iter().all(|state| state.received_data.is_empty()));
         }
     );

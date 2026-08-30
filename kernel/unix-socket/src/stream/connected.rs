@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use roxy_fd::{FileError, PollEvents};
+use roxy_fd::{FileError, PollEvents, ShutdownHow};
 use roxy_poll::{PollListener, PollRegistration};
 use roxy_thread::scheduler;
 
@@ -35,7 +35,6 @@ impl Connected {
                 let index = self.side.index();
                 let peer = self.side.other().index();
 
-                let peer_is_open = states[peer].open;
                 let state = &mut states[index];
 
                 if !state.received_data.is_empty() {
@@ -53,7 +52,13 @@ impl Connected {
                     return Ok(count);
                 }
 
-                if !peer_is_open {
+                // This side has shut down receiving; report EOF once buffered data is drained.
+                if !state.open_read {
+                    return Ok(0);
+                }
+
+                // The peer will no longer send (half-closed or fully closed); report EOF.
+                if !states[peer].open_write {
                     return Ok(0);
                 }
 
@@ -76,7 +81,7 @@ impl Connected {
                 let index = self.side.index();
                 let peer = self.side.other().index();
 
-                if !states[peer].open {
+                if !states[index].open_write || !states[peer].open_read {
                     return Err(FileError::BrokenPipe);
                 }
 
@@ -104,6 +109,34 @@ impl Connected {
         }
     }
 
+    /// Disables one or both directions on this side of the connection and wakes any peer that
+    /// is blocked on the resulting readiness change.
+    pub(super) fn shutdown(&mut self, how: ShutdownHow) {
+        let (self_listener, peer_listener) = {
+            let mut states = self.connection.states.lock();
+            let index = self.side.index();
+            let peer = self.side.other().index();
+
+            let state = &mut states[index];
+            match how {
+                ShutdownHow::Rd => state.open_read = false,
+                ShutdownHow::Wr => state.open_write = false,
+                ShutdownHow::RdWr => {
+                    state.open_read = false;
+                    state.open_write = false;
+                }
+            }
+
+            (
+                states[index].listeners.clone(),
+                states[peer].listeners.clone(),
+            )
+        };
+
+        self_listener.notify();
+        peer_listener.notify();
+    }
+
     pub(super) fn poll(&self) -> PollEvents {
         let states = self.connection.states.lock();
         let index = self.side.index();
@@ -113,9 +146,11 @@ impl Connected {
         let peer_state = &states[peer];
 
         PollEvents {
-            readable: !state.received_data.is_empty() || !peer_state.open,
-            writable: peer_state.open && peer_state.received_data.len() < CAPACITY,
-            hangup: !peer_state.open,
+            readable: !state.open_read || !state.received_data.is_empty() || !peer_state.open_write,
+            writable: state.open_write
+                && peer_state.open_read
+                && peer_state.received_data.len() < CAPACITY,
+            hangup: !state.open_read || !peer_state.open_write,
             ..PollEvents::default()
         }
     }
@@ -147,7 +182,8 @@ impl Drop for Connected {
             let index = self.side.index();
             let peer = self.side.other().index();
 
-            states[index].open = false;
+            states[index].open_read = false;
+            states[index].open_write = false;
             states[index].received_data.clear();
             states[peer].listeners.clone()
         };

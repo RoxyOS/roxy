@@ -1,8 +1,9 @@
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use roxy_fd::{
     File, FileError, FileMetadata, FileType, OpenFile, PollEvents, SeekError, SeekFrom,
-    SocketError, SocketOps,
+    ShutdownHow, SocketError, SocketOps,
 };
 use roxy_poll::{PollListener, PollRegistration};
 use roxy_utils::Lock;
@@ -31,21 +32,35 @@ impl Drop for SocketInner {
 }
 
 /// One Unix stream socket in any lifecycle state: created, bound, listening, or connected.
+///
+/// Tracks the local address (`name`) and peer address (`peer_name`) for `getsockname` and
+/// `getpeername` respectively. Both are `None` when the socket is anonymous.
 pub struct Socket {
     inner: Lock<SocketInner>,
+    name: Lock<Option<Arc<[u8]>>>,
+    peer_name: Lock<Option<Arc<[u8]>>>,
 }
 
 impl Socket {
     pub(super) const fn new() -> Self {
         Self {
             inner: Lock::new(SocketInner::Initial),
+            name: Lock::new(None),
+            peer_name: Lock::new(None),
         }
     }
 
-    /// Creates a socket already connected as `side` of `connection`.
-    pub(super) fn connected(connection: Arc<Connection>, side: Side) -> Self {
+    /// Creates a socket already connected as `side` of `connection`, with the given local
+    /// `name` (the bound path for a server-side accepted socket, or `None` for unnamed clients).
+    pub(super) fn connected(
+        connection: Arc<Connection>,
+        side: Side,
+        name: Option<Arc<[u8]>>,
+    ) -> Self {
         Self {
             inner: Lock::new(SocketInner::Connected(Connected::new(connection, side))),
+            name: Lock::new(name),
+            peer_name: Lock::new(None),
         }
     }
 }
@@ -130,6 +145,7 @@ impl SocketOps for Socket {
         }
 
         *inner = SocketInner::Bound(bound);
+        *self.name.lock() = Some(Arc::from(name));
 
         Ok(())
     }
@@ -179,9 +195,80 @@ impl SocketOps for Socket {
             .ok_or(SocketError::ConnectionRefused)?;
 
         *inner = SocketInner::Connected(client);
+        *self.peer_name.lock() = Some(Arc::from(name));
 
         Ok(())
     }
+
+    fn shutdown(&mut self, how: ShutdownHow) -> Result<(), SocketError> {
+        let mut inner = self.inner.lock();
+
+        match &mut *inner {
+            SocketInner::Connected(connected) => {
+                connected.shutdown(how);
+
+                Ok(())
+            }
+            SocketInner::Initial | SocketInner::Bound(_) => Err(SocketError::InvalidState),
+        }
+    }
+
+    fn get_sockopt(
+        &mut self,
+        layer: u32,
+        number: u32,
+        buffer: &mut [u8],
+    ) -> Result<usize, SocketError> {
+        // Only the minimal `SOL_SOCKET` subset is exposed. The socket type is always stream.
+        if layer != 1 {
+            return Err(SocketError::InvalidState);
+        }
+
+        match number {
+            // SO_TYPE: report `SOCK_STREAM`.
+            3 => write_option(buffer, 1),
+            // SO_ERROR: report a zero (no pending error) error code.
+            4 => write_option(buffer, 0),
+            _ => Err(SocketError::InvalidState),
+        }
+    }
+
+    fn sockname(&mut self) -> Result<Option<Vec<u8>>, SocketError> {
+        let inner = self.inner.lock();
+
+        match &*inner {
+            SocketInner::Bound(_) | SocketInner::Connected(_) => {
+                Ok(self.name.lock().as_ref().map(|name| name.to_vec()))
+            }
+            SocketInner::Initial => Err(SocketError::InvalidState),
+        }
+    }
+
+    fn peername(&mut self) -> Result<Option<Vec<u8>>, SocketError> {
+        let inner = self.inner.lock();
+
+        match &*inner {
+            SocketInner::Connected(_) => {
+                Ok(self.peer_name.lock().as_ref().map(|name| name.to_vec()))
+            }
+            SocketInner::Initial | SocketInner::Bound(_) => Err(SocketError::InvalidState),
+        }
+    }
+}
+
+/// Writes an `i32` option value into `buffer`, zero-filled to its full capacity.
+fn write_option(buffer: &mut [u8], value: i32) -> Result<usize, SocketError> {
+    if buffer.len() < 4 {
+        return Err(SocketError::InvalidState);
+    }
+
+    let bytes = value.to_ne_bytes();
+    buffer[..4].copy_from_slice(&bytes);
+    for byte in &mut buffer[4..] {
+        *byte = 0;
+    }
+
+    Ok(4)
 }
 
 #[cfg(feature = "kernel-test")]

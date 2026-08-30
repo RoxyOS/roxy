@@ -23,12 +23,16 @@ pub fn pair() -> (Arc<OpenFile>, Arc<OpenFile>) {
 
     (
         {
-            let end = OpenFile::new(Box::new(Socket::connected(connection.clone(), Side::First)));
+            let end = OpenFile::new(Box::new(Socket::connected(
+                connection.clone(),
+                Side::First,
+                None,
+            )));
             end.set_status_flags(StatusFlags::READ_WRITE);
             end
         },
         {
-            let end = OpenFile::new(Box::new(Socket::connected(connection, Side::Second)));
+            let end = OpenFile::new(Box::new(Socket::connected(connection, Side::Second, None)));
             end.set_status_flags(StatusFlags::READ_WRITE);
             end
         },
