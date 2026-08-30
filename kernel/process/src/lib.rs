@@ -191,8 +191,71 @@ pub fn dup2_current(oldfd: Fd, newfd: Fd, close_on_exec: bool) -> Result<(), Des
         .map_err(map_dup_error)
 }
 
-fn map_dup_error(_: DupError) -> DescriptorError {
-    DescriptorError::NotOpen
+/// Returns whether a descriptor of the currently scheduled process closes on `exec`.
+///
+/// # Errors
+///
+/// Returns an error when the descriptor is not open.
+///
+/// # Panics
+///
+/// Panics when the current scheduled thread is not owned by a running process.
+pub fn fcntl_close_on_exec(fd: Fd) -> Result<bool, DescriptorError> {
+    let table = table::PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    let process = table.processes.get(&process_id).unwrap();
+
+    process.fds.close_on_exec(fd).map_err(map_dup_error)
+}
+
+/// Sets whether a descriptor of the currently scheduled process closes on `exec`.
+///
+/// # Errors
+///
+/// Returns an error when the descriptor is not open.
+///
+/// # Panics
+///
+/// Panics when the current scheduled thread is not owned by a running process.
+pub fn fcntl_set_close_on_exec(fd: Fd, close_on_exec: bool) -> Result<(), DescriptorError> {
+    let mut table = table::PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    let process = table.processes.get_mut(&process_id).unwrap();
+
+    process
+        .fds
+        .set_close_on_exec(fd, close_on_exec)
+        .map_err(map_dup_error)
+}
+
+/// Makes the lowest available descriptor at or above `minimum` in the currently scheduled process
+/// refer to the same open file description as `oldfd`.
+///
+/// `close_on_exec` records whether `execve` should close the new descriptor.
+///
+/// # Errors
+///
+/// Returns an error when `oldfd` is not open or no descriptor at or above `minimum` is free.
+///
+/// # Panics
+///
+/// Panics when the current scheduled thread is not owned by a running process.
+pub fn fcntl_dupfd(oldfd: Fd, minimum: Fd, close_on_exec: bool) -> Result<Fd, DescriptorError> {
+    let mut table = table::PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    let process = table.processes.get_mut(&process_id).unwrap();
+
+    process
+        .fds
+        .dupfd(oldfd, minimum, close_on_exec)
+        .map_err(map_dup_error)
+}
+
+fn map_dup_error(error: DupError) -> DescriptorError {
+    match error {
+        DupError::NotOpen => DescriptorError::NotOpen,
+        DupError::NoSpace => DescriptorError::NoSpace,
+    }
 }
 
 /// Clones the user address space belonging to the currently scheduled process.
@@ -221,4 +284,5 @@ pub fn current_addrspace() -> Result<AddrSpaceHandle, DescriptorError> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DescriptorError {
     NotOpen,
+    NoSpace,
 }

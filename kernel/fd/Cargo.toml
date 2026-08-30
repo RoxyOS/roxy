@@ -9,6 +9,7 @@ publish.workspace = true
 kernel-test = ["dep:linkme", "dep:roxy-test"]
 
 [dependencies]
+bitflags.workspace = true
 linkme = { workspace = true, optional = true }
 
 roxy-fb-types.workspace = true

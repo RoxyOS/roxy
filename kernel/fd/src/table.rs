@@ -24,6 +24,7 @@ pub struct FdTable {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DupError {
     NotOpen,
+    NoSpace,
 }
 
 impl FdTable {
@@ -109,6 +110,67 @@ impl FdTable {
     /// Drops every descriptor marked close-on-exec.
     pub fn drop_close_on_exec(&mut self) {
         self.entries.retain(|_, entry| !entry.close_on_exec);
+    }
+
+    /// Returns whether `fd` closes on `exec`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DupError::NotOpen` when `fd` is not open.
+    pub fn close_on_exec(&self, fd: Fd) -> Result<bool, DupError> {
+        self.entries
+            .get(&fd)
+            .map(|entry| entry.close_on_exec)
+            .ok_or(DupError::NotOpen)
+    }
+
+    /// Sets whether `fd` closes on `exec`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DupError::NotOpen` when `fd` is not open.
+    pub fn set_close_on_exec(&mut self, fd: Fd, close_on_exec: bool) -> Result<(), DupError> {
+        let entry = self.entries.get_mut(&fd).ok_or(DupError::NotOpen)?;
+        entry.close_on_exec = close_on_exec;
+
+        Ok(())
+    }
+
+    /// Makes the lowest available descriptor at or above `minimum` refer to the same open file
+    /// description as `oldfd`, without replacing any lower descriptor.
+    ///
+    /// This is the `fcntl(F_DUPFD)` and `fcntl(F_DUPFD_CLOEXEC)` semantics, distinct from `dup2`
+    /// which targets an exact descriptor. Unlike `dup2`, the new descriptor always differs from
+    /// `oldfd`; if `minimum` is already open, the search continues upward. `close_on_exec` records
+    /// whether `execve` should close the new descriptor.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DupError::NotOpen` when `oldfd` is not open, or `DupError::NoSpace` when every
+    /// descriptor at or above `minimum` is occupied.
+    pub fn dupfd(&mut self, oldfd: Fd, minimum: Fd, close_on_exec: bool) -> Result<Fd, DupError> {
+        let file = self
+            .entries
+            .get(&oldfd)
+            .ok_or(DupError::NotOpen)?
+            .file
+            .clone();
+
+        let mut value = minimum.as_u32();
+
+        loop {
+            let fd = Fd::new(value);
+
+            if let btree_map::Entry::Vacant(entry) = self.entries.entry(fd) {
+                entry.insert(FdEntry {
+                    file,
+                    close_on_exec,
+                });
+                return Ok(fd);
+            }
+
+            value = value.checked_add(1).ok_or(DupError::NoSpace)?;
+        }
     }
 }
 
@@ -270,5 +332,54 @@ mod tests {
 
         assert!(table.get(oldfd).is_some());
         assert!(table.get(newfd).is_none());
+    });
+
+    kernel_test!("roxy-fd::close-on-exec", reads_and_writes_the_flag, {
+        let mut table = FdTable::new();
+        let fd = table.insert(file(), false);
+
+        assert_eq!(table.close_on_exec(fd), Ok(false));
+        assert_eq!(table.set_close_on_exec(fd, true), Ok(()));
+        assert_eq!(table.close_on_exec(fd), Ok(true));
+        assert_eq!(
+            table.close_on_exec(Fd::new(9)),
+            Err(crate::DupError::NotOpen)
+        );
+        assert_eq!(
+            table.set_close_on_exec(Fd::new(9), true),
+            Err(crate::DupError::NotOpen)
+        );
+    });
+
+    kernel_test!("roxy-fd::dupfd", allocates_at_or_above_minimum, {
+        let shared = file();
+        let mut table = FdTable::new();
+        let oldfd = table.insert(shared.clone(), false);
+
+        assert_eq!(table.dupfd(oldfd, Fd::new(5), false), Ok(Fd::new(5)));
+        assert_eq!(table.dupfd(oldfd, Fd::new(5), false), Ok(Fd::new(6)));
+        assert_eq!(table.dupfd(oldfd, Fd::new(2), false), Ok(Fd::new(2)));
+        assert!(Arc::ptr_eq(&table.get(Fd::new(5)).unwrap(), &shared));
+    });
+
+    kernel_test!("roxy-fd::dupfd", rejects_missing_source_fd, {
+        let mut table = FdTable::new();
+
+        assert_eq!(
+            table.dupfd(Fd::new(3), Fd::new(4), false),
+            Err(crate::DupError::NotOpen)
+        );
+    });
+
+    kernel_test!("roxy-fd::dupfd", records_close_on_exec_flag, {
+        let shared = file();
+        let mut table = FdTable::new();
+        let oldfd = table.insert(shared, false);
+
+        assert_eq!(table.dupfd(oldfd, Fd::new(4), true), Ok(Fd::new(4)));
+        table.drop_close_on_exec();
+
+        assert!(table.get(oldfd).is_some());
+        assert!(table.get(Fd::new(4)).is_none());
     });
 }

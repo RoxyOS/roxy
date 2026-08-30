@@ -652,6 +652,7 @@ dependencies = [
 name = "roxy-fd"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.13.1",
  "linkme",
  "roxy-fb-types",
  "roxy-poll",

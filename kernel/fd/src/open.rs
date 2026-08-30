@@ -4,11 +4,15 @@ use roxy_poll::{PollListener, PollRegistration};
 use roxy_utils::Lock;
 
 use crate::file::File;
-use crate::{DirectoryEntry, FileError, FileMetadata, PollEvents, SeekError, SeekFrom, SocketOps};
+use crate::{
+    DirectoryEntry, FileError, FileMetadata, PollEvents, SeekError, SeekFrom, SocketOps,
+    StatusFlags,
+};
 
 pub(crate) struct OpenFileState {
     pub(crate) object: Box<dyn File>,
     position: u64,
+    status_flags: StatusFlags,
 }
 
 pub struct OpenFile {
@@ -22,6 +26,7 @@ impl OpenFile {
             state: Lock::new(OpenFileState {
                 object,
                 position: 0,
+                status_flags: StatusFlags::default(),
             }),
         })
     }
@@ -40,6 +45,17 @@ impl OpenFile {
         self.state.lock().object.metadata()
     }
 
+    /// Reports the file status flags of this open file description.
+    #[must_use]
+    pub fn status_flags(&self) -> StatusFlags {
+        self.state.lock().status_flags
+    }
+
+    /// Sets the file status flags of this open file description.
+    pub fn set_status_flags(&self, flags: StatusFlags) {
+        self.state.lock().status_flags = flags;
+    }
+
     /// Reads through the serialized open-file state.
     ///
     /// # Errors
@@ -47,7 +63,9 @@ impl OpenFile {
     /// Returns the underlying object's error.
     pub fn read(&self, output: &mut [u8]) -> Result<usize, FileError> {
         let mut state = self.state.lock();
-        let OpenFileState { object, position } = &mut *state;
+        let OpenFileState {
+            object, position, ..
+        } = &mut *state;
 
         object.read(position, output)
     }
@@ -59,7 +77,9 @@ impl OpenFile {
     /// Returns the underlying object's error.
     pub fn write(&self, input: &[u8]) -> Result<usize, FileError> {
         let mut state = self.state.lock();
-        let OpenFileState { object, position } = &mut *state;
+        let OpenFileState {
+            object, position, ..
+        } = &mut *state;
 
         object.write(position, input)
     }
@@ -114,7 +134,9 @@ impl OpenFile {
     /// Returns `BadOperation` when the open object is not a directory.
     pub fn read_directory_entries(&self, limit: usize) -> Result<Vec<DirectoryEntry>, FileError> {
         let mut state = self.state.lock();
-        let OpenFileState { object, position } = &mut *state;
+        let OpenFileState {
+            object, position, ..
+        } = &mut *state;
         let directory = object.as_directory().ok_or(FileError::BadOperation)?;
 
         directory.read_entries(position, limit)
@@ -292,5 +314,16 @@ mod tests {
         assert_eq!(shared.read(&mut output), Ok(2));
         assert_eq!(file.seek(SeekFrom::Current(0)), Ok(10));
         assert_eq!(independent.seek(SeekFrom::Current(0)), Ok(3));
+    });
+
+    kernel_test!("roxy-fd::status-flags", read_default_and_set, {
+        let file = OpenFile::new(Box::new(Cursor { length: 0 }));
+
+        assert_eq!(file.status_flags(), crate::StatusFlags::default());
+        assert_eq!(file.status_flags().bits(), 0);
+
+        let flags = crate::StatusFlags::READ_WRITE | crate::StatusFlags::APPEND;
+        file.set_status_flags(flags);
+        assert_eq!(file.status_flags(), flags);
     });
 }

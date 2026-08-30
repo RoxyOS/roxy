@@ -6,6 +6,7 @@ mod close;
 mod dup2;
 mod execve;
 mod exit;
+mod fcntl;
 mod fork;
 mod fs;
 mod futex_wait;
@@ -39,7 +40,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 57] = [
+pub(super) const SYSCALLS: [Syscall; 58] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -97,4 +98,5 @@ pub(super) const SYSCALLS: [Syscall; 57] = [
     signal::SIGRETURN_SYSCALL,
     pipe::SYSCALL,
     dup2::SYSCALL,
+    fcntl::SYSCALL,
 ];

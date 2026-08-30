@@ -7,6 +7,7 @@ mod file;
 mod ioctl;
 mod open;
 mod socket;
+mod status_flags;
 mod table;
 mod truncate;
 
@@ -21,5 +22,6 @@ pub use ioctl::{
 };
 pub use open::OpenFile;
 pub use socket::{SocketError, SocketOps};
+pub use status_flags::StatusFlags;
 pub use table::DupError;
 pub use table::FdTable;
