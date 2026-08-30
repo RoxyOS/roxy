@@ -16,6 +16,7 @@ roxy-test = { workspace = true, optional = true }
 roxy-utils.workspace = true
 
 roxy-fd.workspace = true
+roxy-poll.workspace = true
 
 [lints]
 workspace = true

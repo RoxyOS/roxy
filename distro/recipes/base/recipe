@@ -4,4 +4,4 @@ version=1
 revision=1
 
 # This base metapackage contains the essential software for a normal system.
-deps="lua python duktape bash busybox vim xorg-server xf86-video-fbdev twm xeyes xinit"
+deps="lua python duktape bash busybox vim xorg-server xf86-video-fbdev xf86-input-mouse twm xeyes xinit"

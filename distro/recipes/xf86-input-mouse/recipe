@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+version=1.9.4
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/driver/xf86-input-mouse-${version}.tar.xz"
+tarball_sha256="7f6f8551fc238abdddcf9f38906564c1f8c7dacb0ad947cfc110487aefbd8d4c"
+
+cross_compile=yes
+
+deps="mlibc xorg-server xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+configure() {
+	autotools_configure \
+		--with-xorg-module-dir="$(pkg-config --variable=moduledir xorg-server)"
+}
+
+package() {
+	autotools_install
+
+	install -D -m 0644 "${base_dir}/recipes/xf86-input-mouse/psaux.conf" \
+		"${dest_dir}/usr/share/X11/xorg.conf.d/10-psaux.conf"
+}

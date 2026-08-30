@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
 
-use roxy_fd::{IoctlError, IoctlRequest, MmapError, MmapTarget};
+use roxy_fd::{IoctlError, IoctlRequest, MmapError, MmapTarget, PollEvents};
+use roxy_poll::{PollListener, PollRegistration};
 use roxy_utils::Lock;
 
 use crate::{FileHandle, FilePermissions, Metadata, ResolvedPath, Vfs, VfsError, umask};
@@ -180,6 +181,15 @@ impl VfsFile {
 
     pub fn mmap(&mut self, size: usize, offset: u64) -> Result<MmapTarget, MmapError> {
         self.handle.mmap(size, offset)
+    }
+
+    pub fn poll(&self) -> Result<PollEvents, VfsError> {
+        self.handle.poll()
+    }
+
+    #[must_use]
+    pub fn register_poll_listener(&self, listener: Arc<PollListener>) -> PollRegistration {
+        self.handle.register_poll_listener(listener)
     }
 }
 

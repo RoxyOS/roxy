@@ -17,6 +17,7 @@ pub enum VfsError {
     CrossDevice,
     Loop,
     Unsupported,
+    WouldBlock,
     Io,
     Corrupt,
 }
@@ -39,6 +40,7 @@ impl fmt::Display for VfsError {
             Self::CrossDevice => "operation crosses mount points",
             Self::Loop => "too many levels of symbolic links",
             Self::Unsupported => "operation is unsupported",
+            Self::WouldBlock => "operation would block",
             Self::Io => "filesystem I/O failed",
             Self::Corrupt => "filesystem is corrupt",
         })

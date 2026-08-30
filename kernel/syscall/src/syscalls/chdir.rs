@@ -39,5 +39,6 @@ fn map_vfs_error(error: VfsError) -> Errno {
         VfsError::Unsupported => {
             crate::unsupported::unsupported_argument("chdir.filesystem", 0, Errno::NotSupported)
         }
+        VfsError::WouldBlock => Errno::Again,
     }
 }

@@ -65,6 +65,7 @@ fn map_vfs_error(error: VfsError) -> Errno {
         VfsError::CrossDevice => Errno::CrossDevice,
         VfsError::Loop => Errno::Loop,
         VfsError::Unsupported => unsupported("fs.filesystem", 0),
+        VfsError::WouldBlock => Errno::Again,
     }
 }
 

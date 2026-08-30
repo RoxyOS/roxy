@@ -2,8 +2,9 @@ use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 use roxy_fd::{
     FileError, FileMetadata, FileType as FdFileType, IoctlError, IoctlRequest, MmapError,
-    MmapTarget,
+    MmapTarget, PollEvents,
 };
+use roxy_poll::{PollListener, PollRegistration};
 use roxy_vfs::{
     DirEntry, FileHandle, FilePermissions, FileSystem, Metadata, OpenOptions, ResolvedPath,
     SeekFrom, VfsError,
@@ -178,6 +179,14 @@ impl FileHandle for DeviceFile {
     fn mmap(&mut self, size: usize, offset: u64) -> Result<MmapTarget, MmapError> {
         self.device.mmap(size, offset)
     }
+
+    fn poll(&self) -> Result<PollEvents, VfsError> {
+        Ok(self.device.poll())
+    }
+
+    fn register_poll_listener(&self, listener: Arc<PollListener>) -> PollRegistration {
+        self.device.register_poll_listener(listener)
+    }
 }
 
 fn to_vfs_metadata(metadata: FileMetadata) -> Metadata {
@@ -207,9 +216,8 @@ fn map_file_type(file_type: FdFileType) -> roxy_vfs::FileType {
 fn map_device_error(error: FileError) -> VfsError {
     match error {
         FileError::BadOperation => VfsError::Unsupported,
-        FileError::WouldBlock | FileError::Io | FileError::BrokenPipe | FileError::NotConnected => {
-            VfsError::Io
-        }
+        FileError::WouldBlock => VfsError::WouldBlock,
+        FileError::Io | FileError::BrokenPipe | FileError::NotConnected => VfsError::Io,
     }
 }
 

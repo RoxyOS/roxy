@@ -1,6 +1,6 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
-use roxy_fd::{IoctlError, IoctlRequest, MmapError, MmapTarget};
+use roxy_fd::{IoctlError, IoctlRequest, MmapError, MmapTarget, PollEvents};
 
 use crate::{DirEntry, FilePermissions, Metadata, OpenOptions, ResolvedPath, SeekFrom, VfsError};
 
@@ -35,6 +35,30 @@ pub trait FileHandle: Send {
     /// Returns an error when the object does not support device mapping.
     fn mmap(&mut self, _size: usize, _offset: u64) -> Result<MmapTarget, MmapError> {
         Err(MmapError::Unsupported)
+    }
+
+    /// Reports the events that are currently ready for this handle.
+    ///
+    /// The default implementation reports the handle as both readable and writable, which is
+    /// correct for regular files and most filesystem-backed handles. Character-device handles
+    /// should override this to reflect the actual device readiness.
+    fn poll(&self) -> Result<PollEvents, VfsError> {
+        Ok(PollEvents {
+            readable: true,
+            writable: true,
+            ..PollEvents::default()
+        })
+    }
+
+    /// Registers a listener to be notified when this handle's readiness may have changed.
+    ///
+    /// The default implementation returns an inactive registration (no-op). Handles that can
+    /// become ready asynchronously (e.g. device files) should override this.
+    fn register_poll_listener(
+        &self,
+        _listener: Arc<roxy_poll::PollListener>,
+    ) -> roxy_poll::PollRegistration {
+        roxy_poll::PollRegistration::inactive()
     }
 }
 

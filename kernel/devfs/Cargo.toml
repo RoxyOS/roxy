@@ -12,6 +12,7 @@ kernel-test = ["dep:linkme", "dep:roxy-test"]
 linkme = { workspace = true, optional = true }
 
 roxy-fd.workspace = true
+roxy-poll.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-utils.workspace = true
 roxy-vfs.workspace = true

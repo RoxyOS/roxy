@@ -3,6 +3,7 @@ use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 use roxy_fd::{
     FileError, FileMetadata, IoctlError, IoctlRequest, MmapError, MmapTarget, PollEvents,
 };
+use roxy_poll::{PollListener, PollRegistration};
 use roxy_utils::Lock;
 
 /// A character device exposed through the device filesystem.
@@ -39,6 +40,14 @@ pub trait Device: Send + Sync {
     /// Returns an error when the device does not support mapping or the range is invalid.
     fn mmap(&self, _size: usize, _offset: u64) -> Result<MmapTarget, MmapError> {
         Err(MmapError::Unsupported)
+    }
+
+    /// Registers a listener to be notified when this device's readiness may have changed.
+    ///
+    /// The default implementation returns an inactive registration (no-op). Devices that can
+    /// become readable asynchronously (e.g. input devices) should override this.
+    fn register_poll_listener(&self, _listener: Arc<PollListener>) -> PollRegistration {
+        PollRegistration::inactive()
     }
 
     /// Reads data from the device.

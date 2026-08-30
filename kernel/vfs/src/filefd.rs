@@ -1,8 +1,11 @@
+use alloc::sync::Arc;
+
 use roxy_fd::{
     File as FdFile, FileError as FdFileError, FileMetadata as FdFileMetadata,
     FileType as FdFileType, IoctlError, IoctlRequest, MmapError, MmapTarget, PollEvents,
     SeekError as FdSeekError, SeekFrom as FdSeekFrom, TruncateError as FdTruncateError,
 };
+use roxy_poll::{PollListener, PollRegistration};
 
 use crate::{FilePermissions, SeekFrom as VfsSeekFrom, VfsError, VfsFile};
 
@@ -10,11 +13,11 @@ use crate::{FilePermissions, SeekFrom as VfsSeekFrom, VfsError, VfsFile};
 // not to be confused with `FdFile::{seek, read, write}`
 impl FdFile for VfsFile {
     fn poll(&mut self) -> Result<PollEvents, FdFileError> {
-        Ok(PollEvents {
-            readable: true,
-            writable: true,
-            ..PollEvents::default()
-        })
+        VfsFile::poll(self).map_err(map_file_error)
+    }
+
+    fn register_poll_listener(&mut self, listener: Arc<PollListener>) -> PollRegistration {
+        VfsFile::register_poll_listener(self, listener)
     }
 
     fn is_terminal(&self) -> bool {
@@ -106,6 +109,7 @@ fn map_file_error(error: VfsError) -> FdFileError {
         | VfsError::NotDirectory
         | VfsError::PermissionDenied
         | VfsError::Unsupported => FdFileError::BadOperation,
+        VfsError::WouldBlock => FdFileError::WouldBlock,
         _ => FdFileError::Io,
     }
 }

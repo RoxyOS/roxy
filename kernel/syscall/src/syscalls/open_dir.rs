@@ -37,5 +37,6 @@ fn map_vfs_error(error: VfsError) -> Errno {
         VfsError::Unsupported => {
             crate::unsupported::unsupported_argument("open_dir.filesystem", 0, Errno::NotSupported)
         }
+        VfsError::WouldBlock => Errno::Again,
     }
 }
