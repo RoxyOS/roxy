@@ -26,6 +26,7 @@ bitflags! {
         const EXCLUSIVE = 0o200;
         const TRUNCATE = 0o1000;
         const APPEND = 0o2000;
+        const NOFOLLOW = 0o400_000;
         const LARGE_FILE = 0o100_000;
         const CLOEXEC = 0o2_000_000;
     }
@@ -49,6 +50,7 @@ impl OpenRequest {
             permissions: self.permissions()?,
             append: self.flags.contains(OpenFlags::APPEND),
             truncate: self.flags.contains(OpenFlags::TRUNCATE),
+            no_follow: self.flags.contains(OpenFlags::NOFOLLOW),
         };
 
         options.validate().map_err(map_vfs_error)?;
@@ -152,6 +154,7 @@ fn map_vfs_error(error: VfsError) -> Errno {
         VfsError::NoSpace => Errno::NoSpace,
         VfsError::Busy => Errno::Busy,
         VfsError::CrossDevice => Errno::CrossDevice,
+        VfsError::Loop => Errno::Loop,
         VfsError::Unsupported => unsupported("open.filesystem", 0),
     }
 }

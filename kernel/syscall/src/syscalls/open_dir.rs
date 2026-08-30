@@ -33,6 +33,7 @@ fn map_vfs_error(error: VfsError) -> Errno {
         VfsError::NoSpace => Errno::NoSpace,
         VfsError::Busy => Errno::Busy,
         VfsError::CrossDevice => Errno::CrossDevice,
+        VfsError::Loop => Errno::Loop,
         VfsError::Unsupported => {
             crate::unsupported::unsupported_argument("open_dir.filesystem", 0, Errno::NotSupported)
         }

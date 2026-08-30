@@ -28,6 +28,7 @@ impl Vfs {
             permissions: crate::FilePermissions::DEFAULT_FILE,
             append: false,
             truncate: true,
+            no_follow: false,
         };
         let mut file = self.open(path, options)?;
         let mut written = 0;

@@ -18,9 +18,9 @@ pub(crate) fn map_ext4(error: Ext4Error) -> VfsError {
         | Ext4Error::DotEntry => VfsError::InvalidPath,
         Ext4Error::NotASymlink
         | Ext4Error::NotUtf8
-        | Ext4Error::TooManySymlinks
         | Ext4Error::Encrypted
         | Ext4Error::IsASpecialFile => VfsError::InvalidInput,
+        Ext4Error::TooManySymlinks => VfsError::Loop,
         _ => VfsError::Unsupported,
     }
 }

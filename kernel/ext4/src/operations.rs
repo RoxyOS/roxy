@@ -2,11 +2,11 @@ use alloc::{boxed::Box, vec::Vec};
 
 use ext4plus::{file::File, inode::InodeMode};
 use roxy_vfs::{
-    CreationMode, DirEntry, FileHandle, FilePermissions, FileSystem, Metadata, OpenOptions,
-    ResolvedPath, VfsError,
+    CreationMode, DirEntry, FileHandle, FilePermissions, FileSystem, FileType, Metadata,
+    OpenOptions, ResolvedPath, VfsError,
 };
 
-use crate::{Ext4FileSystem, error::map_ext4, file::Ext4File, metadata};
+use crate::{Ext4FileSystem, error::map_ext4, file::Ext4File, metadata, metadata::map_file_type};
 
 impl FileSystem for Ext4FileSystem {
     fn open(
@@ -16,14 +16,24 @@ impl FileSystem for Ext4FileSystem {
     ) -> Result<Box<dyn FileHandle>, VfsError> {
         let _mutation = self.mutation.lock();
 
-        let inode = match self.resolve_inode(path, true) {
+        // With O_NOFOLLOW the final component is resolved without following, so a trailing
+        // symbolic link is reported as ELOOP instead of being followed.
+        let inode = match self.resolve_inode(path, !options.no_follow) {
             Ok(_) if options.creation == CreationMode::CreateNew => {
                 return Err(VfsError::AlreadyExists);
             }
-            Ok(inode) => inode,
+            Ok(inode) => {
+                if options.no_follow
+                    && map_file_type(inode.metadata().file_type) == FileType::Symlink
+                {
+                    return Err(VfsError::Loop);
+                }
+                inode
+            }
             Err(VfsError::NotFound) if options.creation != CreationMode::OpenExisting => {
                 self.create_regular(path, options.permissions)?;
 
+                // A newly created file is never a symbolic link, so it is safe to follow.
                 self.resolve_inode(path, true)?
             }
             Err(error) => return Err(error),

@@ -27,6 +27,7 @@ pub(crate) enum Errno {
     NameTooLong = 36,
     NoSys = 38,
     NotEmpty = 39,
+    Loop = 40,
     Overflow = 75,
     NotSocket = 88,
     NotSupported = 95,

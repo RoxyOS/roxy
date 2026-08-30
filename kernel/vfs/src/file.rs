@@ -28,6 +28,8 @@ pub struct OpenOptions {
     pub permissions: FilePermissions,
     pub append: bool,
     pub truncate: bool,
+    /// When set, the final path component is not followed if it is a symbolic link.
+    pub no_follow: bool,
 }
 
 impl Default for OpenOptions {
@@ -45,6 +47,7 @@ impl OpenOptions {
             permissions: FilePermissions::DEFAULT_FILE,
             append: false,
             truncate: false,
+            no_follow: false,
         }
     }
 
@@ -56,6 +59,7 @@ impl OpenOptions {
             permissions: FilePermissions::DEFAULT_FILE,
             append: false,
             truncate: false,
+            no_follow: false,
         }
     }
 

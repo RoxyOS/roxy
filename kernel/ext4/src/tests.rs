@@ -19,6 +19,7 @@ roxy_test::kernel_test!(
             permissions: FilePermissions::new(0o640).unwrap(),
             append: false,
             truncate: false,
+            no_follow: false,
         };
 
         let mut file = open(b"/a/file", options).unwrap();
@@ -89,3 +90,44 @@ roxy_test::kernel_test!(
         sync().unwrap();
     }
 );
+
+roxy_test::kernel_test!("roxy-ext4::open-no-follow", refuses_trailing_symlink, {
+    let options = OpenOptions {
+        access: OpenAccess::ReadWrite,
+        creation: CreationMode::CreateNew,
+        permissions: FilePermissions::new(0o640).unwrap(),
+        append: false,
+        truncate: false,
+        no_follow: false,
+    };
+    open(b"/target", options).unwrap();
+    symlink(b"/target", b"/link").unwrap();
+
+    // Without O_NOFOLLOW the trailing symlink is followed to the regular file.
+    let followed = open(
+        b"/link",
+        OpenOptions {
+            access: OpenAccess::ReadOnly,
+            no_follow: false,
+            ..OpenOptions::read_only()
+        },
+    )
+    .unwrap();
+    assert_eq!(followed.metadata().unwrap().file_type, FileType::Regular);
+
+    // With O_NOFOLLOW the trailing symlink is rejected with ELOOP.
+    match open(
+        b"/link",
+        OpenOptions {
+            access: OpenAccess::ReadOnly,
+            no_follow: true,
+            ..OpenOptions::read_only()
+        },
+    ) {
+        Err(VfsError::Loop) => {}
+        Err(other) => panic!("expected Err(Loop), got {other:?}"),
+        Ok(_) => panic!("expected Err(Loop), got Ok"),
+    }
+    unlink(b"/link").unwrap();
+    unlink(b"/target").unwrap();
+});
