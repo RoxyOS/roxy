@@ -36,6 +36,45 @@ impl ShutdownHow {
     }
 }
 
+/// The protocol level of a `getsockopt` request (`SOL_SOCKET`).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SockoptLevel {
+    /// The generic socket layer (`SOL_SOCKET`).
+    Socket,
+}
+
+impl SockoptLevel {
+    /// Decodes the raw `level` argument of `getsockopt(2)` (`SOL_SOCKET`=1).
+    #[must_use]
+    pub const fn from_raw(raw: u64) -> Option<Self> {
+        match raw {
+            1 => Some(Self::Socket),
+            _ => None,
+        }
+    }
+}
+
+/// A socket option name at the [`SockoptLevel::Socket`] level.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SockoptName {
+    /// The socket type (`SO_TYPE`).
+    Type,
+    /// The pending socket error (`SO_ERROR`).
+    Error,
+}
+
+impl SockoptName {
+    /// Decodes the raw `optname` argument of `getsockopt(2)` (`SO_TYPE`=3, `SO_ERROR`=4).
+    #[must_use]
+    pub const fn from_raw(raw: u64) -> Option<Self> {
+        match raw {
+            3 => Some(Self::Type),
+            4 => Some(Self::Error),
+            _ => None,
+        }
+    }
+}
+
 /// Socket-specific operations exposed by file objects that can act as sockets.
 ///
 /// Path arguments are normalized absolute paths; the caller resolves relative paths against the
@@ -84,15 +123,15 @@ pub trait SocketOps: Send {
     /// Reads a socket option into `buffer`, returning the number of bytes written.
     ///
     /// Only a minimal `SOL_SOCKET` subset is supported (`SO_TYPE`, `SO_ERROR`); unsupported
-    /// options return an error.
+    /// options are rejected during argument parsing.
     ///
     /// # Errors
     ///
-    /// Returns an error when the option is unsupported.
+    /// Returns an error when the option cannot be read.
     fn get_sockopt(
         &mut self,
-        layer: u32,
-        number: u32,
+        level: SockoptLevel,
+        optname: SockoptName,
         buffer: &mut [u8],
     ) -> Result<usize, SocketError>;
 

@@ -1,21 +1,39 @@
-use roxy_fd::Fd;
+use roxy_fd::{Fd, SockoptLevel, SockoptName};
 use roxy_memory::UserAddress;
 use roxy_process::DescriptorError;
 
-use crate::{SyscallResult, args::user_memory, errno::Errno, numbers::SyscallNumber, syscall};
+use crate::{
+    SyscallResult,
+    args::{SyscallArg, user_memory},
+    errno::Errno,
+    numbers::SyscallNumber,
+    syscall,
+};
+
+impl SyscallArg for SockoptLevel {
+    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        Self::from_raw(raw).ok_or_else(|| unsupported("getsockopt.level", raw, error))
+    }
+}
+
+impl SyscallArg for SockoptName {
+    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        Self::from_raw(raw).ok_or_else(|| unsupported("getsockopt.optname", raw, error))
+    }
+}
 
 syscall!(SyscallNumber::GetSockopt, handle(
     fd: Fd => BadFd,
-    layer: u64,
-    number: u64,
+    level: SockoptLevel => Invalid,
+    optname: SockoptName => Invalid,
     buffer: UserAddress => Fault,
     size: UserAddress => Fault,
 ));
 
 fn handle(
     fd: Fd,
-    layer: u64,
-    number: u64,
+    level: SockoptLevel,
+    optname: SockoptName,
     buffer: UserAddress,
     size: UserAddress,
 ) -> SyscallResult {
@@ -30,13 +48,7 @@ fn handle(
     let mut local_buffer = alloc::vec![0u8; max_len];
 
     let written = file
-        .socket_ops(|socket| {
-            socket.get_sockopt(
-                u32::try_from(layer).unwrap_or(u32::MAX),
-                u32::try_from(number).unwrap_or(u32::MAX),
-                &mut local_buffer,
-            )
-        })
+        .socket_ops(|socket| socket.get_sockopt(level, optname, &mut local_buffer))
         .ok_or(Errno::NotSocket)?
         .map_err(super::map_socket_error)?;
 
@@ -52,4 +64,8 @@ fn handle(
 
 fn map_descriptor_error(_: DescriptorError) -> Errno {
     Errno::BadFd
+}
+
+fn unsupported(operation: &str, argument: u64, errno: Errno) -> Errno {
+    crate::unsupported::unsupported_argument(operation, argument, errno)
 }

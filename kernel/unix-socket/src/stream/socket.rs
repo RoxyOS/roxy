@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use roxy_fd::{
     File, FileError, FileMetadata, FileType, OpenFile, PollEvents, SeekError, SeekFrom,
-    ShutdownHow, SocketError, SocketOps,
+    ShutdownHow, SocketError, SocketOps, SockoptLevel, SockoptName,
 };
 use roxy_poll::{PollListener, PollRegistration};
 use roxy_utils::Lock;
@@ -215,21 +215,17 @@ impl SocketOps for Socket {
 
     fn get_sockopt(
         &mut self,
-        layer: u32,
-        number: u32,
+        level: SockoptLevel,
+        optname: SockoptName,
         buffer: &mut [u8],
     ) -> Result<usize, SocketError> {
-        // Only the minimal `SOL_SOCKET` subset is exposed. The socket type is always stream.
-        if layer != 1 {
-            return Err(SocketError::InvalidState);
-        }
-
-        match number {
+        // Only the generic socket level is defined; other levels are rejected in the syscall
+        // handler during argument parsing, so reaching here implies `Socket`.
+        match (level, optname) {
             // SO_TYPE: report `SOCK_STREAM`.
-            3 => write_option(buffer, 1),
+            (SockoptLevel::Socket, SockoptName::Type) => write_option(buffer, 1),
             // SO_ERROR: report a zero (no pending error) error code.
-            4 => write_option(buffer, 0),
-            _ => Err(SocketError::InvalidState),
+            (SockoptLevel::Socket, SockoptName::Error) => write_option(buffer, 0),
         }
     }
 
