@@ -35,7 +35,9 @@ pub use signal::{
     has_pending_signal, pop_signal_frame, replace_masked_signals, replace_signal_action,
     send_signal, send_signal_to_pgid, signal_action_of, unblock_signals,
 };
-pub use table::{current_parent_process_id, current_process_id, process_pgid};
+pub use table::{
+    current_parent_process_id, current_process_id, process_pgid, try_current_process_id,
+};
 pub use wait::{WaitError, WaitResult, WaitTarget, wait_current};
 
 use alloc::{sync::Arc, vec::Vec};

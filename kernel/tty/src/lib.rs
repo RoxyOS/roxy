@@ -49,6 +49,7 @@ pub fn initialize(input: Arc<dyn InputDevice>, output: Arc<dyn TerminalOutput>) 
 
 impl InputListener for Tty {
     fn on_recive_input(&self) {
+        self.try_process_input_arrival();
         self.poll_listeners.notify();
     }
 }

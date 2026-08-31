@@ -71,7 +71,11 @@ pub(super) enum SignalSource {
 pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalError> {
     let thread_id = {
         let mut table = PROCESS_TABLE.lock();
-        let sender_pid = table.current_process_id().as_u64();
+        // Called from IRQ context (e.g. terminal ISIG) there may be no "current" thread;
+        // use 0 (kernel) as the sender pid in that case.
+        let sender_pid = roxy_thread::scheduler::try_current_thread_id()
+            .and_then(|tid| table.thread_owners.get(&tid).copied())
+            .map_or(0, ProcessId::as_u64);
         let Some(process) = table.processes.get_mut(&process_id) else {
             return Err(SignalError::NoSuchProcess);
         };
@@ -90,10 +94,18 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
             SignalAction::Handler { .. } | SignalAction::Default => {}
         }
 
+        // A signal with no sender (IRQ-generated, e.g. terminal ISIG) is attributed to the
+        // kernel; otherwise it is a user-process signal.
+        let source = if sender_pid == 0 {
+            SignalSource::Kernel
+        } else {
+            SignalSource::Process
+        };
+
         process.queue_signal(PendingSignal {
             signal,
             sender_pid,
-            source: SignalSource::Process,
+            source,
         });
         process.main_thread_id
     };

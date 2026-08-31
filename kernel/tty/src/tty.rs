@@ -94,6 +94,60 @@ impl Tty {
         Ok(())
     }
 
+    /// Processes one pending input event early when input arrives, without blocking.
+    ///
+    /// Called from the IRQ handler's listener callback (`on_recive_input`), so all locks use
+    /// `try_lock` and all delivery is best-effort: if a lock is contended, the read path will
+    /// handle the event later.
+    ///
+    /// This interrupt-time processing is what makes VINTR (Ctrl+C) deliver SIGINT immediately,
+    /// even when nobody is reading the TTY (e.g. a foreground child is running). Without it,
+    /// the interrupt character would sit queued until the next `read`.
+    pub(super) fn try_process_input_arrival(&self) {
+        let Some(mut discipline) = self.line_discipline.try_lock() else {
+            return;
+        };
+        let Some(event) = self.input.read_event() else {
+            return;
+        };
+        let Some(encoded) = encode_input_event(event) else {
+            return;
+        };
+        let result = discipline.process(encoded.as_bytes());
+        // Drop the discipline lock as soon as possible; echo and buffering use separate locks.
+        drop(discipline);
+
+        // Deliver the signal immediately — this is the whole point of interrupt-time processing.
+        if let Some(signal) = result.signal {
+            let pgid = *self.foreground_pgid.lock();
+            match pgid {
+                Some(pgid) => {
+                    roxy_process::send_signal_to_pgid(pgid, signal);
+                }
+                None => {
+                    // No foreground group selected; fall back to the reader. IRQ context may
+                    // have no current thread (e.g. the only thread is blocked in waitpid), so
+                    // skip when none can be resolved.
+                    if let Some(reader) = roxy_process::try_current_process_id() {
+                        let _ = roxy_process::send_signal(reader, signal);
+                    }
+                }
+            }
+        }
+
+        // Buffer and echo are best-effort — if the lock is contended the read path will handle
+        // the remaining events.
+        let Some(mut buffered) = self.buffered.try_lock() else {
+            return;
+        };
+        if let Some(buffer) = result.buffer {
+            buffered.extend(buffer);
+        }
+        if result.echo {
+            let _ = self.output.write(encoded.as_bytes());
+        }
+    }
+
     fn apply_result(&self, input: &[u8], result: ProcessResult) -> Result<(), FileError> {
         if let Some(signal) = result.signal {
             match *self.foreground_pgid.lock() {
