@@ -36,6 +36,11 @@
   architectural failure case.
 - Do not create placeholder crates, speculative abstractions, compatibility shims, silent stubs,
   or test-name special cases.
+- Any implementation that approximates, degrades, substitutes, or stubs behavior because a
+  capability is not yet implemented must carry an in-place `TODO(<missing-capability>)` or
+  `FIXME` comment naming the gap and the intended final behavior. A plain doc comment is not
+  enough: it reads as intended design rather than as debt. Substantial gaps are also recorded in
+  `ISSUES.md` in the same style as the existing ext4 `FIXME` entries.
 
 ## Userspace Debugging
 
