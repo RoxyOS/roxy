@@ -1,6 +1,6 @@
 # Syscall Subsystem Style
 
-This guide supplements the repository-wide `agent-instructions/STYLE.md` for syscall handlers.
+This guide supplements the repository-wide rules in `AGENTS.md` for syscall handlers.
 
 ## Handler Flow
 
@@ -27,7 +27,7 @@ call it from the handler after validation succeeds.
 
 ## Unsupported Requests
 
-The repository-wide rule (see `agent-instructions/GENERAL.md`) is that **no** userspace request may
+The repository-wide rule (see `AGENTS.md`) is that **no** userspace request may
 be silently degraded or silently ignored because kernel functionality is missing or incomplete.
 Every such path must emit the centralized `UNSUPPORTED` diagnostic before returning, via the
 `crate::unsupported::unsupported_argument` helper (through the per-syscall `unsupported()` shim).
