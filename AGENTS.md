@@ -168,6 +168,30 @@ procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`
   against a fetched source must be stated as an assumption in code and in the
   handoff summary, never presented as established fact.
 
+### Syscall ABI, Errno, and Semantics Compliance
+
+- Before implementing or modifying a syscall handler, ABI record, or errno mapping, consult
+  the authoritative sources below; do not reproduce struct layouts, padding, errno
+  numbers, or error-selection rules from memory.
+- Source precedence for Roxy ABI work:
+  - mlibc `sysdeps/roxy/include/abi-bits/*.h` first: the canonical definition of
+    Roxy errno numbers, struct layouts, signal and wait-status bits, and ABI
+    constants. Kernel `#[repr(C)]` records must match these headers byte-for-byte.
+  - man-pages (man7.org) for the Linux/POSIX syscall pages: authoritative for
+    argument semantics, errno selection (which error under which condition),
+    return-value conventions, and edge cases when Roxy follows the Linux personality.
+- Every ABI record names its authoritative source in a nearby comment (e.g.,
+  "layout per mlibc sysdeps/roxy/include/abi-bits/stat.h; sizes pinned by the
+  assertions below"), and size/offset assertions are computed against that source,
+  not recalled.
+- When behavior deliberately diverges from mlibc or man-pages (a Roxy extension or
+  an unimplemented part), state it with a `TODO(<missing-capability>)` or explicit
+  comment and route unsupported paths through the centralized diagnostic helper;
+  never silently substitute a wrong errno or layout.
+- Use the web research tools (web_search / source_check / fetch_content) to fetch
+  the man-pages page, and `read`/`rg` in the mlibc tree to confirm the layout or
+  number before writing code.
+
 ### Subsystem Design
 
 - Before changing a subsystem, find and read every applicable `DESIGN.md`, starting at the
