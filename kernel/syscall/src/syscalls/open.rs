@@ -26,6 +26,7 @@ bitflags! {
         const EXCLUSIVE = 0o200;
         const TRUNCATE = 0o1000;
         const APPEND = 0o2000;
+        const NONBLOCK = 0o4000;
         const NOFOLLOW = 0o400_000;
         const LARGE_FILE = 0o100_000;
         const CLOEXEC = 0o2_000_000;
@@ -101,8 +102,10 @@ impl OpenRequest {
             2 => StatusFlags::READ_WRITE.bits(),
             _ => 0,
         };
-        let extra =
-            self.flags.bits() & (StatusFlags::APPEND.bits() | StatusFlags::LARGE_FILE.bits());
+        let extra = self.flags.bits()
+            & (StatusFlags::APPEND.bits()
+                | StatusFlags::LARGE_FILE.bits()
+                | StatusFlags::NONBLOCK.bits());
 
         StatusFlags::from_bits_retain(access | extra)
     }
@@ -212,12 +215,18 @@ mod tests {
             OpenFlags::READ_WRITE | OpenFlags::APPEND | OpenFlags::LARGE_FILE,
             0,
         );
+        let read_write_nonblocking =
+            OpenRequest::new(OpenFlags::READ_WRITE | OpenFlags::NONBLOCK, 0);
 
         assert_eq!(read_only.status_flags(), StatusFlags::empty());
         assert_eq!(write_only.status_flags(), StatusFlags::WRITE_ONLY);
         assert_eq!(
             read_write.status_flags(),
             StatusFlags::READ_WRITE | StatusFlags::APPEND | StatusFlags::LARGE_FILE
+        );
+        assert_eq!(
+            read_write_nonblocking.status_flags(),
+            StatusFlags::READ_WRITE | StatusFlags::NONBLOCK
         );
     });
 }
