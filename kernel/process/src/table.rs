@@ -117,6 +117,21 @@ pub fn current_process_id() -> ProcessId {
     PROCESS_TABLE.lock().current_process_id()
 }
 
+/// Returns the current process ID when a current thread exists.
+///
+/// Unlike `current_process_id`, this does not panic when the scheduler has no current thread
+/// (e.g. during IRQ context while the only thread is blocked).
+#[must_use]
+pub fn try_current_process_id() -> Option<ProcessId> {
+    let thread_id = roxy_thread::scheduler::try_current_thread_id()?;
+    let process_id = PROCESS_TABLE
+        .lock()
+        .thread_owners
+        .get(&thread_id)
+        .copied()?;
+    Some(process_id)
+}
+
 pub fn current_parent_process_id() -> Option<ProcessId> {
     PROCESS_TABLE.lock().current_parent_process_id()
 }
