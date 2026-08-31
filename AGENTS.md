@@ -91,6 +91,16 @@ procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`
   `kernel/syscall/STYLE.md` when one exists.
 - Repository policy is written in English. Always speak to the user in Chinese.
 
+### Question Context
+
+- Questions inside this repository about how software behaves or is made to work — Xorg/X11
+  input, drivers, terminals, or any userspace or kernel feature — default to the Roxy OS
+  implementation under development here, not to the user's NixOS host.
+- Only treat a question as host-NixOS configuration when the user explicitly mentions the
+  host OS.
+- When the intended target is genuinely ambiguous, ask one clarifying question before
+  answering rather than guessing.
+
 ### User Handoff
 
 - After completing any change, explain to the user what changed, why it changed, and the resulting
