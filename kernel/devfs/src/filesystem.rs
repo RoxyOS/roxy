@@ -217,7 +217,10 @@ fn map_device_error(error: FileError) -> VfsError {
     match error {
         FileError::BadOperation => VfsError::Unsupported,
         FileError::WouldBlock => VfsError::WouldBlock,
-        FileError::Io | FileError::BrokenPipe | FileError::NotConnected => VfsError::Io,
+        FileError::Io
+        | FileError::BrokenPipe
+        | FileError::NotConnected
+        | FileError::Interrupted => VfsError::Io,
     }
 }
 

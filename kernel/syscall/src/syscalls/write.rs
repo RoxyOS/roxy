@@ -56,5 +56,6 @@ fn map_file_error(error: FileError) -> Errno {
         FileError::BrokenPipe => Errno::Pipe,
         FileError::NotConnected => Errno::NotConnected,
         FileError::Io => Errno::Io,
+        FileError::Interrupted => Errno::Interrupted,
     }
 }

@@ -16,6 +16,7 @@ pub enum ApplyWhen {
 bitflags! {
     #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
     pub struct LocalFlags: u32 {
+        const ISIG = 0o1;
         const ICANON = 0o2;
         const ECHO = 0o10;
     }

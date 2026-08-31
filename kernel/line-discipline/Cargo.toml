@@ -11,6 +11,7 @@ kernel-test = ["dep:linkme", "dep:roxy-test"]
 [dependencies]
 linkme = { workspace = true, optional = true }
 
+roxy-signal.workspace = true
 roxy-test = { workspace = true, optional = true }
 
 [lints]

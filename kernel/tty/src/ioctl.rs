@@ -5,6 +5,7 @@ use roxy_tty_types::{ApplyWhen, LocalFlags, Termios};
 use crate::Tty;
 
 const CS8: u32 = 0o60;
+const VINTR: usize = 0;
 const VERASE: usize = 2;
 const VMIN: usize = 6;
 
@@ -70,6 +71,7 @@ impl Tty {
 
 fn termios_from_settings(settings: LineDisciplineSettings) -> Termios {
     let mut control_characters = [0; 32];
+    control_characters[VINTR] = settings.intr_character;
     control_characters[VERASE] = settings.erase_character;
     control_characters[VMIN] = 1;
 
@@ -90,6 +92,8 @@ fn settings_from_termios(termios: Termios) -> LineDisciplineSettings {
         echo: termios.local_flags.contains(LocalFlags::ECHO),
         canonical: termios.local_flags.contains(LocalFlags::ICANON),
         erase_character: termios.control_characters[VERASE],
+        isig: termios.local_flags.contains(LocalFlags::ISIG),
+        intr_character: termios.control_characters[VINTR],
     }
 }
 
@@ -97,6 +101,7 @@ fn local_flags_from_settings(settings: LineDisciplineSettings) -> LocalFlags {
     let mut flags = LocalFlags::empty();
     flags.set(LocalFlags::ECHO, settings.echo);
     flags.set(LocalFlags::ICANON, settings.canonical);
+    flags.set(LocalFlags::ISIG, settings.isig);
 
     flags
 }
@@ -107,7 +112,7 @@ fn validate_termios(termios: &Termios) -> Result<(), IoctlError> {
     validate_fixed("ioctl.tcsetattr.output-flags", termios.output_flags, 0)?;
     validate_fixed("ioctl.tcsetattr.control-flags", termios.control_flags, CS8)?;
 
-    let supported_local = LocalFlags::ECHO | LocalFlags::ICANON;
+    let supported_local = LocalFlags::ECHO | LocalFlags::ICANON | LocalFlags::ISIG;
     let unsupported_local = termios.local_flags.difference(supported_local);
     validate_fixed("ioctl.tcsetattr.local-flags", unsupported_local.bits(), 0)?;
     validate_fixed(
@@ -119,6 +124,7 @@ fn validate_termios(termios: &Termios) -> Result<(), IoctlError> {
     validate_fixed("ioctl.tcsetattr.output-speed", termios.output_speed, 0)?;
 
     let mut expected = [0; 32];
+    expected[VINTR] = 0o3;
     expected[VERASE] = termios.control_characters[VERASE];
     expected[VMIN] = 1;
 
@@ -247,7 +253,7 @@ mod tests {
             let mut termios = Termios::default();
 
             file.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
-            termios.local_flags = LocalFlags::from_bits_retain(1);
+            termios.local_flags = LocalFlags::from_bits_retain(0o100);
 
             assert_eq!(
                 file.ioctl(IoctlRequest::SetTermios {
@@ -256,9 +262,27 @@ mod tests {
                 }),
                 Err(IoctlError::Unsupported {
                     operation: "ioctl.tcsetattr.local-flags",
-                    argument: 1,
+                    argument: 0o100,
                 })
             );
         }
     );
+
+    kernel_test!("roxy-tty::termios-isig", round_trips_isig_flag, {
+        let (tty, _output, file) = open(alloc::vec![]);
+        let mut termios = Termios::default();
+
+        file.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
+        assert!(tty.line_discipline.lock().settings.isig);
+        assert!(termios.local_flags.contains(LocalFlags::ISIG));
+        assert_eq!(termios.control_characters[0], b'\x03');
+
+        termios.local_flags.remove(LocalFlags::ISIG);
+        file.ioctl(IoctlRequest::SetTermios {
+            when: ApplyWhen::Immediate,
+            termios,
+        })
+        .unwrap();
+        assert!(!tty.line_discipline.lock().settings.isig);
+    });
 }

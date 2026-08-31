@@ -191,6 +191,8 @@ pub enum FileError {
     BrokenPipe,
     NotConnected,
     Io,
+    /// A pending signal interrupted a blocking operation; report `EINTR`.
+    Interrupted,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

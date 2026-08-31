@@ -41,6 +41,7 @@ fn map_file_error(error: FileError) -> Errno {
         FileError::BrokenPipe => Errno::Pipe,
         FileError::NotConnected => Errno::NotConnected,
         FileError::Io => Errno::Io,
+        FileError::Interrupted => Errno::Interrupted,
     }
 }
 const FAMILY_UNIX: u16 = 1;

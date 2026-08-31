@@ -138,6 +138,7 @@ fn fd_metadata(raw: u64) -> Result<StatAbi, Errno> {
             FileError::BrokenPipe => Errno::Pipe,
             FileError::NotConnected => Errno::NotConnected,
             FileError::Io => Errno::Io,
+            FileError::Interrupted => Errno::Interrupted,
         })
 }
 

@@ -8,7 +8,11 @@ pub(crate) struct Decoder {
 impl Decoder {
     pub(crate) const fn new() -> Self {
         Self {
-            keyboard: PS2Keyboard::new(ScancodeSet1::new(), Us104Key, HandleControl::Ignore),
+            keyboard: PS2Keyboard::new(
+                ScancodeSet1::new(),
+                Us104Key,
+                HandleControl::MapLettersToUnicode,
+            ),
         }
     }
 
@@ -106,6 +110,23 @@ mod tests {
         assert_eq!(press(&mut decoder, 0x3a), None);
         assert_eq!(press(&mut decoder, 0x1e), Some(InputEvent::Character('a')));
     });
+
+    kernel_test!(
+        "roxy-ps2::decoder-ctrl",
+        ctrl_translates_letters_to_control_characters,
+        {
+            let mut decoder = Decoder::new();
+            // LCtrl down (0x1d), then C (0x2e): Ctrl+C becomes 0x03.
+            assert_eq!(press(&mut decoder, 0x1d), None);
+            assert_eq!(
+                press(&mut decoder, 0x2e),
+                Some(InputEvent::Character('\u{3}'))
+            );
+            // LCtrl up (0x9d); plain C now returns lowercase 'c'.
+            assert_eq!(press(&mut decoder, 0x9d), None);
+            assert_eq!(press(&mut decoder, 0x2e), Some(InputEvent::Character('c')));
+        }
+    );
 
     kernel_test!(
         "roxy-ps2::decoder-symbols-and-extensions",

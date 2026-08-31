@@ -703,6 +703,7 @@ name = "roxy-line-discipline"
 version = "0.1.0"
 dependencies = [
  "linkme",
+ "roxy-signal",
  "roxy-test",
 ]
 
@@ -900,6 +901,8 @@ dependencies = [
  "roxy-input",
  "roxy-line-discipline",
  "roxy-poll",
+ "roxy-process",
+ "roxy-signal",
  "roxy-terminal",
  "roxy-test",
  "roxy-tty-types",

@@ -38,6 +38,10 @@ impl Tty {
                 return Ok(count);
             }
 
+            if roxy_process::has_pending_signal() {
+                return Err(FileError::Interrupted);
+            }
+
             assert!(!CurrentArchitectureBackend::interrupts_enabled());
             CurrentArchitectureBackend::wait_for_interrupt();
         }
@@ -90,6 +94,12 @@ impl Tty {
     }
 
     fn apply_result(&self, input: &[u8], result: ProcessResult) -> Result<(), FileError> {
+        if let Some(signal) = result.signal {
+            // TODO: No foreground process group exists yet; deliver to the reader, which is the
+            // foreground process while it is blocked in this TTY read.
+            let _ = roxy_process::send_signal(roxy_process::current_process_id(), signal);
+        }
+
         if let Some(buffer) = result.buffer {
             self.buffered.lock().extend(buffer);
         }

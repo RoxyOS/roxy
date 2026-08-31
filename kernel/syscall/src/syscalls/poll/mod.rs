@@ -206,9 +206,12 @@ fn poll_entry(entry: PollFdAbi) -> i16 {
     match file.poll() {
         Ok(events) => encode_events(requested, events),
         Err(FileError::BadOperation | FileError::WouldBlock) => 0,
-        Err(FileError::BrokenPipe | FileError::NotConnected | FileError::Io) => {
-            PollEventFlags::ERR.bits()
-        }
+        Err(
+            FileError::BrokenPipe
+            | FileError::NotConnected
+            | FileError::Io
+            | FileError::Interrupted,
+        ) => PollEventFlags::ERR.bits(),
     }
 }
 
