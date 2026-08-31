@@ -144,6 +144,30 @@ procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`
   available; use disassembly or other binary analysis only when the source is unavailable or the
   investigation specifically requires it.
 
+### Hardware Drivers and Spec Compliance
+
+- When implementing or modifying a hardware driver — PS/2 (8042, keyboard, mouse),
+  ACPI, PCI(e), interrupt controllers, timers, UART/16550, disk or network
+  controllers — locate and read the authoritative specification or reference for
+  the device before writing code. Do not derive register layouts, command
+  sequences, packet formats, or timing from memory.
+- Source precedence: the vendor or official specification first (e.g., IBM PC AT
+  Technical Reference for 8042, Adam Chapweske's PS/2 protocol reference, device
+  datasheets); the OSDev wiki pages (which cite and condense those specs) second;
+  a mature implementation such as a Linux or SeaBIOS driver only as a behavioral
+  cross-check, never as the primary authority for register definitions.
+- Record provenance in code: every driver carries a header comment naming the
+  specification used and the sections defining the implemented behavior
+  (e.g., "8042 behavior per IBM PC AT TRM §N; mouse protocol per Chapweske §N").
+  Without such a comment, treat the code as unverified.
+- When a detail must rely on undocumented or hardware-observed behavior, mark it
+  with a `TODO(<missing-spec>)` comment naming the gap and record substantial
+  gaps in `ISSUES.md`, following the existing ext4 `FIXME` style.
+- Use the web research tools (web_search / source_check / fetch_content) to pull
+  the actual spec or wiki text. A driver detail that could not be confirmed
+  against a fetched source must be stated as an assumption in code and in the
+  handoff summary, never presented as established fact.
+
 ### Subsystem Design
 
 - Before changing a subsystem, find and read every applicable `DESIGN.md`, starting at the
