@@ -2,7 +2,10 @@ use roxy_arch::{ResumeInfo, UserContext};
 use roxy_signal::{DefaultAction, Signal, SignalSet};
 use roxy_thread::scheduler;
 
-use crate::{ExitStatus, Process, ProcessId, ProcessState, signal_frame, table::PROCESS_TABLE};
+use crate::{
+    ExitStatus, Process, ProcessGroupId, ProcessId, ProcessState, signal_frame,
+    table::{PROCESS_TABLE, process_ids_in_group},
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SignalAction {
@@ -98,6 +101,18 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
     let _ = scheduler::wake_unconditionally(thread_id);
 
     Ok(())
+}
+
+/// Sends a signal to every process currently in the given process group.
+///
+/// The group membership snapshot is taken under the process-table lock before any delivery, so a
+/// process that exits mid-delivery is simply skipped by `send_signal`.
+pub fn send_signal_to_pgid(pgid: ProcessGroupId, signal: Signal) {
+    let targets = process_ids_in_group(pgid);
+
+    for target in targets {
+        let _ = send_signal(target, signal);
+    }
 }
 
 /// Applies one pending signal for the current process.

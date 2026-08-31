@@ -18,6 +18,7 @@ mod getcwd;
 mod getegid;
 mod geteuid;
 mod getgid;
+mod getpgid;
 mod getpid;
 mod getppid;
 mod getuid;
@@ -30,6 +31,8 @@ mod poll;
 mod read;
 mod read_entries;
 mod seek;
+mod setpgid;
+mod setsid;
 pub(crate) mod signal;
 mod sleep;
 mod socket;
@@ -44,7 +47,7 @@ mod write;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 68] = [
+pub(super) const SYSCALLS: [Syscall; 71] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -113,4 +116,7 @@ pub(super) const SYSCALLS: [Syscall; 68] = [
     chmod::SYSCALL,
     fchmod::SYSCALL,
     access::SYSCALL,
+    setpgid::SYSCALL,
+    getpgid::SYSCALL,
+    setsid::SYSCALL,
 ];

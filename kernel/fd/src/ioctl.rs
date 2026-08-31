@@ -9,6 +9,8 @@ pub enum IoctlRequest<'a> {
     SetTermios { when: ApplyWhen, termios: Termios },
     GetWindowSize(&'a mut WindowSize),
     SetWindowSize(WindowSize),
+    GetForegroundPgid(&'a mut u32),
+    SetForegroundPgid(u32),
     FbGetVarInfo(&'a mut FbVarInfo),
     FbSetVarInfo(FbVarInfo),
     FbGetFixedInfo(&'a mut FbFixedInfo),

@@ -4,7 +4,7 @@ use roxy_tty_types::{ApplyWhen, Termios, WindowSize};
 
 use super::terminal_abi;
 use crate::{
-    args::{Out, SyscallArg},
+    args::{Out, SyscallArg, user_memory},
     errno::Errno,
 };
 
@@ -14,6 +14,8 @@ pub(super) const TCSETSW: u64 = 0x5403;
 pub(super) const TCSETSF: u64 = 0x5404;
 pub(super) const TIOCGWINSZ: u64 = 0x5413;
 pub(super) const TIOCSWINSZ: u64 = 0x5414;
+pub(super) const TIOCGPGRP: u64 = 0x540f;
+pub(super) const TIOCSPGRP: u64 = 0x5410;
 
 pub(super) fn get_termios(file: &OpenFile, address: UserAddress) -> Result<(), Errno> {
     let output = Out::<terminal_abi::TermiosAbi>::parse(address.as_u64(), Errno::Fault)?;
@@ -50,5 +52,28 @@ pub(super) fn set_window_size(file: &OpenFile, address: UserAddress) -> Result<(
     let window_size = terminal_abi::read_window_size(address)?;
 
     file.ioctl(IoctlRequest::SetWindowSize(window_size))
+        .map_err(super::execute::map_ioctl_error)
+}
+
+pub(super) fn get_foreground_pgid(file: &OpenFile, address: UserAddress) -> Result<(), Errno> {
+    let output = Out::<u32>::parse(address.as_u64(), Errno::Fault)?;
+    output.validate()?;
+    let mut pgid = 0u32;
+
+    file.ioctl(IoctlRequest::GetForegroundPgid(&mut pgid))
+        .map_err(super::execute::map_ioctl_error)?;
+
+    // SAFETY: u32 has no padding and pgid is initialized.
+    unsafe { output.write(&pgid) }?;
+
+    Ok(())
+}
+
+pub(super) fn set_foreground_pgid(file: &OpenFile, address: UserAddress) -> Result<(), Errno> {
+    let mut pgid = 0u32;
+    // SAFETY: u32 has no padding and every bit pattern is valid.
+    unsafe { user_memory::read(address, &mut pgid) }?;
+
+    file.ioctl(IoctlRequest::SetForegroundPgid(pgid))
         .map_err(super::execute::map_ioctl_error)
 }

@@ -141,8 +141,10 @@ at the syscall boundary; process reports whether a matching child is pending or 
 The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
 survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
 multi-threaded exec cleanup, credentials, asynchronous interrupt-return delivery,
-process groups, and PID 1 reparenting are not. POSIX real-time signals are supported; standard-signal
+and PID 1 reparenting are not. POSIX real-time signals are supported; standard-signal
 coalescing is not, so every delivery is queued and the most recent one is delivered first.
-Orphan zombies are retained because no init reaper adopts them. Process-identity callers encode an
-absent parent as PID 0. `chdir` can replace cwd after VFS validation; descriptor-based `fchdir`
-remains unsupported.
+Process groups are tracked (`pgid`/`session_id`), with `setpgid`/`getpgid`/`setsid` and
+foreground-group selection through `TIOCSPGRP`/`TIOCGPGRP`; session validation beyond membership
+recording remains minimal (see `ISSUES.md`). Orphan zombies are retained because no init reaper
+adopts them. Process-identity callers encode an absent parent as PID 0. `chdir` can replace cwd
+after VFS validation; descriptor-based `fchdir` remains unsupported.

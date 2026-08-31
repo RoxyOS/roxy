@@ -65,7 +65,7 @@ mod tests {
     use roxy_vm::AddrSpace;
 
     use super::ProcessTable;
-    use crate::{ExitStatus, Process};
+    use crate::{ExitStatus, Process, ProcessGroupId};
 
     kernel_test!("roxy-process::table-lifecycle", table_lifecycle, {
         let baseline = statistics().allocated_frames;
@@ -83,6 +83,8 @@ mod tests {
         let child_working_directory = ResolvedPath::resolve(b"/usr").unwrap();
         let child_process = Process::from_fork(
             process_id,
+            ProcessGroupId::from(process_id),
+            None,
             child_thread.id(),
             child_addrspace.clone(),
             child_working_directory,

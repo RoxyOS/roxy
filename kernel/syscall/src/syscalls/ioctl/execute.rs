@@ -17,6 +17,8 @@ pub(super) fn execute(
         terminal::TCSETSF => terminal::set_termios(file, ApplyWhen::Flush, argument),
         terminal::TIOCGWINSZ => terminal::get_window_size(file, argument),
         terminal::TIOCSWINSZ => terminal::set_window_size(file, argument),
+        terminal::TIOCGPGRP => terminal::get_foreground_pgid(file, argument),
+        terminal::TIOCSPGRP => terminal::set_foreground_pgid(file, argument),
         framebuffer::FBIOGET_VSCREENINFO => framebuffer::get_var_screen_info(file, argument),
         framebuffer::FBIOPUT_VSCREENINFO => framebuffer::set_var_screen_info(file, argument),
         framebuffer::FBIOGET_FSCREENINFO => framebuffer::get_fix_screen_info(file, argument),

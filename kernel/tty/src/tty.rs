@@ -23,6 +23,7 @@ impl Tty {
             buffered: Lock::new(alloc::vec::Vec::new()),
             read_lock: Lock::new(()),
             poll_listeners: Arc::new(roxy_poll::PollListeners::new()),
+            foreground_pgid: Lock::new(None),
         }
     }
 
@@ -95,9 +96,15 @@ impl Tty {
 
     fn apply_result(&self, input: &[u8], result: ProcessResult) -> Result<(), FileError> {
         if let Some(signal) = result.signal {
-            // TODO: No foreground process group exists yet; deliver to the reader, which is the
-            // foreground process while it is blocked in this TTY read.
-            let _ = roxy_process::send_signal(roxy_process::current_process_id(), signal);
+            match *self.foreground_pgid.lock() {
+                Some(pgid) => {
+                    roxy_process::send_signal_to_pgid(pgid, signal);
+                }
+                None => {
+                    // TODO(foreground-process-group): no group selected; fall back to the reader.
+                    let _ = roxy_process::send_signal(roxy_process::current_process_id(), signal);
+                }
+            }
         }
 
         if let Some(buffer) = result.buffer {

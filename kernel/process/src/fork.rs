@@ -6,7 +6,7 @@ use roxy_thread::{Thread, ThreadCreateError, scheduler};
 use roxy_vfs::{FilePermissions, ResolvedPath};
 use roxy_vm::VmError;
 
-use crate::{Process, ProcessId, table::PROCESS_TABLE};
+use crate::{Process, ProcessGroupId, ProcessId, table::PROCESS_TABLE};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ForkError {
@@ -17,6 +17,8 @@ pub enum ForkError {
 /// Process-owned state copied while creating a fork child.
 struct ForkInfo {
     parent_process_id: ProcessId,
+    pgid: ProcessGroupId,
+    session_id: Option<ProcessId>,
     addrspace: roxy_vm::AddrSpaceHandle,
     fds: FdTable,
     working_directory: ResolvedPath,
@@ -42,6 +44,8 @@ pub fn fork_current(context: UserContext) -> Result<ProcessId, ForkError> {
 
         ForkInfo {
             parent_process_id: process_id,
+            pgid: process.pgid,
+            session_id: process.session_id,
             addrspace: process
                 .addrspace
                 .clone()
@@ -57,6 +61,8 @@ pub fn fork_current(context: UserContext) -> Result<ProcessId, ForkError> {
     let child_thread = Thread::new_user_resume(child_context).map_err(map_thread_error)?;
     let child_process = Process::from_fork(
         snapshot.parent_process_id,
+        snapshot.pgid,
+        snapshot.session_id,
         child_thread.id(),
         child_addrspace,
         snapshot.working_directory,

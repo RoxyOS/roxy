@@ -1,4 +1,4 @@
-use roxy_process::ProcessId;
+use roxy_process::{ProcessGroupId, ProcessId};
 
 use super::SyscallArg;
 use crate::{errno::Errno, unsupported::unsupported_argument};
@@ -16,9 +16,26 @@ impl SyscallArg for ProcessId {
     }
 }
 
+impl SyscallArg for ProcessGroupId {
+    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
+        let pgid = raw.cast_signed();
+        if pgid <= 0 {
+            return Err(unsupported_argument(
+                "process_group_id",
+                pgid,
+                Errno::NotSupported,
+            ));
+        }
+
+        let pgid = ProcessGroupId::new(pgid.cast_unsigned()).unwrap();
+
+        Ok(pgid)
+    }
+}
+
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use roxy_process::ProcessId;
+    use roxy_process::{ProcessGroupId, ProcessId};
     use roxy_test::kernel_test;
 
     use super::SyscallArg;
@@ -28,6 +45,17 @@ mod tests {
         assert_eq!(ProcessId::parse(42, Errno::Invalid).unwrap().as_u64(), 42);
         assert_eq!(
             ProcessId::parse(0, Errno::Invalid),
+            Err(Errno::NotSupported)
+        );
+    });
+
+    kernel_test!("roxy-syscall::process-group-id-argument", validates_pgid, {
+        assert_eq!(
+            ProcessGroupId::parse(42, Errno::Invalid).unwrap().as_u64(),
+            42
+        );
+        assert_eq!(
+            ProcessGroupId::parse(0, Errno::Invalid),
             Err(Errno::NotSupported)
         );
     });

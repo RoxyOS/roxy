@@ -13,6 +13,7 @@ use roxy_fd::OpenFile;
 use roxy_input::{InputDevice, InputListener};
 use roxy_line_discipline::LineDiscipline;
 use roxy_poll::PollListeners;
+use roxy_process::ProcessGroupId;
 use roxy_terminal::TerminalOutput;
 use roxy_tty_types::WindowSize;
 use roxy_utils::Lock;
@@ -28,6 +29,8 @@ struct Tty {
     buffered: Lock<Vec<u8>>,
     read_lock: Lock<()>,
     poll_listeners: Arc<PollListeners>,
+    /// The process group that receives terminal-generated signals, when one is selected.
+    foreground_pgid: Lock<Option<ProcessGroupId>>,
 }
 
 static TTY: Once<Arc<Tty>> = Once::new();

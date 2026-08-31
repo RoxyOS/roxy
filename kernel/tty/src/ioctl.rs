@@ -1,5 +1,6 @@
 use roxy_fd::{IoctlError, IoctlRequest};
 use roxy_line_discipline::LineDisciplineSettings;
+use roxy_process::ProcessGroupId;
 use roxy_tty_types::{ApplyWhen, LocalFlags, Termios};
 
 use crate::Tty;
@@ -26,6 +27,26 @@ impl Tty {
             }
             IoctlRequest::SetWindowSize(window_size) => {
                 *self.window_size.lock() = window_size;
+                Ok(())
+            }
+            IoctlRequest::GetForegroundPgid(pgid) => {
+                *pgid = self
+                    .foreground_pgid
+                    .lock()
+                    .map(ProcessGroupId::as_u64)
+                    .unwrap_or(0)
+                    .try_into()
+                    .map_err(|_| IoctlError::Invalid)?;
+                Ok(())
+            }
+            IoctlRequest::SetForegroundPgid(pgid) => {
+                let pgid = if pgid == 0 {
+                    None
+                } else {
+                    Some(ProcessGroupId::new(u64::from(pgid)).ok_or(IoctlError::Invalid)?)
+                };
+
+                *self.foreground_pgid.lock() = pgid;
                 Ok(())
             }
             IoctlRequest::FbGetVarInfo(_)

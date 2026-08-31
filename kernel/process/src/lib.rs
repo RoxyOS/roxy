@@ -13,6 +13,7 @@ mod memory;
 mod signal;
 mod signal_frame;
 pub use signal_frame::SIGRETURN_SYSCALL_NUMBER;
+mod setpgid;
 mod startup_stack;
 mod table;
 mod wait;
@@ -27,13 +28,14 @@ pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, map_physical,
     protect_memory, unmap_anonymous, unmap_memory,
 };
+pub use setpgid::{CreateSessionError, SetPgidError, create_session, set_pgid};
 use signal::PendingSignal;
 pub use signal::{
     SignalAction, SignalError, block_signals, currently_blocked_signals, deliver_pending_signal,
     has_pending_signal, pop_signal_frame, replace_masked_signals, replace_signal_action,
-    send_signal, signal_action_of, unblock_signals,
+    send_signal, send_signal_to_pgid, signal_action_of, unblock_signals,
 };
-pub use table::{current_parent_process_id, current_process_id};
+pub use table::{current_parent_process_id, current_process_id, process_pgid};
 pub use wait::{WaitError, WaitResult, WaitTarget, wait_current};
 
 use alloc::{sync::Arc, vec::Vec};
@@ -51,6 +53,8 @@ use roxy_vm::AddrSpaceHandle;
 /// The process retains it until its thread has been safely reaped on another kernel stack.
 struct Process {
     id: ProcessId,
+    pgid: ProcessGroupId,
+    session_id: Option<ProcessId>,
     parent_process_id: Option<ProcessId>,
     addrspace: Option<AddrSpaceHandle>,
     main_thread_id: ThreadId,
@@ -83,6 +87,28 @@ impl ProcessId {
     #[must_use]
     pub const fn as_u64(self) -> u64 {
         self.0
+    }
+}
+
+/// Identifies a process group, whose value is the PID of the group's leader process.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct ProcessGroupId(u64);
+
+impl ProcessGroupId {
+    #[must_use]
+    pub const fn new(value: u64) -> Option<Self> {
+        if value == 0 { None } else { Some(Self(value)) }
+    }
+
+    #[must_use]
+    pub const fn as_u64(self) -> u64 {
+        self.0
+    }
+}
+
+impl From<ProcessId> for ProcessGroupId {
+    fn from(pid: ProcessId) -> Self {
+        Self(pid.as_u64())
     }
 }
 

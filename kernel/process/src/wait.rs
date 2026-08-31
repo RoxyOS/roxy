@@ -241,6 +241,8 @@ mod tests {
     ) -> Process {
         let mut process = Process::from_fork(
             parent_id,
+            crate::ProcessGroupId::from(parent_id),
+            None,
             thread_id,
             AddrSpace::new().unwrap().into_handle(),
             ResolvedPath::root(),

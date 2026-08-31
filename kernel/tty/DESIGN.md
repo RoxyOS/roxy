@@ -56,9 +56,8 @@ discards the readable buffer, partial canonical line, and currently queued input
 Each TTY snapshots its initial window size from the selected `TerminalOutput`. Framebuffer-backed
 terminals report their actual text grid and pixel dimensions; endpoints without a window-size
 concept report zero fields. Window-size ioctls read or replace the TTY's shared state after
-initialization. Changing it does not emit `SIGWINCH` because the current process model has neither
-foreground process groups nor `SIGWINCH` delivery; adding those facilities must connect
-notification after the size update.
+initialization. Changing it does not emit `SIGWINCH` because the current process model has no
+`SIGWINCH` delivery; adding it must connect notification after the size update.
 
 The adapter defines the character-device metadata so hardware backends do not need to know
 user-facing file identity or permissions.
@@ -67,6 +66,9 @@ user-facing file identity or permissions.
 
 The current line discipline supports configurable erase, newline canonical processing, raw event
 delivery when canonical mode is disabled, and `ISIG`/`VINTR` interrupt-character signal generation.
-Input/output transformations, non-default speeds and character sizes, `VMIN`/`VTIME` combinations,
-other control characters, PTYs, job control, foreground process groups, and other signal
-generation remain unsupported.
+The TTY tracks a foreground process group selected through `TIOCSPGRP`/`TIOCGPGRP`; when one is
+selected, terminal-generated signals are delivered to every process in it, and the blocked reader
+returns `EINTR` so delivery happens at the userspace return boundary. Without a selected group the
+TTY falls back to the current reader. Input/output transformations, non-default speeds and
+character sizes, `VMIN`/`VTIME` combinations, other control characters, PTYs, job control, and
+other signal generation remain unsupported.

@@ -37,6 +37,23 @@ impl ProcessTable {
         self.processes[&process_id].parent_process_id
     }
 
+    /// Collects the IDs of every process currently in the given process group.
+    pub(super) fn process_ids_by_pgid(
+        &self,
+        pgid: crate::ProcessGroupId,
+    ) -> alloc::vec::Vec<ProcessId> {
+        self.processes
+            .iter()
+            .filter(|(_, process)| process.pgid == pgid)
+            .map(|(_, process)| process.id)
+            .collect()
+    }
+
+    /// Returns the process group of the given process.
+    pub(super) fn process_pgid(&self, process_id: ProcessId) -> Option<crate::ProcessGroupId> {
+        self.processes.get(&process_id).map(|process| process.pgid)
+    }
+
     pub(super) const fn new() -> Self {
         Self {
             processes: BTreeMap::new(),
@@ -102,4 +119,14 @@ pub fn current_process_id() -> ProcessId {
 
 pub fn current_parent_process_id() -> Option<ProcessId> {
     PROCESS_TABLE.lock().current_parent_process_id()
+}
+
+/// Returns the IDs of every process currently in the given process group.
+pub fn process_ids_in_group(pgid: crate::ProcessGroupId) -> alloc::vec::Vec<ProcessId> {
+    PROCESS_TABLE.lock().process_ids_by_pgid(pgid)
+}
+
+/// Returns the process group of the given process, if it exists.
+pub fn process_pgid(process_id: ProcessId) -> Option<crate::ProcessGroupId> {
+    PROCESS_TABLE.lock().process_pgid(process_id)
 }

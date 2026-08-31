@@ -8,7 +8,8 @@ use roxy_vfs::{FilePermissions, ResolvedPath};
 use roxy_vm::AddrSpaceHandle;
 
 use crate::{
-    Process, ProcessError, ProcessId, ProcessState, image, initial_fds, table::PROCESS_TABLE,
+    Process, ProcessError, ProcessGroupId, ProcessId, ProcessState, image, initial_fds,
+    table::PROCESS_TABLE,
 };
 
 static NEXT_PROCESS_ID: AtomicU64 = AtomicU64::new(1);
@@ -44,8 +45,13 @@ impl Process {
         addrspace: AddrSpaceHandle,
         fds: roxy_fd::FdTable,
     ) -> Self {
+        let id = ProcessId(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed));
+        let pgid = ProcessGroupId::from(id);
+
         Self {
-            id: ProcessId(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed)),
+            id,
+            pgid,
+            session_id: None,
             parent_process_id: None,
             addrspace: Some(addrspace),
             main_thread_id,
@@ -60,8 +66,11 @@ impl Process {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn from_fork(
         parent_process_id: ProcessId,
+        pgid: ProcessGroupId,
+        session_id: Option<ProcessId>,
         main_thread_id: ThreadId,
         addrspace: AddrSpaceHandle,
         working_directory: ResolvedPath,
@@ -71,6 +80,8 @@ impl Process {
     ) -> Self {
         Self {
             id: ProcessId(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed)),
+            pgid,
+            session_id,
             parent_process_id: Some(parent_process_id),
             addrspace: Some(addrspace),
             main_thread_id,
