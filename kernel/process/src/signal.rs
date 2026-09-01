@@ -59,15 +59,17 @@ pub(super) enum SignalSource {
     Kernel,
 }
 
-/// Queues a signal for a running process and wakes it if it is blocked.
+/// Queues a signal for a process and wakes its thread when the process should resume.
 ///
-/// The target consumes the queued signal at a userspace return boundary. Sending never exits the
+/// A stopped process is resumed by SIGCONT and terminated by SIGKILL; any other signal is
+/// queued but does not wake the stopped thread (it is delivered after continuation). The
+/// target consumes the queued signal at a userspace return boundary. Sending never exits the
 /// target directly because its thread may still be executing on its own kernel stack.
 ///
 /// # Errors
 ///
-/// Returns an error when the target process does not exist or the effective default action is not
-/// implemented.
+/// Returns an error when the target process does not exist or the effective default action is
+/// not implemented.
 pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalError> {
     let thread_id = {
         let mut table = PROCESS_TABLE.lock();
@@ -80,34 +82,76 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
             return Err(SignalError::NoSuchProcess);
         };
 
-        if !matches!(process.state, ProcessState::Running) {
-            return Err(SignalError::NoSuchProcess);
-        }
-
-        match process.signal_action_of(signal) {
-            SignalAction::Ignore => return Ok(()),
-            SignalAction::Default
-                if matches!(signal.default_action(), DefaultAction::Unsupported) =>
-            {
-                return Err(SignalError::UnsupportedAction);
+        match process.state {
+            // Reaped or exiting processes are no longer reachable.
+            ProcessState::Exited(_) | ProcessState::Exiting(_) => {
+                return Err(SignalError::NoSuchProcess);
             }
-            SignalAction::Handler { .. } | SignalAction::Default => {}
+            ProcessState::Stopped(_) => match signal {
+                // SIGCONT resumes the process: clear the stopped state so the default action
+                // returns the thread to the syscall return it was stopped in.
+                Signal::Continue => {
+                    process.state = ProcessState::Running;
+                    process.main_thread_id
+                }
+                // SIGKILL must still terminate a stopped process: queue it and wake the
+                // thread so it reaches the return boundary that runs the terminate default.
+                Signal::Kill => {
+                    process.queue_signal(PendingSignal {
+                        signal,
+                        sender_pid,
+                        source: SignalSource::Kernel,
+                    });
+                    process.main_thread_id
+                }
+                // Further stop signals are ignored; everything else stays queued until
+                // SIGCONT resumes the process.
+                _ => {
+                    if matches!(signal.default_action(), DefaultAction::Stop) {
+                        return Ok(());
+                    }
+                    process.queue_signal(PendingSignal {
+                        signal,
+                        sender_pid,
+                        source: SignalSource::Kernel,
+                    });
+                    return Ok(());
+                }
+            },
+            ProcessState::Running => {
+                // SIGCONT's default action on a running process is a no-op.
+                if signal == Signal::Continue
+                    && matches!(process.signal_action_of(signal), SignalAction::Default)
+                {
+                    return Ok(());
+                }
+
+                match process.signal_action_of(signal) {
+                    SignalAction::Ignore => return Ok(()),
+                    SignalAction::Default
+                        if matches!(signal.default_action(), DefaultAction::Unsupported) =>
+                    {
+                        return Err(SignalError::UnsupportedAction);
+                    }
+                    SignalAction::Handler { .. } | SignalAction::Default => {}
+                }
+
+                // A signal with no sender (IRQ-generated, e.g. terminal ISIG) is attributed
+                // to the kernel; otherwise it is a user-process signal.
+                let source = if sender_pid == 0 {
+                    SignalSource::Kernel
+                } else {
+                    SignalSource::Process
+                };
+
+                process.queue_signal(PendingSignal {
+                    signal,
+                    sender_pid,
+                    source,
+                });
+                process.main_thread_id
+            }
         }
-
-        // A signal with no sender (IRQ-generated, e.g. terminal ISIG) is attributed to the
-        // kernel; otherwise it is a user-process signal.
-        let source = if sender_pid == 0 {
-            SignalSource::Kernel
-        } else {
-            SignalSource::Process
-        };
-
-        process.queue_signal(PendingSignal {
-            signal,
-            sender_pid,
-            source,
-        });
-        process.main_thread_id
     };
 
     let _ = scheduler::wake_unconditionally(thread_id);
@@ -378,11 +422,36 @@ fn take_pending_unmasked_signal() -> Option<PendingSignal> {
 fn do_default_action(signal: Signal, action: DefaultAction) {
     match action {
         DefaultAction::Terminate => crate::exit_current(ExitStatus::signaled(signal)),
-        DefaultAction::Ignore => {}
+        DefaultAction::Stop => stop_current(signal),
+        // SIGCONT's default action is handled by `send_signal` (it resumes a stopped process
+        // directly); a queued Continue would only arise from a handler disposition, which is
+        // never delivered through this default-action path.
+        DefaultAction::Continue | DefaultAction::Ignore => {}
         DefaultAction::Unsupported => {
             unreachable!("unsupported signal actions cannot be queued")
         }
     }
+}
+
+/// Suspends the current process: records its stopped state, wakes any parent waiting with
+/// WUNTRACED, and blocks the current thread until SIGCONT resumes it.
+///
+/// Runs on the process's own thread at a userspace return boundary, so interrupts are disabled
+/// and blocking here is safe. `send_signal` clears the stopped state and wakes the thread on
+/// SIGCONT; the thread then returns from the block and the interrupted syscall completes.
+fn stop_current(signal: Signal) {
+    let block = {
+        let mut table = PROCESS_TABLE.lock();
+        let process_id = table.current_process_id();
+        let process = table
+            .processes
+            .get_mut(&process_id)
+            .expect("current process");
+        process.state = ProcessState::Stopped(signal);
+        table.wake_state_waiter(process_id);
+        scheduler::prepare_block_current()
+    };
+    block.perform();
 }
 
 impl Process {

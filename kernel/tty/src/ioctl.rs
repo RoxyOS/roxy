@@ -34,22 +34,50 @@ impl Tty {
                 *pgid = self
                     .foreground_pgid
                     .lock()
-                    .map(ProcessGroupId::as_u64)
-                    .unwrap_or(0)
+                    .ok_or(IoctlError::NotTty)?
+                    .as_u64()
                     .try_into()
                     .map_err(|_| IoctlError::Invalid)?;
                 Ok(())
             }
             IoctlRequest::SetForegroundPgid(pgid) => {
-                let pgid = if pgid == 0 {
-                    None
-                } else {
-                    Some(ProcessGroupId::new(u64::from(pgid)).ok_or(IoctlError::Invalid)?)
-                };
+                // The caller must have this terminal as its controlling terminal and belong to
+                // the terminal's session (Linux `tiocspgrp`). The target group must exist and
+                // belong to the same session.
+                let session = (*self.owner_session_id.lock()).ok_or(IoctlError::NotTty)?;
+                let caller_session =
+                    roxy_process::current_process_session_id().ok_or(IoctlError::NotTty)?;
+                if caller_session != session {
+                    return Err(IoctlError::NotTty);
+                }
 
-                *self.foreground_pgid.lock() = pgid;
+                let pgid = ProcessGroupId::new(u64::from(pgid)).ok_or(IoctlError::Invalid)?;
+                let target_session =
+                    roxy_process::process_session_of_pgid(pgid).ok_or(IoctlError::Invalid)?;
+                if target_session != session {
+                    return Err(IoctlError::Invalid);
+                }
+
+                // POSIX: a background process group calling TIOCSPGRP must be sent SIGTTOU
+                // (unless the signal is blocked or ignored).
+                let caller_pgid = roxy_process::current_process_group_id();
+                if *self.foreground_pgid.lock() != Some(caller_pgid) {
+                    let sigttou = roxy_signal::Signal::TerminalOutput;
+                    let blocked = roxy_process::currently_blocked_signals()
+                        .contains(roxy_signal::SignalSet::from_signal(sigttou));
+                    let ignored = matches!(
+                        roxy_process::signal_action_of(sigttou),
+                        roxy_process::SignalAction::Ignore
+                    );
+                    if !blocked && !ignored {
+                        roxy_process::send_signal_to_pgid(caller_pgid, sigttou);
+                    }
+                }
+
+                *self.foreground_pgid.lock() = Some(pgid);
                 Ok(())
             }
+            IoctlRequest::SetControllingTerminal { force } => self.set_controlling_terminal(force),
             IoctlRequest::FbGetVarInfo(_)
             | IoctlRequest::FbSetVarInfo(_)
             | IoctlRequest::FbGetFixedInfo(_) => Err(IoctlError::NotTty),
@@ -90,6 +118,33 @@ impl Tty {
         if let Some(released) = released {
             self.buffered.lock().extend(released);
         }
+
+        Ok(())
+    }
+
+    /// Makes the calling process's session the controller of this terminal (`TIOCSCTTY`).
+    ///
+    /// On success the terminal's `owner_session_id` and its initial foreground process group
+    /// are bound to the caller's session, making this terminal that session's controlling
+    /// terminal. Only a session leader may do this, and the terminal must not already be
+    /// owned unless `force` requests stealing it.
+    fn set_controlling_terminal(&self, force: bool) -> Result<(), IoctlError> {
+        // The caller must be a session leader that does not already have a controlling terminal.
+        if !roxy_process::is_current_session_leader() {
+            return Err(IoctlError::NotTty);
+        }
+
+        let mut session = self.owner_session_id.lock();
+        if session.is_some() && !force {
+            return Err(IoctlError::NotTty);
+        }
+
+        let caller_pgid = roxy_process::current_process_group_id();
+        let caller_session =
+            roxy_process::current_process_session_id().ok_or(IoctlError::NotTty)?;
+
+        *session = Some(caller_session);
+        *self.foreground_pgid.lock() = Some(caller_pgid);
 
         Ok(())
     }

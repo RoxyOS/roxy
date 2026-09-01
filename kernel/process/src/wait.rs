@@ -1,3 +1,4 @@
+use roxy_signal::Signal;
 use roxy_thread::{ThreadId, scheduler};
 
 use crate::{ExitStatus, ProcessId, ProcessState, table::PROCESS_TABLE, table::ProcessTable};
@@ -17,13 +18,27 @@ impl WaitTarget {
     }
 }
 
+/// Options controlling which child state changes a wait observes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WaitOptions {
+    /// Return immediately when no matching child has changed state (`WNOHANG`).
+    pub no_hang: bool,
+    /// Report stopped children in addition to exited ones (`WUNTRACED`).
+    pub wuntraced: bool,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum WaitResult {
     Exited {
         process_id: ProcessId,
         status: ExitStatus,
     },
-    /// A matching child exists, but none has exited; returned only by a non-blocking wait.
+    /// A matching child was stopped by a signal; it is not reaped and resumes on SIGCONT.
+    Stopped {
+        process_id: ProcessId,
+        signal: Signal,
+    },
+    /// A matching child exists, but none has changed state; returned only by a non-blocking wait.
     Pending,
 }
 
@@ -32,7 +47,7 @@ pub enum WaitError {
     NoChild,
 }
 
-/// Waits for one matching child to exit and reaps it.
+/// Waits for one matching child to change state and reaps exited children.
 ///
 /// # Errors
 ///
@@ -46,7 +61,7 @@ pub enum WaitError {
     clippy::redundant_else,
     reason = "the explicit branches distinguish non-blocking and blocking wait semantics"
 )]
-pub fn wait_current(target: WaitTarget, no_hang: bool) -> Result<WaitResult, WaitError> {
+pub fn wait_current(target: WaitTarget, options: WaitOptions) -> Result<WaitResult, WaitError> {
     loop {
         let mut table = PROCESS_TABLE.lock();
         let parent_process_id = table.current_process_id();
@@ -58,11 +73,18 @@ pub fn wait_current(target: WaitTarget, no_hang: bool) -> Result<WaitResult, Wai
             return Ok(WaitResult::Exited { process_id, status });
         }
 
+        if options.wuntraced
+            && let Some((process_id, signal)) =
+                table.find_stopped_matching_child(parent_process_id, target)
+        {
+            return Ok(WaitResult::Stopped { process_id, signal });
+        }
+
         if !table.has_matching_child(parent_process_id, target) {
             return Err(WaitError::NoChild);
         }
 
-        if no_hang {
+        if options.no_hang {
             return Ok(WaitResult::Pending);
         } else {
             let previous = table.child_waiters.insert(parent_process_id, target);
@@ -91,14 +113,31 @@ impl ProcessTable {
         })
     }
 
+    fn find_stopped_matching_child(
+        &self,
+        parent_process_id: ProcessId,
+        target: WaitTarget,
+    ) -> Option<(ProcessId, Signal)> {
+        self.processes.iter().find_map(|(process_id, process)| {
+            if process.parent_process_id == Some(parent_process_id)
+                && target.is_target(*process_id)
+                && let ProcessState::Stopped(signal) = process.state
+            {
+                return Some((*process_id, signal));
+            }
+            None
+        })
+    }
+
     fn has_matching_child(&self, parent_process_id: ProcessId, target: WaitTarget) -> bool {
         self.processes.iter().any(|(process_id, process)| {
             process.parent_process_id == Some(parent_process_id) && target.is_target(*process_id)
         })
     }
 
-    /// Wakes the process waiting for `process_id` to exit.
-    pub(super) fn wake_exit_waiter(&mut self, process_id: ProcessId) {
+    /// Wakes the process waiting for `process_id` to change state, regardless of whether the
+    /// change is an exit or a stop.
+    pub(super) fn wake_state_waiter(&mut self, process_id: ProcessId) {
         let Some(thread_id) = self.take_waiter_thread(process_id) else {
             return;
         };
@@ -109,11 +148,16 @@ impl ProcessTable {
         );
     }
 
-    /// Returns the thread ID of the process waiting for `process_id` to exit and removes its
-    /// waiter.
+    /// Returns the thread ID of the process waiting for `process_id` and removes its waiter.
     fn take_waiter_thread(&mut self, process_id: ProcessId) -> Option<ThreadId> {
         let process = &self.processes[&process_id];
-        assert!(matches!(process.state, ProcessState::Exited(_)));
+        assert!(
+            matches!(
+                process.state,
+                ProcessState::Exited(_) | ProcessState::Stopped(_)
+            ),
+            "waitable child was neither exited nor stopped"
+        );
         let parent_process_id = process.parent_process_id?;
         let target = self.child_waiters.get(&parent_process_id)?;
 

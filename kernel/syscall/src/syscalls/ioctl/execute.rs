@@ -1,27 +1,23 @@
 use roxy_fd::{IoctlError, OpenFile};
-use roxy_memory::UserAddress;
 use roxy_tty_types::ApplyWhen;
 
 use super::{framebuffer, terminal};
 use crate::errno::Errno;
 
-pub(super) fn execute(
-    file: &OpenFile,
-    raw_request: u64,
-    argument: UserAddress,
-) -> Result<(), Errno> {
+pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> Result<(), Errno> {
     match raw_request {
-        terminal::TCGETS => terminal::get_termios(file, argument),
-        terminal::TCSETS => terminal::set_termios(file, ApplyWhen::Immediate, argument),
-        terminal::TCSETSW => terminal::set_termios(file, ApplyWhen::Drain, argument),
-        terminal::TCSETSF => terminal::set_termios(file, ApplyWhen::Flush, argument),
-        terminal::TIOCGWINSZ => terminal::get_window_size(file, argument),
-        terminal::TIOCSWINSZ => terminal::set_window_size(file, argument),
-        terminal::TIOCGPGRP => terminal::get_foreground_pgid(file, argument),
-        terminal::TIOCSPGRP => terminal::set_foreground_pgid(file, argument),
-        framebuffer::FBIOGET_VSCREENINFO => framebuffer::get_var_screen_info(file, argument),
-        framebuffer::FBIOPUT_VSCREENINFO => framebuffer::set_var_screen_info(file, argument),
-        framebuffer::FBIOGET_FSCREENINFO => framebuffer::get_fix_screen_info(file, argument),
+        terminal::TCGETS => terminal::get_termios(file, raw_argument),
+        terminal::TCSETS => terminal::set_termios(file, ApplyWhen::Immediate, raw_argument),
+        terminal::TCSETSW => terminal::set_termios(file, ApplyWhen::Drain, raw_argument),
+        terminal::TCSETSF => terminal::set_termios(file, ApplyWhen::Flush, raw_argument),
+        terminal::TIOCGWINSZ => terminal::get_window_size(file, raw_argument),
+        terminal::TIOCSWINSZ => terminal::set_window_size(file, raw_argument),
+        terminal::TIOCGPGRP => terminal::get_foreground_pgid(file, raw_argument),
+        terminal::TIOCSPGRP => terminal::set_foreground_pgid(file, raw_argument),
+        terminal::TIOCSCTTY => terminal::set_controlling_terminal(file, raw_argument),
+        framebuffer::FBIOGET_VSCREENINFO => framebuffer::get_var_screen_info(file, raw_argument),
+        framebuffer::FBIOPUT_VSCREENINFO => framebuffer::set_var_screen_info(file, raw_argument),
+        framebuffer::FBIOGET_FSCREENINFO => framebuffer::get_fix_screen_info(file, raw_argument),
         _ => Err(Errno::NotTty),
     }
 }

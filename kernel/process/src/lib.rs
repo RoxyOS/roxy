@@ -23,7 +23,9 @@ pub use cwd::{current_working_directory, set_current_working_directory};
 pub use execve::execve_current;
 pub use fork::{ForkError, fork_current};
 pub use initial_fds::InitialFdInjector;
-pub use lifecycle::{exit_current, initialize};
+pub use lifecycle::{
+    SessionLeaderExitHandler, exit_current, initialize, register_session_leader_exit_handler,
+};
 pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, map_physical,
     protect_memory, unmap_anonymous, unmap_memory,
@@ -36,9 +38,11 @@ pub use signal::{
     send_signal, send_signal_to_pgid, signal_action_of, unblock_signals,
 };
 pub use table::{
-    current_parent_process_id, current_process_id, process_pgid, try_current_process_id,
+    current_parent_process_id, current_process_group_id, current_process_id,
+    current_process_session_id, is_current_session_leader, process_pgid, process_session_id,
+    process_session_of_pgid, try_current_process_id,
 };
-pub use wait::{WaitError, WaitResult, WaitTarget, wait_current};
+pub use wait::{WaitError, WaitOptions, WaitResult, WaitTarget, wait_current};
 
 use alloc::{sync::Arc, vec::Vec};
 
@@ -56,7 +60,7 @@ use roxy_vm::AddrSpaceHandle;
 struct Process {
     id: ProcessId,
     pgid: ProcessGroupId,
-    session_id: Option<ProcessId>,
+    session_id: Option<SessionId>,
     parent_process_id: Option<ProcessId>,
     addrspace: Option<AddrSpaceHandle>,
     main_thread_id: ThreadId,
@@ -73,6 +77,9 @@ struct Process {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProcessState {
     Running,
+    /// The process is suspended by a stop signal (SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU); its
+    /// main thread is blocked until a continuing signal (SIGCONT) resumes it.
+    Stopped(Signal),
     Exiting(ExitStatus),
     Exited(ExitStatus),
 }
@@ -109,6 +116,28 @@ impl ProcessGroupId {
 }
 
 impl From<ProcessId> for ProcessGroupId {
+    fn from(pid: ProcessId) -> Self {
+        Self(pid.as_u64())
+    }
+}
+
+/// Identifies a session, whose value is the PID of the session's leader process.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct SessionId(u64);
+
+impl SessionId {
+    #[must_use]
+    pub const fn new(value: u64) -> Option<Self> {
+        if value == 0 { None } else { Some(Self(value)) }
+    }
+
+    #[must_use]
+    pub const fn as_u64(self) -> u64 {
+        self.0
+    }
+}
+
+impl From<ProcessId> for SessionId {
     fn from(pid: ProcessId) -> Self {
         Self(pid.as_u64())
     }

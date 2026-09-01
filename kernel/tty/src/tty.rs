@@ -25,6 +25,7 @@ impl Tty {
             read_lock: Lock::new(()),
             poll_listeners: Arc::new(roxy_poll::PollListeners::new()),
             foreground_pgid: Lock::new(None),
+            owner_session_id: Lock::new(None),
         }
     }
 
@@ -34,6 +35,10 @@ impl Tty {
         }
 
         loop {
+            // Background process groups reading from the terminal receive SIGTTIN; if the
+            // signal is blocked or ignored the read fails with EIO instead.
+            self.ensure_foreground_read()?;
+
             let count = self.read_inner(output)?;
 
             if count > 0 {
@@ -80,6 +85,40 @@ impl Tty {
 
         self.fill_buffered()?;
         Ok(self.drain_buffered(output))
+    }
+
+    /// Enforces the foreground read rule: a background process group reading the controlling
+    /// terminal is sent SIGTTIN (which stops it via the default action). If SIGTTIN is blocked
+    /// or ignored the read fails with EIO instead, matching Linux `n_tty`/`tty_check_change`.
+    ///
+    /// Returns `Ok(())` for the foreground group (or when no foreground group has been
+    /// established yet, i.e. the terminal has no controlling session). Returns `Interrupted`
+    /// after queuing SIGTTIN so the signal is delivered at the return boundary.
+    fn ensure_foreground_read(&self) -> Result<(), FileError> {
+        let Some(foreground) = *self.foreground_pgid.lock() else {
+            return Ok(());
+        };
+        let caller_pgid = roxy_process::current_process_group_id();
+
+        if foreground == caller_pgid {
+            return Ok(());
+        }
+
+        // Background read: block or ignore SIGTTIN to avoid stopping ourselves.
+        let sigttin = roxy_signal::Signal::TerminalInput;
+        let blocked = roxy_process::currently_blocked_signals()
+            .contains(roxy_signal::SignalSet::from_signal(sigttin));
+        let ignored = matches!(
+            roxy_process::signal_action_of(sigttin),
+            roxy_process::SignalAction::Ignore
+        );
+
+        if blocked || ignored {
+            return Err(FileError::Io);
+        }
+
+        roxy_process::send_signal_to_pgid(caller_pgid, sigttin);
+        Err(FileError::Interrupted)
     }
 
     fn fill_buffered(&self) -> Result<(), FileError> {

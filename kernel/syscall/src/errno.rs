@@ -1,6 +1,7 @@
 #[repr(u64)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Errno {
+    Permission = 1,
     NotFound = 2,
     NoSuchProcess = 3,
     Interrupted = 4,

@@ -1,4 +1,4 @@
-use crate::{ProcessGroupId, ProcessId, table::PROCESS_TABLE};
+use crate::{ProcessGroupId, ProcessId, SessionId, table::PROCESS_TABLE};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SetPgidError {
@@ -8,6 +8,9 @@ pub enum SetPgidError {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CreateSessionError {
     NoSuchProcess,
+    /// The caller is already a process group leader; POSIX forbids it from starting a new
+    /// session (`EPERM`).
+    AlreadyGroupLeader,
 }
 
 /// Moves `target` into the process group `pgid`.
@@ -31,7 +34,8 @@ pub fn set_pgid(target: ProcessId, pgid: ProcessGroupId) -> Result<(), SetPgidEr
 ///
 /// # Errors
 ///
-/// Returns an error when the calling process cannot be found in the process table.
+/// Returns an error when the calling process cannot be found in the process table, or when it
+/// is already a process group leader (POSIX `EPERM`).
 pub fn create_session() -> Result<ProcessGroupId, CreateSessionError> {
     let mut table = PROCESS_TABLE.lock();
     let process_id = table.current_process_id();
@@ -40,11 +44,14 @@ pub fn create_session() -> Result<ProcessGroupId, CreateSessionError> {
         .get_mut(&process_id)
         .ok_or(CreateSessionError::NoSuchProcess)?;
 
-    // TODO(session): POSIX requires EPERM when the caller is already a process group leader.
-    // The current spawn model makes every top-level process a leader, so we skip the check.
+    // POSIX: `setsid` fails with EPERM when the caller is already a process group leader,
+    // otherwise it could strand the rest of its group in the old session.
+    if process.pgid == ProcessGroupId::from(process_id) {
+        return Err(CreateSessionError::AlreadyGroupLeader);
+    }
 
     process.pgid = ProcessGroupId::from(process_id);
-    process.session_id = Some(process_id);
+    process.session_id = Some(SessionId::from(process_id));
 
     Ok(process.pgid)
 }

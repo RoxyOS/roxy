@@ -8,7 +8,7 @@ use roxy_vfs::{FilePermissions, ResolvedPath};
 use roxy_vm::AddrSpaceHandle;
 
 use crate::{
-    Process, ProcessError, ProcessGroupId, ProcessId, ProcessState, image, initial_fds,
+    Process, ProcessError, ProcessGroupId, ProcessId, ProcessState, SessionId, image, initial_fds,
     table::PROCESS_TABLE,
 };
 
@@ -47,11 +47,14 @@ impl Process {
     ) -> Self {
         let id = ProcessId(NEXT_PROCESS_ID.fetch_add(1, Ordering::Relaxed));
         let pgid = ProcessGroupId::from(id);
+        // Every directly spawned process starts a new session (init/getty model):
+        // it is both its own group leader and its own session leader.
+        let session_id = Some(SessionId::from(id));
 
         Self {
             id,
             pgid,
-            session_id: None,
+            session_id,
             parent_process_id: None,
             addrspace: Some(addrspace),
             main_thread_id,
@@ -70,7 +73,7 @@ impl Process {
     pub(super) fn from_fork(
         parent_process_id: ProcessId,
         pgid: ProcessGroupId,
-        session_id: Option<ProcessId>,
+        session_id: Option<SessionId>,
         main_thread_id: ThreadId,
         addrspace: AddrSpaceHandle,
         working_directory: ResolvedPath,

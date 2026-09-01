@@ -144,8 +144,10 @@ impl Signal {
             | Self::FloatingPointException
             | Self::SegmentationFault => DefaultAction::Terminate,
             Self::Child | Self::WindowChanged | Self::Urgent => DefaultAction::Ignore,
-            Self::Continue | Self::Stop | Self::TerminalStop | Self::TerminalInput
-            | Self::TerminalOutput => DefaultAction::Unsupported,
+            Self::Stop | Self::TerminalStop | Self::TerminalInput | Self::TerminalOutput => {
+                DefaultAction::Stop
+            }
+            Self::Continue => DefaultAction::Continue,
         }
     }
 
@@ -196,14 +198,14 @@ mod tests {
         );
         assert_actions(
             &[
-                Signal::Continue,
                 Signal::Stop,
                 Signal::TerminalStop,
                 Signal::TerminalInput,
                 Signal::TerminalOutput,
             ],
-            DefaultAction::Unsupported,
+            DefaultAction::Stop,
         );
+        assert_actions(&[Signal::Continue], DefaultAction::Continue);
     });
 
     fn assert_actions(signals: &[Signal], action: DefaultAction) {

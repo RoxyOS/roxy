@@ -12,11 +12,13 @@ use crate::{
 syscall!(SyscallNumber::Waitpid, handle(target: WaitTarget => Invalid, status: Nullable<Out<u32>> => Fault, options: WaitOptions => Invalid, rusage: u64));
 
 const WNOHANG: u64 = 1;
+const WUNTRACED: u64 = 2;
 
+/// Linux `waitpid` option bits, validated against the `WNOHANG`/`WUNTRACED` constants above.
 #[derive(Clone, Copy)]
-enum WaitOptions {
-    Blocking,
-    NoHang,
+struct WaitOptions {
+    no_hang: bool,
+    wuntraced: bool,
 }
 
 fn handle(
@@ -26,7 +28,6 @@ fn handle(
     rusage: u64,
 ) -> SyscallResult {
     let status = status.into_option();
-    let no_hang = matches!(options, WaitOptions::NoHang);
 
     if rusage != 0 {
         return Err(unsupported_argument(
@@ -40,20 +41,37 @@ fn handle(
         status.validate()?;
     }
 
-    let (process_id, exit_status) =
-        match roxy_process::wait_current(target, no_hang).map_err(map_wait_error)? {
-            WaitResult::Exited { process_id, status } => (process_id, status),
-            WaitResult::Pending => return Ok(0),
-        };
+    let wait_options = roxy_process::WaitOptions {
+        no_hang: options.no_hang,
+        wuntraced: options.wuntraced,
+    };
 
-    if let Some(output) = status {
-        let encoded = encode_status(exit_status);
+    match roxy_process::wait_current(target, wait_options).map_err(map_wait_error)? {
+        WaitResult::Exited {
+            process_id,
+            status: exit_status,
+        } => {
+            if let Some(output) = status {
+                let encoded = encode_status(exit_status);
 
-        // SAFETY: u32 has no padding and encoded is initialized.
-        unsafe { output.write(&encoded) }?;
+                // SAFETY: u32 has no padding and encoded is initialized.
+                unsafe { output.write(&encoded) }?;
+            }
+
+            Ok(process_id.as_u64())
+        }
+        WaitResult::Stopped { process_id, signal } => {
+            if let Some(output) = status {
+                let encoded = encode_stopped_status(signal);
+
+                // SAFETY: u32 has no padding and encoded is initialized.
+                unsafe { output.write(&encoded) }?;
+            }
+
+            Ok(process_id.as_u64())
+        }
+        WaitResult::Pending => Ok(0),
     }
-
-    Ok(process_id.as_u64())
 }
 
 impl SyscallArg for WaitTarget {
@@ -76,15 +94,19 @@ impl SyscallArg for WaitTarget {
 
 impl SyscallArg for WaitOptions {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
-        match raw {
-            0 => Ok(Self::Blocking),
-            WNOHANG => Ok(Self::NoHang),
-            _ => Err(unsupported_argument(
+        let unknown = raw & !(WNOHANG | WUNTRACED);
+        if unknown != 0 {
+            return Err(unsupported_argument(
                 "waitpid.options",
-                raw,
+                unknown,
                 Errno::NotSupported,
-            )),
+            ));
         }
+
+        Ok(Self {
+            no_hang: raw & WNOHANG != 0,
+            wuntraced: raw & WUNTRACED != 0,
+        })
     }
 }
 
@@ -93,6 +115,12 @@ fn encode_status(status: roxy_process::ExitStatus) -> u32 {
         roxy_process::ExitStatus::Exited(code) => u32::from(code) << 8,
         roxy_process::ExitStatus::Signaled(signal) => u32::from(signal.number()),
     }
+}
+
+/// Encodes a stopped child's status: low byte `0x7f` with the stopping signal in bits 8-15
+/// (`WIFSTOPPED` + `WSTOPSIG`).
+fn encode_stopped_status(signal: roxy_signal::Signal) -> u32 {
+    0x7f | (u32::from(signal.number()) << 8)
 }
 
 const fn map_wait_error(error: WaitError) -> Errno {
@@ -108,7 +136,7 @@ mod tests {
     use roxy_process::ExitStatus;
     use roxy_signal::Signal;
 
-    use super::encode_status;
+    use super::{encode_status, encode_stopped_status};
 
     kernel_test!("roxy-syscall::waitpid-status", waitpid_status, {
         assert_eq!(encode_status(ExitStatus::exited(0)), 0);
@@ -118,5 +146,13 @@ mod tests {
             0xff00
         );
         assert_eq!(encode_status(ExitStatus::signaled(Signal::Terminate)), 15);
+    });
+
+    kernel_test!("roxy-syscall::waitpid-stopped-status", waitpid_stopped, {
+        assert_eq!(
+            encode_stopped_status(Signal::TerminalStop),
+            0x7f | (20 << 8)
+        );
+        assert_eq!(encode_stopped_status(Signal::Stop), 0x7f | (19 << 8));
     });
 }

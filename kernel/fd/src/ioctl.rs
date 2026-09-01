@@ -6,11 +6,19 @@ pub use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
 #[derive(Debug)]
 pub enum IoctlRequest<'a> {
     GetTermios(&'a mut Termios),
-    SetTermios { when: ApplyWhen, termios: Termios },
+    SetTermios {
+        when: ApplyWhen,
+        termios: Termios,
+    },
     GetWindowSize(&'a mut WindowSize),
     SetWindowSize(WindowSize),
     GetForegroundPgid(&'a mut u32),
     SetForegroundPgid(u32),
+    /// Makes the calling session leader's session the terminal's controlling session
+    /// (`TIOCSCTTY`). `force` allows stealing an already-controlled terminal.
+    SetControllingTerminal {
+        force: bool,
+    },
     FbGetVarInfo(&'a mut FbVarInfo),
     FbSetVarInfo(FbVarInfo),
     FbGetFixedInfo(&'a mut FbFixedInfo),

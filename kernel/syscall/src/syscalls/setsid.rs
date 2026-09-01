@@ -13,5 +13,6 @@ fn handle() -> SyscallResult {
 const fn map_create_session_error(error: CreateSessionError) -> Errno {
     match error {
         CreateSessionError::NoSuchProcess => Errno::NoSuchProcess,
+        CreateSessionError::AlreadyGroupLeader => Errno::Permission,
     }
 }

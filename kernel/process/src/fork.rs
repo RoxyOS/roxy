@@ -6,7 +6,7 @@ use roxy_thread::{Thread, ThreadCreateError, scheduler};
 use roxy_vfs::{FilePermissions, ResolvedPath};
 use roxy_vm::VmError;
 
-use crate::{Process, ProcessGroupId, ProcessId, table::PROCESS_TABLE};
+use crate::{Process, ProcessGroupId, ProcessId, SessionId, table::PROCESS_TABLE};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ForkError {
@@ -18,7 +18,7 @@ pub enum ForkError {
 struct ForkInfo {
     parent_process_id: ProcessId,
     pgid: ProcessGroupId,
-    session_id: Option<ProcessId>,
+    session_id: Option<SessionId>,
     addrspace: roxy_vm::AddrSpaceHandle,
     fds: FdTable,
     working_directory: ResolvedPath,

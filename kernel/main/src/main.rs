@@ -100,11 +100,19 @@ fn select_kernel_terminal(boot_info: &BootInfo) {
 
 #[cfg(not(feature = "kernel-test"))]
 fn kernel_main() -> ! {
-    roxy_process::spawn(
+    let init = roxy_process::spawn(
         INIT,
         &INIT_ENV.iter().map(|s| s.to_vec()).collect::<Vec<_>>(),
     )
     .expect("spawn init process");
+
+    // The kernel plays the login/getty role for the initial shell: bind the terminal to the
+    // init process's session and make its process group the initial foreground group. Bash can
+    // then run job control against a valid foreground group.
+    let init_pgid = roxy_process::process_pgid(init).expect("init process has a process group");
+    let init_session =
+        roxy_process::process_session_id(init).expect("init process must be a session leader");
+    roxy_tty::bind_controlling_terminal(init_session, init_pgid);
 
     roxy_thread::scheduler::start()
 }

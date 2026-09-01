@@ -1,9 +1,37 @@
 use roxy_thread::{ThreadId, scheduler};
 
 use crate::{
-    ExitStatus, InitialFdInjector, ProcessState, current_umask, cwd, initial_fds,
+    ExitStatus, InitialFdInjector, ProcessState, SessionId, current_umask, cwd, initial_fds,
     table::{PROCESS_TABLE, ProcessTable},
 };
+
+/// Invoked when a session leader exits, so its controlling terminal can send SIGHUP to the
+/// foreground process group and release the session.
+///
+/// Registered by the terminal subsystem (reverse dependency: process does not depend on tty).
+pub type SessionLeaderExitHandler = fn(SessionId);
+
+static SESSION_LEADER_EXIT_HANDLER: spin::Once<SessionLeaderExitHandler> = spin::Once::new();
+
+/// Registers the handler invoked when a session leader exits.
+///
+/// # Panics
+///
+/// Panics when a handler was already registered.
+pub fn register_session_leader_exit_handler(handler: SessionLeaderExitHandler) {
+    assert!(
+        SESSION_LEADER_EXIT_HANDLER.get().is_none(),
+        "session leader exit handler already registered"
+    );
+    SESSION_LEADER_EXIT_HANDLER.call_once(|| handler);
+}
+
+fn notify_session_leader_exit(session: SessionId) {
+    let handler = SESSION_LEADER_EXIT_HANDLER
+        .get()
+        .expect("session leader exit handler must be registered before a session leader exits");
+    handler(session);
+}
 
 /// Initializes process integration and registers its VFS and descriptor hooks.
 ///
@@ -26,7 +54,10 @@ fn activate_addrspace(thread_id: ThreadId) {
 
 pub fn exit_current(status: ExitStatus) -> ! {
     let thread_id = scheduler::current_thread_id();
-    PROCESS_TABLE.lock().begin_exit(thread_id, status);
+    let exited_session = PROCESS_TABLE.lock().begin_exit(thread_id, status);
+    if let Some(session) = exited_session {
+        notify_session_leader_exit(session);
+    }
     scheduler::exit_current()
 }
 
@@ -35,11 +66,17 @@ fn on_thread_reaped(thread_id: ThreadId) {
 }
 
 impl ProcessTable {
-    fn begin_exit(&mut self, thread_id: ThreadId, status: ExitStatus) {
+    /// Marks a process as exiting and returns its session ID when the process is a session
+    /// leader (its session ID equals its PID), so the caller can notify its controlling
+    /// terminal that the session ended.
+    fn begin_exit(&mut self, thread_id: ThreadId, status: ExitStatus) -> Option<SessionId> {
         let process_id = self.thread_owners[&thread_id];
         let process = self.processes.get_mut(&process_id).unwrap();
         assert!(matches!(process.state, ProcessState::Running));
         process.state = ProcessState::Exiting(status);
+
+        let is_session_leader = process.session_id == Some(SessionId::from(process_id));
+        is_session_leader.then_some(process.session_id).flatten()
     }
 
     fn finish_thread_reap(&mut self, thread_id: ThreadId) {
@@ -52,7 +89,7 @@ impl ProcessTable {
 
         process.addrspace = None;
         process.state = ProcessState::Exited(status);
-        self.wake_exit_waiter(process_id);
+        self.wake_state_waiter(process_id);
     }
 }
 

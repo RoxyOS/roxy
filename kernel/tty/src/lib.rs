@@ -16,6 +16,7 @@ use roxy_key_decoder::KeyDecoder;
 use roxy_line_discipline::LineDiscipline;
 use roxy_poll::PollListeners;
 use roxy_process::ProcessGroupId;
+use roxy_process::SessionId;
 use roxy_terminal::TerminalOutput;
 use roxy_tty_types::WindowSize;
 use roxy_utils::Lock;
@@ -43,6 +44,8 @@ struct Tty {
     poll_listeners: Arc<PollListeners>,
     /// The process group that receives terminal-generated signals, when one is selected.
     foreground_pgid: Lock<Option<ProcessGroupId>>,
+    /// The session that owns this controlling terminal, when one is established.
+    owner_session_id: Lock<Option<SessionId>>,
 }
 
 static TTY: Once<Arc<Tty>> = Once::new();
@@ -58,7 +61,31 @@ pub fn initialize(output: Arc<dyn TerminalOutput>) -> Arc<dyn InputListener> {
     assert!(TTY.get().is_none(), "TTY initialized twice");
     let tty = Arc::new(Tty::new(output));
     TTY.call_once(|| tty.clone());
+    roxy_process::register_session_leader_exit_handler(on_session_leader_exit);
     tty
+}
+
+/// Sends SIGHUP to the foreground process group of this terminal when its controlling session's
+/// leader exits, then releases the terminal (Linux `disassociate_ctty`/hangup semantics).
+///
+/// Runs on the exiting session leader's own thread via the process-side callback, so no
+/// process-table lock is held; the locks taken here are the terminal's own.
+fn on_session_leader_exit(session: roxy_process::SessionId) {
+    let Some(tty) = TTY.get() else {
+        return;
+    };
+
+    let owns_terminal = *tty.owner_session_id.lock() == Some(session);
+    if !owns_terminal {
+        return;
+    }
+
+    let foreground = tty.foreground_pgid.lock().take();
+    *tty.owner_session_id.lock() = None;
+
+    if let Some(pgid) = foreground {
+        roxy_process::send_signal_to_pgid(pgid, roxy_signal::Signal::Hangup);
+    }
 }
 
 impl InputListener for Tty {
@@ -81,6 +108,28 @@ pub fn open() -> Arc<OpenFile> {
     let tty = TTY.get().expect("TTY must be initialized before opening");
 
     TtyFile::open(tty.clone())
+}
+
+/// Binds the terminal to a session as its controlling terminal, setting the session's initial
+/// foreground process group.
+///
+/// This is how the composition root establishes the initial controlling terminal in the role
+/// that a login/getty program plays on Linux: the terminal is acquired by a fresh session leader
+/// (the spawned init shell) and its foreground group is the leader's group.
+///
+/// # Panics
+///
+/// Panics when the TTY has not been initialized or is already bound to a session.
+pub fn bind_controlling_terminal(session: SessionId, pgid: ProcessGroupId) {
+    let tty = TTY.get().expect("TTY must be initialized before binding");
+    let mut current_session = tty.owner_session_id.lock();
+
+    assert!(
+        current_session.is_none(),
+        "TTY controlling terminal bound twice"
+    );
+    *current_session = Some(session);
+    *tty.foreground_pgid.lock() = Some(pgid);
 }
 
 #[cfg(feature = "kernel-test")]

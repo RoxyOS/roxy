@@ -12,7 +12,8 @@ pub(super) const FBIOGET_VSCREENINFO: u64 = 0x4600;
 pub(super) const FBIOPUT_VSCREENINFO: u64 = 0x4601;
 pub(super) const FBIOGET_FSCREENINFO: u64 = 0x4602;
 
-pub(super) fn get_var_screen_info(file: &OpenFile, address: UserAddress) -> Result<(), Errno> {
+pub(super) fn get_var_screen_info(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
+    let address = UserAddress::parse(raw_argument, Errno::Fault)?;
     let output = Out::<framebuffer_abi::FbVarScreenInfoAbi>::parse(address.as_u64(), Errno::Fault)?;
     output.validate()?;
     let mut info = FbVarInfo {
@@ -31,14 +32,16 @@ pub(super) fn get_var_screen_info(file: &OpenFile, address: UserAddress) -> Resu
     framebuffer_abi::write_var_screen_info(output, info)
 }
 
-pub(super) fn set_var_screen_info(file: &OpenFile, address: UserAddress) -> Result<(), Errno> {
+pub(super) fn set_var_screen_info(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
+    let address = UserAddress::parse(raw_argument, Errno::Fault)?;
     let info = framebuffer_abi::read_var_screen_info(address)?;
 
     file.ioctl(IoctlRequest::FbSetVarInfo(info))
         .map_err(super::execute::map_ioctl_error)
 }
 
-pub(super) fn get_fix_screen_info(file: &OpenFile, address: UserAddress) -> Result<(), Errno> {
+pub(super) fn get_fix_screen_info(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
+    let address = UserAddress::parse(raw_argument, Errno::Fault)?;
     let output = Out::<framebuffer_abi::FbFixScreenInfoAbi>::parse(address.as_u64(), Errno::Fault)?;
     output.validate()?;
     let mut info = FbFixedInfo {

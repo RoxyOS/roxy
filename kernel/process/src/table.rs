@@ -54,6 +54,27 @@ impl ProcessTable {
         self.processes.get(&process_id).map(|process| process.pgid)
     }
 
+    /// Returns the session of the given process.
+    pub(super) fn process_session_id(&self, process_id: ProcessId) -> Option<crate::SessionId> {
+        self.processes
+            .get(&process_id)
+            .and_then(|process| process.session_id)
+    }
+
+    /// Returns the session shared by the members of the given process group, if it is non-empty.
+    ///
+    /// Every member of a process group belongs to the same session, so any member's session is
+    /// the group's session.
+    pub(super) fn process_session_of_pgid(
+        &self,
+        pgid: crate::ProcessGroupId,
+    ) -> Option<crate::SessionId> {
+        self.processes
+            .values()
+            .find(|process| process.pgid == pgid)
+            .and_then(|process| process.session_id)
+    }
+
     pub(super) const fn new() -> Self {
         Self {
             processes: BTreeMap::new(),
@@ -144,4 +165,39 @@ pub fn process_ids_in_group(pgid: crate::ProcessGroupId) -> alloc::vec::Vec<Proc
 /// Returns the process group of the given process, if it exists.
 pub fn process_pgid(process_id: ProcessId) -> Option<crate::ProcessGroupId> {
     PROCESS_TABLE.lock().process_pgid(process_id)
+}
+
+/// Returns the session of the given process, if it exists.
+pub fn process_session_id(process_id: ProcessId) -> Option<crate::SessionId> {
+    PROCESS_TABLE.lock().process_session_id(process_id)
+}
+
+/// Returns the session shared by the members of the given process group, if it is non-empty.
+pub fn process_session_of_pgid(pgid: crate::ProcessGroupId) -> Option<crate::SessionId> {
+    PROCESS_TABLE.lock().process_session_of_pgid(pgid)
+}
+
+/// Returns the session of the current process, if it has one.
+pub fn current_process_session_id() -> Option<crate::SessionId> {
+    let table = PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    table.processes.get(&process_id).and_then(|p| p.session_id)
+}
+
+/// Returns the current process's process group.
+pub fn current_process_group_id() -> crate::ProcessGroupId {
+    let table = PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    table.processes[&process_id].pgid
+}
+
+/// Reports whether the current process is a session leader (its session ID equals its PID).
+#[must_use]
+pub fn is_current_session_leader() -> bool {
+    let table = PROCESS_TABLE.lock();
+    let process_id = table.current_process_id();
+    table
+        .processes
+        .get(&process_id)
+        .is_some_and(|p| p.session_id == Some(crate::SessionId::from(process_id)))
 }
