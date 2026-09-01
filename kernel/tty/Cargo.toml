@@ -15,6 +15,7 @@ spin.workspace = true
 roxy-fd.workspace = true
 roxy-arch.workspace = true
 roxy-input.workspace = true
+roxy-key-decoder.workspace = true
 roxy-line-discipline.workspace = true
 roxy-poll.workspace = true
 roxy-process.workspace = true

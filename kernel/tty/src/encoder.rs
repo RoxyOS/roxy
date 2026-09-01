@@ -1,4 +1,5 @@
-use roxy_input::{InputEvent, KeyCode, KeyState};
+use roxy_input::KeyCode;
+use roxy_key_decoder::DecodedKey;
 
 #[derive(Clone, Copy)]
 pub(crate) struct EncodedInputEvent {
@@ -12,38 +13,40 @@ impl EncodedInputEvent {
     }
 }
 
-/// Encodes an input event into the raw bytes returned by TTY reads.
-pub(crate) fn encode_input_event(event: InputEvent) -> Option<EncodedInputEvent> {
+/// Encodes a decoded key from the layout engine into the raw bytes
+/// returned by TTY reads.
+///
+/// `DecodedKey::Character(char)` is encoded as its UTF-8 representation.
+/// `DecodedKey::Key(code)` is encoded as a terminal escape sequence for
+/// navigation and function keys; other keys produce no output.
+pub(crate) fn encode_decoded(decoded: DecodedKey) -> Option<EncodedInputEvent> {
     let mut encoded = EncodedInputEvent {
         bytes: [0; 8],
         length: 0,
     };
-    let bytes = match event {
-        InputEvent::Character(character) => {
-            let mut bytes = [0; 4];
-            let length = character.encode_utf8(&mut bytes).len();
-            encoded.bytes[..length].copy_from_slice(&bytes[..length]);
+
+    match decoded {
+        DecodedKey::Character(character) => {
+            let mut buf = [0; 4];
+            let length = character.encode_utf8(&mut buf).len();
+            encoded.bytes[..length].copy_from_slice(&buf[..length]);
             encoded.length = length;
-
-            return Some(encoded);
+            Some(encoded)
         }
-        InputEvent::Key {
-            code,
-            state: KeyState::Pressed,
-        } => special_key_bytes(code),
-        InputEvent::Key {
-            state: KeyState::Released,
-            ..
-        } => return None,
-    };
-    encoded.bytes[..bytes.len()].copy_from_slice(bytes);
-    encoded.length = bytes.len();
-
-    Some(encoded)
+        DecodedKey::Key(code) => {
+            let bytes = special_key_bytes(code)?;
+            encoded.bytes[..bytes.len()].copy_from_slice(bytes);
+            encoded.length = bytes.len();
+            Some(encoded)
+        }
+    }
 }
 
-fn special_key_bytes(code: KeyCode) -> &'static [u8] {
-    match code {
+/// Maps a Roxy key code to a terminal escape sequence for the 22
+/// navigation and function keys that TTYs traditionally encode. All other keys
+/// (including modifiers, letter keys, and the numeric keypad) return `None`.
+fn special_key_bytes(code: KeyCode) -> Option<&'static [u8]> {
+    Some(match code {
         KeyCode::ArrowUp => b"\x1b[A",
         KeyCode::ArrowDown => b"\x1b[B",
         KeyCode::ArrowRight => b"\x1b[C",
@@ -66,5 +69,34 @@ fn special_key_bytes(code: KeyCode) -> &'static [u8] {
         KeyCode::F10 => b"\x1b[21~",
         KeyCode::F11 => b"\x1b[23~",
         KeyCode::F12 => b"\x1b[24~",
-    }
+        _ => return None,
+    })
+}
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use roxy_input::KeyCode;
+    use roxy_key_decoder::DecodedKey;
+    use roxy_test::kernel_test;
+
+    use super::encode_decoded;
+
+    kernel_test!("roxy-tty::encoder-unicode-ascii", ascii_character, {
+        let encoded = encode_decoded(DecodedKey::Character('a')).unwrap();
+        assert_eq!(encoded.as_bytes(), b"a");
+    });
+
+    kernel_test!("roxy-tty::encoder-unicode-multi-byte", multi_byte_utf8, {
+        let encoded = encode_decoded(DecodedKey::Character('é')).unwrap();
+        assert_eq!(encoded.as_bytes(), &[0xc3, 0xa9]);
+    });
+
+    kernel_test!("roxy-tty::encoder-arrow-left", arrow_left, {
+        let encoded = encode_decoded(DecodedKey::Key(KeyCode::ArrowLeft)).unwrap();
+        assert_eq!(encoded.as_bytes(), b"\x1b[D");
+    });
+
+    kernel_test!("roxy-tty::encoder-unknown-raw", unknown_raw_is_none, {
+        assert!(encode_decoded(DecodedKey::Key(KeyCode::LeftShift)).is_none());
+    });
 }

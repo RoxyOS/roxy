@@ -3,13 +3,14 @@ use alloc::sync::Arc;
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_fd::{FileError, PollEvents};
 use roxy_input::InputDevice;
+use roxy_key_decoder::KeyDecoder;
 use roxy_line_discipline::{LineDiscipline, ProcessResult};
 use roxy_poll::{PollListener, PollRegistration};
 use roxy_terminal::{OutputError, TerminalOutput};
 use roxy_utils::Lock;
 
 use crate::Tty;
-use crate::encoder::{EncodedInputEvent, encode_input_event};
+use crate::encoder::{EncodedInputEvent, encode_decoded};
 
 impl Tty {
     pub(super) fn new(input: Arc<dyn InputDevice>, output: Arc<dyn TerminalOutput>) -> Self {
@@ -19,6 +20,7 @@ impl Tty {
             input,
             output,
             line_discipline: Lock::new(LineDiscipline::new()),
+            decoder: Lock::new(KeyDecoder::new()),
             window_size: Lock::new(window_size),
             buffered: Lock::new(alloc::vec::Vec::new()),
             read_lock: Lock::new(()),
@@ -94,27 +96,37 @@ impl Tty {
         Ok(())
     }
 
-    /// Processes one pending input event early when input arrives, without blocking.
+    /// Processes one pending input event in response to an input-arrival notification without
+    /// blocking. Called from the IRQ handler's listener callback, so all locks use `try_lock`
+    /// to avoid deadlock if the interrupted thread held them.
     ///
-    /// Called from the IRQ handler's listener callback (`on_recive_input`), so all locks use
-    /// `try_lock` and all delivery is best-effort: if a lock is contended, the read path will
-    /// handle the event later.
+    /// This is the path that makes VINTR (Ctrl+C) deliver SIGINT immediately, even when nobody
+    /// is reading the TTY (e.g. a foreground child is running).
     ///
-    /// This interrupt-time processing is what makes VINTR (Ctrl+C) deliver SIGINT immediately,
-    /// even when nobody is reading the TTY (e.g. a foreground child is running). Without it,
-    /// the interrupt character would sit queued until the next `read`.
+    /// The decoder lock is acquired before the line-discipline lock, matching the read path's
+    /// acquisition order (decoder in `next_input_event`, then discipline in `fill_buffered`).
+    /// Events are only consumed after both locks are held, so a failed `try_lock` leaves the
+    /// event in the queue for the read path to handle.
     pub(super) fn try_process_input_arrival(&self) {
+        let Some(mut decoder) = self.decoder.try_lock() else {
+            return;
+        };
         let Some(mut discipline) = self.line_discipline.try_lock() else {
             return;
         };
-        let Some(event) = self.input.read_event() else {
+        let Some(event) = self.input.read_key() else {
             return;
         };
-        let Some(encoded) = encode_input_event(event) else {
+        let Some(decoded_key) = decoder.decode(event) else {
+            return;
+        };
+        let Some(encoded) = encode_decoded(decoded_key) else {
             return;
         };
         let result = discipline.process(encoded.as_bytes());
-        // Drop the discipline lock as soon as possible; echo and buffering use separate locks.
+        // Drop the decoder and discipline locks as soon as possible; echo and buffering use
+        // separate locks.
+        drop(decoder);
         drop(discipline);
 
         // Deliver the signal immediately — this is the whole point of interrupt-time processing.
@@ -190,12 +202,16 @@ impl Tty {
         count
     }
 
-    /// Wait for the next input event
+    /// Waits for the next input event and encodes it for the line discipline.
+    ///
+    /// Each raw key event is fed through the pc-keyboard layout decoder, which updates modifier
+    /// state and produces either a Unicode character or a raw key. Releases of non-modifier keys
+    /// yield `None` from the decoder and are skipped; modifier releases update state only.
     fn next_input_event(&self) -> Option<EncodedInputEvent> {
         loop {
-            let event = self.input.read_event()?;
-
-            if let Some(encoded) = encode_input_event(event) {
+            let event = self.input.read_key()?;
+            let decoded = self.decoder.lock().decode(event)?;
+            if let Some(encoded) = encode_decoded(decoded) {
                 return Some(encoded);
             }
         }
@@ -211,40 +227,31 @@ fn map_output_error(error: OutputError) -> FileError {
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_fd::FileError;
-    use roxy_input::{InputEvent, KeyCode, KeyState};
+    use roxy_input::{KeyCode, KeyState};
     use roxy_test::kernel_test;
 
-    use crate::test_support::{character, open};
+    use crate::test_support::{key, open};
 
     kernel_test!("roxy-tty::noncanonical", preserves_event_stream, {
         let events = alloc::vec![
-            character('é'),
-            InputEvent::Key {
-                code: KeyCode::ArrowLeft,
-                state: KeyState::Pressed,
-            },
-            InputEvent::Key {
-                code: KeyCode::ArrowLeft,
-                state: KeyState::Released,
-            },
+            key(KeyCode::A, KeyState::Pressed),
+            key(KeyCode::ArrowLeft, KeyState::Pressed),
+            key(KeyCode::ArrowLeft, KeyState::Released),
         ];
         let (tty, output, file) = open(events);
         tty.line_discipline.lock().settings.canonical = false;
-        let mut first = [0; 2];
+        let mut first = [0; 1];
         let mut second = [0; 3];
 
-        assert_eq!(file.read(&mut first), Ok(2));
-        assert_eq!(&first, &[0xc3, 0xa9]);
+        assert_eq!(file.read(&mut first), Ok(1));
+        assert_eq!(&first, b"a");
         assert_eq!(file.read(&mut second), Ok(3));
         assert_eq!(&second, b"\x1b[D");
-        assert_eq!(output.bytes(), &[0xc3, 0xa9, 0x1b, b'[', b'D']);
+        assert_eq!(output.bytes(), b"a\x1b[D");
     });
 
     kernel_test!("roxy-tty::partial-echo", preserves_buffered_input, {
-        let events = alloc::vec![InputEvent::Key {
-            code: KeyCode::ArrowLeft,
-            state: KeyState::Pressed,
-        }];
+        let events = alloc::vec![key(KeyCode::ArrowLeft, KeyState::Pressed)];
         let (tty, output, file) = open(events);
         tty.line_discipline.lock().settings.canonical = false;
         output.limit_writes(1);
@@ -257,7 +264,10 @@ mod tests {
     });
 
     kernel_test!("roxy-tty::echo-error", preserves_committed_line, {
-        let (_tty, output, file) = open(alloc::vec![character('x'), character('\n')]);
+        let (_tty, output, file) = open(alloc::vec![
+            key(KeyCode::X, KeyState::Pressed),
+            key(KeyCode::Return, KeyState::Pressed),
+        ]);
         output.fail_on_call(2);
         let mut buffer = [0; 2];
 

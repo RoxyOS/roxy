@@ -11,6 +11,7 @@ use alloc::{sync::Arc, vec::Vec};
 
 use roxy_fd::OpenFile;
 use roxy_input::{InputDevice, InputListener};
+use roxy_key_decoder::KeyDecoder;
 use roxy_line_discipline::LineDiscipline;
 use roxy_poll::PollListeners;
 use roxy_process::ProcessGroupId;
@@ -25,6 +26,9 @@ struct Tty {
     input: Arc<dyn InputDevice>,
     output: Arc<dyn TerminalOutput>,
     line_discipline: Lock<LineDiscipline>,
+    /// Decodes raw key events into characters and special keys
+    /// (US 104-key layout, `MapLettersToUnicode`).
+    decoder: Lock<KeyDecoder>,
     window_size: Lock<WindowSize>,
     buffered: Lock<Vec<u8>>,
     read_lock: Lock<()>,
@@ -72,7 +76,7 @@ mod test_support {
     use core::sync::atomic::{AtomicUsize, Ordering};
 
     use roxy_fd::OpenFile;
-    use roxy_input::{InputDevice, InputEvent};
+    use roxy_input::{InputDevice, KeyCode, KeyEvent, KeyState};
     use roxy_terminal::{OutputError, TerminalOutput};
     use roxy_tty_types::WindowSize;
     use spin::Mutex;
@@ -81,11 +85,11 @@ mod test_support {
     use crate::file::TtyFile;
 
     pub(super) struct EventInput {
-        events: Mutex<Vec<InputEvent>>,
+        events: Mutex<Vec<KeyEvent>>,
     }
 
     impl InputDevice for EventInput {
-        fn read_event(&self) -> Option<InputEvent> {
+        fn read_key(&self) -> Option<KeyEvent> {
             let mut events = self.events.lock();
 
             (!events.is_empty()).then(|| events.remove(0))
@@ -148,11 +152,15 @@ mod test_support {
         }
     }
 
-    pub(super) fn character(character: char) -> InputEvent {
-        InputEvent::Character(character)
+    /// Build a raw key event for test injection.
+    ///
+    /// The TTY's internal US-104 layout decoder maps these to characters:
+    /// `KeyCode::A` → `'a'`, `KeyCode::Return` → `'\n'`, etc.
+    pub(super) fn key(code: KeyCode, state: KeyState) -> KeyEvent {
+        KeyEvent { code, state }
     }
 
-    pub(super) fn open(events: Vec<InputEvent>) -> (Arc<Tty>, Arc<MockOutput>, Arc<OpenFile>) {
+    pub(super) fn open(events: Vec<KeyEvent>) -> (Arc<Tty>, Arc<MockOutput>, Arc<OpenFile>) {
         let input = Arc::new(EventInput {
             events: Mutex::new(events),
         });
@@ -166,38 +174,37 @@ mod test_support {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use roxy_input::{InputEvent, KeyCode, KeyState};
+    use roxy_input::{KeyCode, KeyEvent, KeyState};
     use roxy_test::kernel_test;
     use roxy_tty_types::WindowSize;
 
     use super::file::TtyFile;
-    use super::test_support::{character, open};
+    use super::test_support::{key, open};
+
+    /// Helper that constructs a key-press event for test brevity.
+    fn press(code: KeyCode) -> KeyEvent {
+        key(code, KeyState::Pressed)
+    }
 
     kernel_test!("roxy-tty::canonical-edit", edits_before_delivery, {
         let events = alloc::vec![
-            character('a'),
-            character('b'),
-            character('é'),
-            character('\u{8}'),
-            character('c'),
-            character('\n'),
+            press(KeyCode::A),
+            press(KeyCode::B),
+            press(KeyCode::Backspace),
+            press(KeyCode::C),
+            press(KeyCode::Return),
         ];
         let (_tty, output, file) = open(events);
         let mut buffer = [0; 8];
 
-        assert_eq!(file.read(&mut buffer), Ok(4));
-        assert_eq!(&buffer[..4], b"abc\n");
-        assert_eq!(output.bytes(), b"ab\xc3\xa9\x08c\n");
+        // Type "ab", backspace erases 'b', then "c", newline commits "ac\n".
+        assert_eq!(file.read(&mut buffer), Ok(3));
+        assert_eq!(&buffer[..3], b"ac\n");
+        assert_eq!(output.bytes(), b"ab\x08c\n");
     });
 
     kernel_test!("roxy-tty::canonical-escape", commits_escape_sequence, {
-        let events = alloc::vec![
-            InputEvent::Key {
-                code: KeyCode::ArrowLeft,
-                state: KeyState::Pressed,
-            },
-            character('\n'),
-        ];
+        let events = alloc::vec![press(KeyCode::ArrowLeft), press(KeyCode::Return),];
         let (_tty, output, file) = open(events);
         let mut buffer = [0; 4];
 
@@ -208,10 +215,10 @@ mod tests {
 
     kernel_test!("roxy-tty::shared-line", shares_partial_canonical_line, {
         let (tty, output, first) = open(alloc::vec![
-            character('a'),
-            character('b'),
-            character('c'),
-            character('\n'),
+            press(KeyCode::A),
+            press(KeyCode::B),
+            press(KeyCode::C),
+            press(KeyCode::Return),
         ]);
         let second = TtyFile::open(tty);
         let mut first_half = [0; 2];
@@ -225,7 +232,7 @@ mod tests {
     });
 
     kernel_test!("roxy-tty::disabled-echo", skips_disabled_echo, {
-        let (tty, output, file) = open(alloc::vec![character('x'), character('\n')]);
+        let (tty, output, file) = open(alloc::vec![press(KeyCode::X), press(KeyCode::Return),]);
         tty.line_discipline.lock().settings.echo = false;
         let mut buffer = [0; 2];
 

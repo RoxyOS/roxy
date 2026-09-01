@@ -75,12 +75,17 @@ impl TtyFile {
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_fd::{FileType, SeekError, SeekFrom};
+    use roxy_input::{KeyCode, KeyState};
     use roxy_test::kernel_test;
 
-    use crate::test_support::{character, open};
+    use crate::test_support::{key, open};
+
+    fn press(code: KeyCode) -> roxy_input::KeyEvent {
+        key(code, KeyState::Pressed)
+    }
 
     kernel_test!("roxy-tty::file-adapter", delegates_tty_io, {
-        let (_tty, output, file) = open(alloc::vec![character('x'), character('\n')]);
+        let (_tty, output, file) = open(alloc::vec![press(KeyCode::X), press(KeyCode::Return)]);
         let mut buffer = [0; 4];
 
         assert!(file.is_terminal());

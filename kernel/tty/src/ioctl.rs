@@ -68,7 +68,7 @@ impl Tty {
 
         if when == ApplyWhen::Flush {
             self.buffered.lock().clear();
-            while self.input.read_event().is_some() {}
+            while self.input.read_key().is_some() {}
         }
 
         // Buffered input inside line discipline
@@ -181,13 +181,18 @@ fn validate_fixed(operation: &'static str, actual: u32, expected: u32) -> Result
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_fd::{IoctlError, IoctlRequest};
+    use roxy_input::{KeyCode, KeyState};
     use roxy_test::kernel_test;
     use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
 
-    use crate::test_support::{character, open};
+    use crate::test_support::{key, open};
+
+    fn press(code: KeyCode) -> roxy_input::KeyEvent {
+        key(code, KeyState::Pressed)
+    }
 
     kernel_test!("roxy-tty::termios-ioctl", updates_input_mode, {
-        let (_tty, output, file) = open(alloc::vec![character('x')]);
+        let (_tty, output, file) = open(alloc::vec![press(KeyCode::X)]);
         let mut termios = Termios::default();
 
         file.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
@@ -227,7 +232,7 @@ mod tests {
     });
 
     kernel_test!("roxy-tty::termios-flush", discards_pending_input, {
-        let (tty, _output, file) = open(alloc::vec![character('x')]);
+        let (tty, _output, file) = open(alloc::vec![press(KeyCode::X)]);
         let _ = tty.line_discipline.lock().process(b"partial");
         tty.buffered.lock().extend_from_slice(b"ready");
         let mut termios = Termios::default();
@@ -240,7 +245,7 @@ mod tests {
         .unwrap();
 
         assert!(tty.buffered.lock().is_empty());
-        assert!(tty.input.read_event().is_none());
+        assert!(tty.input.read_key().is_none());
         assert_eq!(
             tty.line_discipline.lock().process(b"\n").buffer.unwrap(),
             b"\n"

@@ -3,17 +3,17 @@
 ## Purpose and scope
 
 `roxy-ps2` owns the x86_64 i8042 first port and ISA IRQ1. It converts Scan Code Set 1 keyboard
-traffic from a US 104-key keyboard into a bounded `roxy-input::InputDevice` stream of character and
-special-key events. It does not implement a terminal line discipline, echo, terminal attributes,
-control signals, layout selection, mouse input, or the i8042 second port.
+traffic from a US 104-key keyboard into a bounded `roxy-input::InputDevice` stream of raw key
+events. It does not implement a terminal line discipline, echo, terminal attributes, control
+signals, layout selection, mouse input, or the i8042 second port.
 
-The driver uses `pc-keyboard` 0.9 with `PS2Keyboard<Us104Key, ScancodeSet1>` and
-`HandleControl::Ignore`. That crate is `no_std`, is licensed under MIT or Apache-2.0, maintains the
-stateful Set 1 and modifier mapping required here, and keeps third-party decoder types inside this
-subsystem. Character key presses become Unicode events; releases for character keys and unsupported
-raw keys are discarded. Navigation and function keys retain pressed/released state as repository-owned
-key codes. Enter, backspace, tab, space, escape, letters, digits, and basic punctuation remain
-character events; Ctrl does not synthesize control characters.
+The driver uses `pc-keyboard` 0.9 for scan-code parsing only: `ScancodeSet1` turns bytes into
+`KeyEvent` records. The stateful layout decoder (`EventDecoder`, layouts, modifier state) is
+deliberately **not** used here; character and layout mapping belongs to consumers such as
+`roxy-tty`. That crate is `no_std`, is licensed under MIT or Apache-2.0, and keeps third-party
+decoder types inside this subsystem. Every physical key press and release — including modifiers
+and character-key releases — becomes a repository-owned `KeyCode` event. No control characters
+are synthesized and no Unicode characters are produced.
 
 ## Initialization and hardware ownership
 
@@ -30,15 +30,15 @@ silently fall back to an output-only framebuffer terminal.
 
 ## Buffering
 
-Decoded input enters a fixed-capacity `heapless::Deque<InputEvent, 256>`. IRQ handling never allocates or
-blocks. When the queue is full, the arriving byte is discarded without additional accounting;
-queued events retain their order. `InputDevice::read_event` removes one oldest event or returns
-`None` without waiting. It does not encode bytes, interpret a caller buffer, wait for interrupts, or
-apply terminal semantics; the TTY FD adapter owns those policies.
+Raw key events enter a fixed-capacity `heapless::Deque<KeyEvent, 256>`. IRQ handling never
+allocates or blocks. When the queue is full, the arriving event is discarded without additional
+accounting; queued events retain their order. `InputDevice::read_key` removes one oldest event or
+returns `None` without waiting. It does not encode bytes, interpret a caller buffer, wait for
+interrupts, or apply terminal semantics; the TTY FD adapter owns those policies.
 
 ## Interrupt and locking contract
 
-The IRQ handler reads port `0x60` before taking driver state, then decodes and enqueues under the
+The IRQ handler reads port `0x60` before taking driver state, then parses and enqueues under the
 driver lock. After a successfully queued event it notifies registered input listeners, which may
 wake token-checked readiness waiters but do not process terminal input in interrupt context. It
 runs with interrupts disabled and must not allocate, block, switch threads, or retain terminal,

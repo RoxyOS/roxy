@@ -5,18 +5,18 @@ extern crate alloc;
 #[cfg(not(target_arch = "x86_64"))]
 compile_error!("roxy-ps2 currently supports only x86_64 i8042 controllers");
 
-mod decoder;
 mod i8042;
 mod input;
 mod mouse;
 mod psaux;
+mod scancode;
 
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use alloc::sync::Arc;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, IrqLine};
-use roxy_input::{InputDevice, InputListener, InputListeners};
+use roxy_input::{InputDevice, InputListener, InputListeners, KeyEvent};
 use roxy_utils::Lock;
 use spin::Once;
 
@@ -104,7 +104,7 @@ fn handle_mouse_irq() {
 }
 
 impl InputDevice for Ps2InputDevice {
-    fn read_event(&self) -> Option<roxy_input::InputEvent> {
+    fn read_key(&self) -> Option<KeyEvent> {
         CurrentArchitectureBackend::without_interrupts(|| KEYBOARD_INPUT.lock().read())
     }
 
@@ -114,12 +114,12 @@ impl InputDevice for Ps2InputDevice {
 }
 
 #[cfg(feature = "kernel-test")]
-pub fn inject_for_test(input_bytes: &[u8]) {
+pub fn inject_for_test(events: &[KeyEvent]) {
     CurrentArchitectureBackend::without_interrupts(|| {
         let mut input = KEYBOARD_INPUT.lock();
 
-        for &byte in input_bytes {
-            let _ = input.enqueue_event(roxy_input::InputEvent::Character(char::from(byte)));
+        for &event in events {
+            let _ = input.enqueue_event(event);
         }
     });
 
@@ -128,19 +128,28 @@ pub fn inject_for_test(input_bytes: &[u8]) {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
+    use roxy_input::{KeyCode, KeyEvent, KeyState};
     use roxy_test::kernel_test;
 
-    kernel_test!("roxy-ps2::input-device", reads_injected_bytes, {
-        super::inject_for_test(b"ok");
+    fn event(code: KeyCode, state: KeyState) -> KeyEvent {
+        KeyEvent { code, state }
+    }
+
+    kernel_test!("roxy-ps2::input-device", reads_injected_key_events, {
+        let events = [
+            event(KeyCode::A, KeyState::Pressed),
+            event(KeyCode::B, KeyState::Pressed),
+        ];
+        super::inject_for_test(&events);
 
         assert_eq!(
-            super::input_device().read_event(),
-            Some(roxy_input::InputEvent::Character('o'))
+            super::input_device().read_key(),
+            Some(event(KeyCode::A, KeyState::Pressed))
         );
         assert_eq!(
-            super::input_device().read_event(),
-            Some(roxy_input::InputEvent::Character('k'))
+            super::input_device().read_key(),
+            Some(event(KeyCode::B, KeyState::Pressed))
         );
-        assert_eq!(super::input_device().read_event(), None);
+        assert_eq!(super::input_device().read_key(), None);
     });
 }
