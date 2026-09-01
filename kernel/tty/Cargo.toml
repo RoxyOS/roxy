@@ -9,6 +9,7 @@ publish.workspace = true
 kernel-test = ["dep:linkme", "dep:roxy-test", "roxy-line-discipline/kernel-test"]
 
 [dependencies]
+heapless.workspace = true
 linkme = { workspace = true, optional = true }
 spin.workspace = true
 

@@ -9,32 +9,30 @@ use alloc::{
 
 use roxy_utils::Lock;
 
-/// A shared source of raw keyboard events.
-///
-/// Implementations expose physical key presses and releases without applying a keyboard layout:
-/// layout mapping (scancode to character, modifiers, dead keys) is owned by consumers. The TTY
-/// decodes events through `pc_keyboard`; a future graphics stack maps them through its own layout
-/// engine (e.g. XKB).
-pub trait InputDevice: Send + Sync {
-    /// Returns the oldest available key event without blocking.
-    #[must_use]
-    fn read_key(&self) -> Option<KeyEvent>;
-
-    /// Registers a listener notified after this device receives input.
-    fn register_listener(&self, _listener: Arc<dyn InputListener>) {}
-}
-
-/// Receives notification that an input device may have queued another event.
+/// Receives every parsed key event published to the input manager.
 pub trait InputListener: Send + Sync {
-    fn on_recive_input(&self);
+    /// Called once per parsed key event, in the producer's context (IRQ).
+    fn on_recive_input(&self, key: KeyEvent);
 }
 
-/// Owns listeners notified when an input device queues an event.
-pub struct InputListeners {
+/// Owns the listener registry and broadcasts parsed key events to every registered listener.
+///
+/// The manager is a global singleton: drivers publish events via [`publish`], and consumers
+/// register via [`register_listener`]. Registration happens at boot (before interrupts are
+/// enabled), after which `publish` is called only from IRQ context.
+pub struct InputManager {
     listeners: Lock<Vec<Weak<dyn InputListener>>>,
 }
 
-impl InputListeners {
+static INPUT_MANAGER: InputManager = InputManager::new();
+
+impl Default for InputManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl InputManager {
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -42,27 +40,42 @@ impl InputListeners {
         }
     }
 
+    /// Registers a listener to receive every future key event.
+    ///
+    /// The manager stores a weak reference; the caller must keep the `Arc` alive for the
+    /// listener to remain registered.
     pub fn register(&self, listener: &Arc<dyn InputListener>) {
         self.listeners.lock().push(Arc::downgrade(listener));
     }
 
-    pub fn notify(&self) {
+    /// Broadcasts one key event to every registered listener.
+    ///
+    /// Called from the driver's IRQ handler. Each listener receives a copy of the event.
+    /// Expired listeners (whose `Arc` was dropped) are cleaned up during the iteration.
+    pub fn publish(&self, key: KeyEvent) {
         let mut listeners = self.listeners.lock();
         listeners.retain(|listener| {
             let Some(listener) = listener.upgrade() else {
                 return false;
             };
-
-            listener.on_recive_input();
+            listener.on_recive_input(key);
             true
         });
     }
 }
 
-impl Default for InputListeners {
-    fn default() -> Self {
-        Self::new()
-    }
+/// Registers a listener with the process-wide input manager.
+///
+/// Called at boot for each consumer (TTY, future evdev, etc.).
+pub fn register_listener(listener: &Arc<dyn InputListener>) {
+    INPUT_MANAGER.register(listener);
+}
+
+/// Publishes one parsed key event to every registered listener.
+///
+/// Called by the keyboard driver's IRQ handler.
+pub fn publish(key: KeyEvent) {
+    INPUT_MANAGER.publish(key);
 }
 
 /// One physical key press or release.

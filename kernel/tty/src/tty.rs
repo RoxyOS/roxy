@@ -2,7 +2,6 @@ use alloc::sync::Arc;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_fd::{FileError, PollEvents};
-use roxy_input::InputDevice;
 use roxy_key_decoder::KeyDecoder;
 use roxy_line_discipline::{LineDiscipline, ProcessResult};
 use roxy_poll::{PollListener, PollRegistration};
@@ -13,16 +12,16 @@ use crate::Tty;
 use crate::encoder::{EncodedInputEvent, encode_decoded};
 
 impl Tty {
-    pub(super) fn new(input: Arc<dyn InputDevice>, output: Arc<dyn TerminalOutput>) -> Self {
+    pub(super) fn new(output: Arc<dyn TerminalOutput>) -> Self {
         let window_size = output.window_size();
 
         Self {
-            input,
             output,
             line_discipline: Lock::new(LineDiscipline::new()),
             decoder: Lock::new(KeyDecoder::new()),
             window_size: Lock::new(window_size),
             buffered: Lock::new(alloc::vec::Vec::new()),
+            pending: Lock::new(heapless::Deque::new()),
             read_lock: Lock::new(()),
             poll_listeners: Arc::new(roxy_poll::PollListeners::new()),
             foreground_pgid: Lock::new(None),
@@ -106,7 +105,7 @@ impl Tty {
     /// The decoder lock is acquired before the line-discipline lock, matching the read path's
     /// acquisition order (decoder in `next_input_event`, then discipline in `fill_buffered`).
     /// Events are only consumed after both locks are held, so a failed `try_lock` leaves the
-    /// event in the queue for the read path to handle.
+    /// event in the pending queue for the read path to handle.
     pub(super) fn try_process_input_arrival(&self) {
         let Some(mut decoder) = self.decoder.try_lock() else {
             return;
@@ -114,7 +113,7 @@ impl Tty {
         let Some(mut discipline) = self.line_discipline.try_lock() else {
             return;
         };
-        let Some(event) = self.input.read_key() else {
+        let Some(event) = self.pending.lock().pop_front() else {
             return;
         };
         let Some(decoded_key) = decoder.decode(event) else {
@@ -209,7 +208,8 @@ impl Tty {
     /// yield `None` from the decoder and are skipped; modifier releases update state only.
     fn next_input_event(&self) -> Option<EncodedInputEvent> {
         loop {
-            let event = self.input.read_key()?;
+            let event =
+                CurrentArchitectureBackend::without_interrupts(|| self.pending.lock().pop_front())?;
             let decoded = self.decoder.lock().decode(event)?;
             if let Some(encoded) = encode_decoded(decoded) {
                 return Some(encoded);

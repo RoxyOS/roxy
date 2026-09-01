@@ -9,8 +9,9 @@ mod tty;
 
 use alloc::{sync::Arc, vec::Vec};
 
+use heapless::Deque;
 use roxy_fd::OpenFile;
-use roxy_input::{InputDevice, InputListener};
+use roxy_input::{InputListener, KeyEvent};
 use roxy_key_decoder::KeyDecoder;
 use roxy_line_discipline::LineDiscipline;
 use roxy_poll::PollListeners;
@@ -22,8 +23,9 @@ use spin::Once;
 
 use file::TtyFile;
 
+const PENDING_CAPACITY: usize = 256;
+
 struct Tty {
-    input: Arc<dyn InputDevice>,
     output: Arc<dyn TerminalOutput>,
     line_discipline: Lock<LineDiscipline>,
     /// Decodes raw key events into characters and special keys
@@ -31,6 +33,12 @@ struct Tty {
     decoder: Lock<KeyDecoder>,
     window_size: Lock<WindowSize>,
     buffered: Lock<Vec<u8>>,
+    /// Bounded queue of raw key events received from the input manager.
+    ///
+    /// The IRQ path pushes events here and tries to process them immediately (with `try_lock`
+    /// on decoder and line discipline). The read path pops events from here when the buffer is
+    /// empty. The queue is sized to match the previous PS/2 driver queue depth.
+    pending: Lock<Deque<KeyEvent, PENDING_CAPACITY>>,
     read_lock: Lock<()>,
     poll_listeners: Arc<PollListeners>,
     /// The process group that receives terminal-generated signals, when one is selected.
@@ -41,18 +49,23 @@ static TTY: Once<Arc<Tty>> = Once::new();
 
 /// Publishes the one TTY used for initial process descriptors.
 ///
+/// Returns an `InputListener` that main registers with the process-wide input manager.
+///
 /// # Panics
 ///
 /// Panics when called more than once.
-pub fn initialize(input: Arc<dyn InputDevice>, output: Arc<dyn TerminalOutput>) {
+pub fn initialize(output: Arc<dyn TerminalOutput>) -> Arc<dyn InputListener> {
     assert!(TTY.get().is_none(), "TTY initialized twice");
-    let tty = Arc::new(Tty::new(input, output));
-    tty.input.register_listener(tty.clone());
-    TTY.call_once(|| tty);
+    let tty = Arc::new(Tty::new(output));
+    TTY.call_once(|| tty.clone());
+    tty
 }
 
 impl InputListener for Tty {
-    fn on_recive_input(&self) {
+    fn on_recive_input(&self, key: KeyEvent) {
+        // IRQ context: interrupts are already disabled, so a plain lock on the pending queue
+        // is safe (the read path disables interrupts while holding it).
+        let _ = self.pending.lock().push_back(key);
         self.try_process_input_arrival();
         self.poll_listeners.notify();
     }
@@ -76,25 +89,13 @@ mod test_support {
     use core::sync::atomic::{AtomicUsize, Ordering};
 
     use roxy_fd::OpenFile;
-    use roxy_input::{InputDevice, KeyCode, KeyEvent, KeyState};
+    use roxy_input::{KeyCode, KeyEvent, KeyState};
     use roxy_terminal::{OutputError, TerminalOutput};
     use roxy_tty_types::WindowSize;
     use spin::Mutex;
 
     use crate::Tty;
     use crate::file::TtyFile;
-
-    pub(super) struct EventInput {
-        events: Mutex<Vec<KeyEvent>>,
-    }
-
-    impl InputDevice for EventInput {
-        fn read_key(&self) -> Option<KeyEvent> {
-            let mut events = self.events.lock();
-
-            (!events.is_empty()).then(|| events.remove(0))
-        }
-    }
 
     pub(super) struct MockOutput {
         bytes: Mutex<Vec<u8>>,
@@ -153,19 +154,17 @@ mod test_support {
     }
 
     /// Build a raw key event for test injection.
-    ///
-    /// The TTY's internal US-104 layout decoder maps these to characters:
-    /// `KeyCode::A` → `'a'`, `KeyCode::Return` → `'\n'`, etc.
     pub(super) fn key(code: KeyCode, state: KeyState) -> KeyEvent {
         KeyEvent { code, state }
     }
 
     pub(super) fn open(events: Vec<KeyEvent>) -> (Arc<Tty>, Arc<MockOutput>, Arc<OpenFile>) {
-        let input = Arc::new(EventInput {
-            events: Mutex::new(events),
-        });
         let output = Arc::new(MockOutput::new());
-        let tty = Arc::new(Tty::new(input, output.clone()));
+        let tty = Arc::new(Tty::new(output.clone()));
+        // Inject events directly into the pending queue (no IRQ-path processing).
+        for event in events {
+            let _ = tty.pending.lock().push_back(event);
+        }
         let file = TtyFile::open(tty.clone());
 
         (tty, output, file)

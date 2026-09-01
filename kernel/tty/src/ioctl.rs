@@ -1,3 +1,4 @@
+use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_fd::{IoctlError, IoctlRequest};
 use roxy_line_discipline::LineDisciplineSettings;
 use roxy_process::ProcessGroupId;
@@ -68,7 +69,11 @@ impl Tty {
 
         if when == ApplyWhen::Flush {
             self.buffered.lock().clear();
-            while self.input.read_key().is_some() {}
+            // Draining the pending queue must disable interrupts: the IRQ path pushes into the
+            // same queue, and it must not run while this thread holds the queue lock.
+            CurrentArchitectureBackend::without_interrupts(|| {
+                while self.pending.lock().pop_front().is_some() {}
+            });
         }
 
         // Buffered input inside line discipline
@@ -245,7 +250,7 @@ mod tests {
         .unwrap();
 
         assert!(tty.buffered.lock().is_empty());
-        assert!(tty.input.read_key().is_none());
+        assert!(tty.pending.lock().is_empty());
         assert_eq!(
             tty.line_discipline.lock().process(b"\n").buffer.unwrap(),
             b"\n"

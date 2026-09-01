@@ -58,7 +58,8 @@ pub extern "C" fn _start() -> ! {
     roxy_thread::initialize();
     roxy_ps2::initialize();
     roxy_ps2::register_psaux(&device_registry);
-    roxy_tty::initialize(roxy_ps2::input_device(), roxy_terminal::kernel_terminal());
+    let tty = roxy_tty::initialize(roxy_terminal::kernel_terminal());
+    roxy_input::register_listener(&tty);
     roxy_process::initialize(initial_fds::inject);
     roxy_futex::initialize();
     roxy_syscall::initialize();
