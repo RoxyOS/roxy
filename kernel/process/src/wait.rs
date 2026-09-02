@@ -25,6 +25,8 @@ pub struct WaitOptions {
     pub no_hang: bool,
     /// Report stopped children in addition to exited ones (`WUNTRACED`).
     pub wuntraced: bool,
+    /// Report children resumed by SIGCONT in addition to exited and stopped ones (`WCONTINUED`).
+    pub wcontinued: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -38,6 +40,8 @@ pub enum WaitResult {
         process_id: ProcessId,
         signal: Signal,
     },
+    /// A matching child was resumed by SIGCONT after being stopped.
+    Continued { process_id: ProcessId },
     /// A matching child exists, but none has changed state; returned only by a non-blocking wait.
     Pending,
 }
@@ -78,6 +82,15 @@ pub fn wait_current(target: WaitTarget, options: WaitOptions) -> Result<WaitResu
                 table.find_stopped_matching_child(parent_process_id, target)
         {
             return Ok(WaitResult::Stopped { process_id, signal });
+        }
+
+        if options.wcontinued
+            && let Some(process_id) = table.find_continued_matching_child(parent_process_id, target)
+        {
+            // The continuation is a one-shot event: clear it so a later wait does not report
+            // the same resumption again.
+            table.processes.get_mut(&process_id).unwrap().continued = false;
+            return Ok(WaitResult::Continued { process_id });
         }
 
         if !table.has_matching_child(parent_process_id, target) {
@@ -129,6 +142,22 @@ impl ProcessTable {
         })
     }
 
+    fn find_continued_matching_child(
+        &self,
+        parent_process_id: ProcessId,
+        target: WaitTarget,
+    ) -> Option<ProcessId> {
+        self.processes.iter().find_map(|(process_id, process)| {
+            if process.parent_process_id == Some(parent_process_id)
+                && target.is_target(*process_id)
+                && process.continued
+            {
+                return Some(*process_id);
+            }
+            None
+        })
+    }
+
     fn has_matching_child(&self, parent_process_id: ProcessId, target: WaitTarget) -> bool {
         self.processes.iter().any(|(process_id, process)| {
             process.parent_process_id == Some(parent_process_id) && target.is_target(*process_id)
@@ -155,8 +184,8 @@ impl ProcessTable {
             matches!(
                 process.state,
                 ProcessState::Exited(_) | ProcessState::Stopped(_)
-            ),
-            "waitable child was neither exited nor stopped"
+            ) || process.continued,
+            "waitable child was neither exited, stopped, nor continued"
         );
         let parent_process_id = process.parent_process_id?;
         let target = self.child_waiters.get(&parent_process_id)?;

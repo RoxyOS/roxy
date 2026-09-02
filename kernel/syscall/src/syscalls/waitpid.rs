@@ -13,12 +13,15 @@ syscall!(SyscallNumber::Waitpid, handle(target: WaitTarget => Invalid, status: N
 
 const WNOHANG: u64 = 1;
 const WUNTRACED: u64 = 2;
+const WCONTINUED: u64 = 8;
 
-/// Linux `waitpid` option bits, validated against the `WNOHANG`/`WUNTRACED` constants above.
+/// Linux `waitpid` option bits, validated against the `WNOHANG`/`WUNTRACED`/`WCONTINUED`
+/// constants above.
 #[derive(Clone, Copy)]
 struct WaitOptions {
     no_hang: bool,
     wuntraced: bool,
+    wcontinued: bool,
 }
 
 fn handle(
@@ -44,6 +47,7 @@ fn handle(
     let wait_options = roxy_process::WaitOptions {
         no_hang: options.no_hang,
         wuntraced: options.wuntraced,
+        wcontinued: options.wcontinued,
     };
 
     match roxy_process::wait_current(target, wait_options).map_err(map_wait_error)? {
@@ -63,6 +67,16 @@ fn handle(
         WaitResult::Stopped { process_id, signal } => {
             if let Some(output) = status {
                 let encoded = encode_stopped_status(signal);
+
+                // SAFETY: u32 has no padding and encoded is initialized.
+                unsafe { output.write(&encoded) }?;
+            }
+
+            Ok(process_id.as_u64())
+        }
+        WaitResult::Continued { process_id } => {
+            if let Some(output) = status {
+                let encoded = encode_continued_status();
 
                 // SAFETY: u32 has no padding and encoded is initialized.
                 unsafe { output.write(&encoded) }?;
@@ -94,7 +108,7 @@ impl SyscallArg for WaitTarget {
 
 impl SyscallArg for WaitOptions {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
-        let unknown = raw & !(WNOHANG | WUNTRACED);
+        let unknown = raw & !(WNOHANG | WUNTRACED | WCONTINUED);
         if unknown != 0 {
             return Err(unsupported_argument(
                 "waitpid.options",
@@ -106,6 +120,7 @@ impl SyscallArg for WaitOptions {
         Ok(Self {
             no_hang: raw & WNOHANG != 0,
             wuntraced: raw & WUNTRACED != 0,
+            wcontinued: raw & WCONTINUED != 0,
         })
     }
 }
@@ -121,6 +136,12 @@ fn encode_status(status: roxy_process::ExitStatus) -> u32 {
 /// (`WIFSTOPPED` + `WSTOPSIG`).
 fn encode_stopped_status(signal: roxy_signal::Signal) -> u32 {
     0x7f | (u32::from(signal.number()) << 8)
+}
+
+/// Encodes a continued child's status: the all-ones `0xffff` pattern that `WIFCONTINUED`
+/// recognizes.
+const fn encode_continued_status() -> u32 {
+    0xffff
 }
 
 const fn map_wait_error(error: WaitError) -> Errno {

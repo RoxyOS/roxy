@@ -82,7 +82,11 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
             return Err(SignalError::NoSuchProcess);
         };
 
-        match process.state {
+        // Set when SIGCONT resumes a stopped process, to wake the parent's waiter only after
+        // `process`'s mutable borrow has been released below.
+        let mut wake_waiter = false;
+
+        let resume_thread_id = match process.state {
             // Reaped or exiting processes are no longer reachable.
             ProcessState::Exited(_) | ProcessState::Exiting(_) => {
                 return Err(SignalError::NoSuchProcess);
@@ -92,6 +96,10 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
                 // returns the thread to the syscall return it was stopped in.
                 Signal::Continue => {
                     process.state = ProcessState::Running;
+                    // Record the continuation so a parent waiting with WCONTINUED can observe
+                    // this single resumption, and wake that waiter to report it.
+                    process.continued = true;
+                    wake_waiter = true;
                     process.main_thread_id
                 }
                 // SIGKILL must still terminate a stopped process: queue it and wake the
@@ -151,7 +159,13 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
                 });
                 process.main_thread_id
             }
+        };
+
+        if wake_waiter {
+            table.wake_state_waiter(process_id);
         }
+
+        resume_thread_id
     };
 
     let _ = scheduler::wake_unconditionally(thread_id);

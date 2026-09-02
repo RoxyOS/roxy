@@ -66,6 +66,7 @@ impl Process {
             signal_frames: Vec::new(),
             signal_actions: HashMap::new(),
             state: ProcessState::Running,
+            continued: false,
         }
     }
 
@@ -96,6 +97,7 @@ impl Process {
             signal_frames: Vec::new(),
             signal_actions,
             state: ProcessState::Running,
+            continued: false,
         }
     }
 }

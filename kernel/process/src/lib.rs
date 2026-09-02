@@ -72,6 +72,9 @@ struct Process {
     signal_frames: Vec<u64>,
     signal_actions: HashMap<Signal, SignalAction>,
     state: ProcessState,
+    /// Set when a stopped process is resumed by SIGCONT; a parent waiting with WCONTINUED
+    /// observes the continuation once and then this is cleared.
+    continued: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
