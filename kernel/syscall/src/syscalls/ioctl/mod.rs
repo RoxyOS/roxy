@@ -1,3 +1,5 @@
+mod evdev;
+mod evdev_abi;
 mod execute;
 mod framebuffer;
 mod framebuffer_abi;
@@ -15,7 +17,5 @@ syscall!(SyscallNumber::Ioctl, handle(fd: Fd => BadFd, raw_request: u64, raw_arg
 fn handle(fd: Fd, raw_request: u64, raw_argument: u64) -> SyscallResult {
     let file = roxy_process::current_open_file(fd).map_err(|_| Errno::BadFd)?;
 
-    execute(file.as_ref(), raw_request, raw_argument)?;
-
-    Ok(0)
+    execute(file.as_ref(), raw_request, raw_argument)
 }

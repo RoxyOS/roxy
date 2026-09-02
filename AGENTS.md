@@ -222,20 +222,27 @@ procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`
 
 ### Design and Safety
 
-- Userspace ABI layouts belong exclusively to the syscall subsystem. Define userspace-facing
+- Direct syscall ABI — records that the syscall marshalling layer encodes or decodes as
+  syscall/ioctl arguments — belongs exclusively to the syscall subsystem. Define such
   `#[repr(C)]` records, explicit ABI padding, size/offset assertions, request numbers, and raw
   pointer interpretation only under `kernel/syscall`; never expose those records through a shared
   kernel API or reproduce them in process, FD, TTY, filesystem, or other domain subsystems.
-- Represent each userspace ABI record in the syscall subsystem with a typed `#[repr(C)]` struct.
-  Model padding explicitly and initialize every field; do not encode or decode structured ABI data
-  by manually indexing raw byte buffers. Decode immediately into ABI-neutral kernel types before
-  dispatch and encode subsystem results only when returning through the selected ABI personality.
-  Keep byte conversion local and document its layout and lifetime invariants in the `SAFETY`
-  comment.
-- A `#[repr(C)]` type outside `kernel/syscall` is permitted only for a non-userspace contract such
-  as an architecture context, hardware-defined record, or internal foreign-function boundary. Its
-  owning design and nearby source must identify that contract so it cannot be mistaken for a
-  userspace ABI layout.
+  This exclusivity covers only ABI that crosses the syscall boundary through marshalled
+  arguments; it does not apply to device-serialised protocol records (e.g. the evdev
+  `input_event` stream) that a device serialises itself and serves to userspace through a
+  generic byte `read`, without the syscall layer interpreting the record layout.
+- Represent each direct syscall ABI record in the syscall subsystem with a typed `#[repr(C)]`
+  struct. Model padding explicitly and initialize every field; do not encode or decode
+  structured ABI data by manually indexing raw byte buffers. Decode immediately into ABI-neutral
+  kernel types before dispatch and encode subsystem results only when returning through the
+  selected ABI personality. Keep byte conversion local and document its layout and lifetime
+  invariants in the `SAFETY` comment.
+- A `#[repr(C)]` type outside `kernel/syscall` is permitted for:
+  - a non-userspace contract such as an architecture context, hardware-defined record, or
+    internal foreign-function boundary, or
+  - a device-serialised protocol record that is not direct syscall ABI (as defined above).
+  Its owning design and nearby source must identify the layout source and pin the size/offset
+  with compile-time assertions, so it cannot be mistaken for a direct syscall ABI layout.
 - **IMPORTANT**: **Never** reject, terminate, block indefinitely, silently degrade, or return any
   error for a userspace request because kernel functionality is missing or incomplete without
   first emitting an unconditional serial `UNSUPPORTED` diagnostic naming the syscall or operation,

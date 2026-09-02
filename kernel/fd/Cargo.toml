@@ -12,6 +12,7 @@ kernel-test = ["dep:linkme", "dep:roxy-test"]
 bitflags.workspace = true
 linkme = { workspace = true, optional = true }
 
+roxy-evdev-types.workspace = true
 roxy-fb-types.workspace = true
 roxy-poll.workspace = true
 roxy-test = { workspace = true, optional = true }

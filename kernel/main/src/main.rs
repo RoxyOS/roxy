@@ -58,7 +58,13 @@ pub extern "C" fn _start() -> ! {
     roxy_thread::initialize();
     roxy_ps2::initialize();
     roxy_ps2::register_psaux(&device_registry);
+    let (keyboard_event, keyboard_listener) = roxy_evdev_keyboard::create();
+    device_registry
+        .register(b"keyboard_event", keyboard_event)
+        .expect("keyboard evdev device registered exactly once");
+    let keyboard_listener: alloc::sync::Arc<dyn roxy_input::InputListener> = keyboard_listener;
     let tty = roxy_tty::initialize(roxy_terminal::kernel_terminal());
+    roxy_input::register_listener(&keyboard_listener);
     roxy_input::register_listener(&tty);
     roxy_process::initialize(initial_fds::inject);
     roxy_futex::initialize();

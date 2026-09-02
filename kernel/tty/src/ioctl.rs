@@ -80,7 +80,17 @@ impl Tty {
             IoctlRequest::SetControllingTerminal { force } => self.set_controlling_terminal(force),
             IoctlRequest::FbGetVarInfo(_)
             | IoctlRequest::FbSetVarInfo(_)
-            | IoctlRequest::FbGetFixedInfo(_) => Err(IoctlError::NotTty),
+            | IoctlRequest::FbGetFixedInfo(_)
+            | IoctlRequest::EvdevGetVersion(_)
+            | IoctlRequest::EvdevGetId(_)
+            | IoctlRequest::EvdevGetName(_)
+            | IoctlRequest::EvdevGetPhys(_)
+            | IoctlRequest::EvdevGetUniq(_)
+            | IoctlRequest::EvdevGetRep(_)
+            | IoctlRequest::EvdevSetRep(_)
+            | IoctlRequest::EvdevGetBits { .. }
+            | IoctlRequest::EvdevGrab(_)
+            | IoctlRequest::EvdevSetClockId(_) => Err(IoctlError::NotTty),
         }
     }
 

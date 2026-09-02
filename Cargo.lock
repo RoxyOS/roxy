@@ -374,6 +374,8 @@ dependencies = [
  "roxy-cpu",
  "roxy-devfs",
  "roxy-elf",
+ "roxy-evdev",
+ "roxy-evdev-keyboard",
  "roxy-ext4",
  "roxy-fbdev",
  "roxy-fbterm",
@@ -605,6 +607,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-evdev"
+version = "0.1.0"
+dependencies = [
+ "heapless",
+ "roxy-devfs",
+ "roxy-evdev-types",
+ "roxy-fd",
+ "roxy-poll",
+ "roxy-utils",
+]
+
+[[package]]
+name = "roxy-evdev-keyboard"
+version = "0.1.0"
+dependencies = [
+ "roxy-devfs",
+ "roxy-evdev",
+ "roxy-evdev-types",
+ "roxy-fd",
+ "roxy-input",
+ "roxy-poll",
+ "roxy-time",
+ "roxy-utils",
+]
+
+[[package]]
+name = "roxy-evdev-types"
+version = "0.1.0"
+
+[[package]]
 name = "roxy-ext4"
 version = "0.1.0"
 dependencies = [
@@ -656,6 +688,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.13.1",
  "linkme",
+ "roxy-evdev-types",
  "roxy-fb-types",
  "roxy-poll",
  "roxy-test",
@@ -819,6 +852,7 @@ dependencies = [
  "bitflags 2.13.1",
  "linkme",
  "roxy-arch",
+ "roxy-evdev-types",
  "roxy-fb-types",
  "roxy-fd",
  "roxy-futex",

@@ -1,5 +1,6 @@
 use crate::OpenFile;
 
+pub use roxy_evdev_types::EvdevDeviceId;
 pub use roxy_fb_types::{FbBitfield, FbFixedInfo, FbVarInfo};
 pub use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
 
@@ -22,6 +23,20 @@ pub enum IoctlRequest<'a> {
     FbGetVarInfo(&'a mut FbVarInfo),
     FbSetVarInfo(FbVarInfo),
     FbGetFixedInfo(&'a mut FbFixedInfo),
+    EvdevGetVersion(&'a mut u32),
+    EvdevGetId(&'a mut EvdevDeviceId),
+    EvdevGetName(&'a mut [u8]),
+    EvdevGetPhys(&'a mut [u8]),
+    EvdevGetUniq(&'a mut [u8]),
+    EvdevGetRep(&'a mut [u8; 8]),
+    EvdevSetRep(&'a [u8; 8]),
+    EvdevGetBits {
+        ev: u16,
+        buffer: &'a mut [u8],
+        written: &'a mut usize,
+    },
+    EvdevGrab(bool),
+    EvdevSetClockId(i32),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
