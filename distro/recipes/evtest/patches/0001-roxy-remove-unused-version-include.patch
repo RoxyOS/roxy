@@ -1,0 +1,13 @@
+diff --git a/evtest.c b/evtest.c
+--- a/evtest.c
++++ b/evtest.c
+@@ -43,9 +43,7 @@
+ #include <config.h>
+ #endif
+ 
+-#include <linux/version.h>
+ #include <linux/input.h>
+-
+ #include <string.h>
+ #include <fcntl.h>
+ #include <unistd.h>

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+version=1.32
+revision=1
+
+git_url="https://github.com/freedesktop-unofficial-mirror/evtest"
+commit="b8343ec1124da18bdabcc04809a8731b9e39295d"
+shallow=no
+
+cross_compile=yes
+
+deps="mlibc"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+# evtest is a single-file C program.  Avoid autotools entirely (no autoreconf
+# in the build container) and compile directly.
+configure() {
+	:
+}
+
+build() {
+	clang --target=x86_64-unknown-roxy --sysroot=/sysroot \
+		-D_GNU_SOURCE \
+		-O2 -std=c99 \
+		-o evtest \
+		"${source_dir}/evtest.c"
+}
+
+package() {
+	install -D -m 0755 evtest "${dest_dir}/usr/bin/evtest"
+}
