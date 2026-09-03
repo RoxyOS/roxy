@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+version=411
+revision=1
+
+# xterm is maintained outside x.org by Thomas Dickey and released as xterm-<NNN>.tgz.
+tarball_url="https://invisible-mirror.net/archives/xterm/xterm-${version}.tgz"
+tarball_sha256="969be283670deadd66934865c4de6c5ab045e3a3facc2b228decf91a20d8c36c"
+
+cross_compile=yes
+
+# X11/Xt/Xext/Xmu plus Xaw (Athena) are required for the toolkit widgets.
+# ncurses provides the termcap/terminfo entry for xterm.
+deps="mlibc libx11 libxt libxext libxmu libxaw ncurses xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+clean_workdirs=no
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	export CPPFLAGS=-D_GNU_SOURCE
+
+	# Disable optional dependencies that are not packaged: Xcursor, Xpm,
+	# Xinerama, Xft/fontconfig, and the setuid/setgid install.
+	autotools_configure \
+		--disable-xcursor \
+		--with-xpm=no \
+		--without-xinerama \
+		--disable-setuid \
+		--disable-setgid
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}
