@@ -59,11 +59,13 @@ signal number (its `RSI`/`RDX` are zeroed); an `SA_SIGINFO` handler is invoked a
 frame. The `siginfo_t` carries the real `si_signo`, `si_code`, and sender `si_pid` recorded at
 queue time; the `ucontext_t` mirrors the interrupted general registers and the pre-delivery mask
 (FPU/SSE state stays zeroed, since Roxy does not save or restore it).
-`pop_signal_frame` validates that the caller's stack pointer matches the recorded
-frame, restores the context and mask, and is invoked by the `sigreturn` syscall, which replaces
-the syscall-return contract itself in the syscall subsystem. Spurious `sigreturn` calls return
-`EINVAL`; a handler that never returns (for example after `longjmp`) leaks its frame entry, which
-is a known limitation of the single-frame-stack model.
+`pop_signal_frame` validates that the caller's stack pointer matches the recorded frame base
+plus the popped return-address slot (the handler's `ret` consumes the frame's leading trampoline
+address before the trampoline issues `sigreturn`), restores the context and mask, and is invoked
+by the `sigreturn` syscall, which replaces the syscall-return contract itself in the syscall
+subsystem. Spurious `sigreturn` calls return `EINVAL`; a handler that never returns (for example
+after `longjmp`) leaks its frame entry, which is a known limitation of the single-frame-stack
+model.
 
 `execve` reverts all dispositions to `Default` and clears outstanding signal frames because
 handler addresses point into the replaced image; the mask and pending set survive. The

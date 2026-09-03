@@ -71,8 +71,9 @@ mod x86_64;
 
 #[cfg(target_arch = "x86_64")]
 pub(super) use x86_64::{
-    SIGINFO_OFFSET, SIGNAL_FRAME_SIZE, TRAMPOLINE_BASE, UCONTEXT_OFFSET, USER_CONTEXT_OFFSET,
-    USER_CONTEXT_SIZE, build_bytes, restore_context, restore_old_mask, trampoline,
+    RETURN_ADDRESS_SIZE, SIGINFO_OFFSET, SIGNAL_FRAME_SIZE, TRAMPOLINE_BASE, UCONTEXT_OFFSET,
+    USER_CONTEXT_OFFSET, USER_CONTEXT_SIZE, build_bytes, restore_context, restore_old_mask,
+    trampoline,
 };
 
 #[cfg(not(target_arch = "x86_64"))]

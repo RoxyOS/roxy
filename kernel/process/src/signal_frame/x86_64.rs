@@ -13,7 +13,9 @@ use crate::signal::PendingSignal;
 /// Sits between the interpreter region and the user stack in the current process layout.
 pub(crate) const TRAMPOLINE_BASE: u64 = 0x0000_4000_0000_0000;
 
-const RETURN_ADDRESS_SIZE: usize = size_of::<u64>();
+/// Size of the leading return-address slot that the handler's `ret` pops before the trampoline
+/// runs; `sigreturn` therefore observes the user stack pointer one slot above the frame base.
+pub(crate) const RETURN_ADDRESS_SIZE: usize = size_of::<u64>();
 const OLD_MASK_SIZE: usize = size_of::<u64>();
 pub(crate) const USER_CONTEXT_SIZE: usize = size_of::<UserContext>();
 

@@ -311,9 +311,11 @@ pub fn pop_signal_frame(context: &UserContext) -> Option<UserContext> {
     let process = table.current_process()?;
     let frame_address = process.signal_frames.pop()?;
 
-    if frame_address != context.stack_pointer {
-        // The handler returned to the trampoline with an unexpected stack pointer; refuse to
-        // restore instead of trusting a foreign frame.
+    // The handler's `ret` pops the frame's leading return-address slot (the trampoline entry)
+    // before the trampoline issues `sigreturn`, so the user stack pointer observed at syscall
+    // entry is one slot above the recorded frame base. Refuse to restore a frame whose position
+    // does not match that contract instead of trusting a foreign frame.
+    if frame_address + signal_frame::RETURN_ADDRESS_SIZE as u64 != context.stack_pointer {
         process.signal_frames.push(frame_address);
 
         return None;
