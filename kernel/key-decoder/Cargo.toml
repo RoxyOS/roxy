@@ -7,7 +7,7 @@ publish.workspace = true
 
 [dependencies]
 pc-keyboard.workspace = true
-roxy-input.workspace = true
+roxy-keyboard-input.workspace = true
 
 [lints]
 workspace = true

@@ -9,7 +9,7 @@ use alloc::sync::Arc;
 
 use roxy_evdev::EvdevConfig;
 use roxy_evdev_types::{BUS_I8042, EvdevCapabilities, EvdevDeviceId};
-use roxy_input::{InputListener, KeyEvent};
+use roxy_keyboard_input::{KeyEvent, KeyboardListener};
 
 use crate::event::EvdevEvent;
 
@@ -18,7 +18,7 @@ const KEYBOARD_EVENT_FILE_ID: u64 = 4;
 
 /// A wrapper around the core `roxy_evdev::EvdevDevice`.
 ///
-/// It implements [`InputListener`] for the input manager and forwards serialised events to the
+/// It implements [`KeyboardListener`] for the input manager and forwards serialised events to the
 /// wrapped `inner` evdev device.
 pub struct EvdevKeyboard {
     inner: Arc<roxy_evdev::EvdevDevice>,
@@ -26,7 +26,7 @@ pub struct EvdevKeyboard {
 
 /// Creates the keyboard evdev device.
 ///
-/// Returns the core devfs `Device` (for `/dev/keyboard_event`) and the keyboard `InputListener`
+/// Returns the core devfs `Device` (for `/dev/keyboard_event`) and the keyboard `KeyboardListener`
 /// (for the input manager) sharing one event queue.
 ///
 /// # Panics
@@ -67,7 +67,7 @@ fn keyboard_capabilities() -> EvdevCapabilities {
     }
 }
 
-impl InputListener for EvdevKeyboard {
+impl KeyboardListener for EvdevKeyboard {
     fn on_recive_input(&self, key: KeyEvent) {
         for event in event::key_state_to_evdev_pair(key.state, key.code) {
             self.push(event);

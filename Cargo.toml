@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/block", "kernel/boot", "kernel/cpu", "kernel/devfs", "kernel/elf", "kernel/evdev", "kernel/evdev-keyboard", "kernel/evdev-types", "kernel/ext4", "kernel/fb-types", "kernel/fbdev", "kernel/fbterm", "kernel/fd", "kernel/futex", "kernel/input", "kernel/interrupt", "kernel/key-decoder", "kernel/line-discipline", "kernel/main", "kernel/memory", "kernel/poll", "kernel/pipe", "kernel/process", "kernel/ps2", "kernel/serial", "kernel/signal", "kernel/syscall", "kernel/terminal", "kernel/test", "kernel/thread", "kernel/time", "kernel/timer-wait", "kernel/tty", "kernel/tty-types", "kernel/utils", "kernel/vfs", "kernel/vm"]
+members = ["xtask", "kernel/arch", "kernel/block", "kernel/boot", "kernel/cpu", "kernel/devfs", "kernel/elf", "kernel/evdev", "kernel/evdev-keyboard", "kernel/evdev-types", "kernel/ext4", "kernel/fb-types", "kernel/fbdev", "kernel/fbterm", "kernel/fd", "kernel/futex", "kernel/keyboard-input", "kernel/interrupt", "kernel/key-decoder", "kernel/line-discipline", "kernel/main", "kernel/memory", "kernel/poll", "kernel/pipe", "kernel/process", "kernel/ps2", "kernel/serial", "kernel/signal", "kernel/syscall", "kernel/terminal", "kernel/test", "kernel/thread", "kernel/time", "kernel/timer-wait", "kernel/tty", "kernel/tty-types", "kernel/utils", "kernel/vfs", "kernel/vm"]
 
 [workspace.package]
 edition = "2024"
@@ -47,7 +47,7 @@ roxy-fbdev.path = "kernel/fbdev"
 roxy-fbterm.path = "kernel/fbterm"
 roxy-fd.path = "kernel/fd"
 roxy-futex.path = "kernel/futex"
-roxy-input.path = "kernel/input"
+roxy-keyboard-input.path = "kernel/keyboard-input"
 roxy-interrupt.path = "kernel/interrupt"
 roxy-key-decoder.path = "kernel/key-decoder"
 roxy-line-discipline.path = "kernel/line-discipline"

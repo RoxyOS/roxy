@@ -266,7 +266,7 @@ fn map_output_error(error: OutputError) -> FileError {
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_fd::FileError;
-    use roxy_input::{KeyCode, KeyState};
+    use roxy_keyboard_input::{KeyCode, KeyState};
     use roxy_test::kernel_test;
 
     use crate::test_support::{key, open};

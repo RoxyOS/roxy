@@ -17,9 +17,9 @@ policy, committed lines, and partially consumed data terminal-wide rather than p
 whichever descriptor read first. Each `open` creates a distinct `OpenFile` whose stateless
 `TtyFile` wrapper retains one `Arc` to the common TTY.
 
-`initialize` returns the TTY as an `Arc<dyn roxy_input::InputListener>`. `kernel/main` registers
-it with the process-wide input manager (`roxy_input::register_listener`); it does not register
-with any hardware driver. When the driver publishes a raw `KeyEvent`, the input manager calls the
+`initialize` returns the TTY as an `Arc<dyn roxy_keyboard_input::KeyboardListener>`. `kernel/main` registers
+it with the process-wide keyboard manager (`roxy_keyboard_input::register_listener`); it does not register
+with any hardware driver. When the driver publishes a raw `KeyEvent`, the keyboard manager calls the
 TTY's `on_recive_input(key)` in IRQ context.
 
 ### Input path
@@ -63,7 +63,7 @@ backpressure model.
 
 Input arrival wakes its poll listener queue, after which the syscall layer re-runs `Tty::poll`; a
 canonical partial line may therefore produce a harmless wakeup but never a false readable result.
-Registration with the input manager is separate from readiness querying and is retained by an
+Registration with the keyboard manager is separate from readiness querying and is retained by an
 RAII guard for the duration of one blocked poll attempt.
 
 ### Locking and IRQ safety

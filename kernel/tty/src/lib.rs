@@ -11,8 +11,8 @@ use alloc::{sync::Arc, vec::Vec};
 
 use heapless::Deque;
 use roxy_fd::OpenFile;
-use roxy_input::{InputListener, KeyEvent};
 use roxy_key_decoder::KeyDecoder;
+use roxy_keyboard_input::{KeyEvent, KeyboardListener};
 use roxy_line_discipline::LineDiscipline;
 use roxy_poll::PollListeners;
 use roxy_process::ProcessGroupId;
@@ -52,12 +52,12 @@ static TTY: Once<Arc<Tty>> = Once::new();
 
 /// Publishes the one TTY used for initial process descriptors.
 ///
-/// Returns an `InputListener` that main registers with the process-wide input manager.
+/// Returns an `KeyboardListener` that main registers with the process-wide input manager.
 ///
 /// # Panics
 ///
 /// Panics when called more than once.
-pub fn initialize(output: Arc<dyn TerminalOutput>) -> Arc<dyn InputListener> {
+pub fn initialize(output: Arc<dyn TerminalOutput>) -> Arc<dyn KeyboardListener> {
     assert!(TTY.get().is_none(), "TTY initialized twice");
     let tty = Arc::new(Tty::new(output));
     TTY.call_once(|| tty.clone());
@@ -88,7 +88,7 @@ fn on_session_leader_exit(session: roxy_process::SessionId) {
     }
 }
 
-impl InputListener for Tty {
+impl KeyboardListener for Tty {
     fn on_recive_input(&self, key: KeyEvent) {
         // IRQ context: interrupts are already disabled, so a plain lock on the pending queue
         // is safe (the read path disables interrupts while holding it).
@@ -138,7 +138,7 @@ mod test_support {
     use core::sync::atomic::{AtomicUsize, Ordering};
 
     use roxy_fd::OpenFile;
-    use roxy_input::{KeyCode, KeyEvent, KeyState};
+    use roxy_keyboard_input::{KeyCode, KeyEvent, KeyState};
     use roxy_terminal::{OutputError, TerminalOutput};
     use roxy_tty_types::WindowSize;
     use spin::Mutex;
@@ -222,7 +222,7 @@ mod test_support {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use roxy_input::{KeyCode, KeyEvent, KeyState};
+    use roxy_keyboard_input::{KeyCode, KeyEvent, KeyState};
     use roxy_test::kernel_test;
     use roxy_tty_types::WindowSize;
 

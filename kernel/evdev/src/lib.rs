@@ -63,7 +63,7 @@ impl EvdevDevice {
 
     /// Queues one serialised event and wakes blocked poll listeners.
     ///
-    /// Called by the owning producer (e.g. the keyboard `InputListener`) on every input
+    /// Called by the owning producer (e.g. the keyboard `KeyboardListener`) on every input
     /// arrival. The caller is responsible for filling the timestamp and the `type`/`code`/
     /// `value` fields of `event`.
     pub fn push(&self, event: InputEvent) {

@@ -2,15 +2,15 @@
 
 ## Purpose and scope
 
-`roxy-input` defines the shared raw-input boundary and the **input-manager** layer between
+`roxy-keyboard-input` defines the shared raw-input boundary and the **keyboard-manager** layer between
 keyboard drivers and consumers. Drivers own hardware access and scancode parsing; the input
 manager owns listener registration and event broadcast. It owns no hardware, queues, terminal
 semantics, file descriptors, or output devices.
 
 ## Contract and limits
 
-`roxy_input::InputManager` is a process-wide singleton that broadcasts `KeyEvent`s to every
-registered `InputListener`. A driver calls `roxy_input::publish(key)` from its IRQ handler after
+`roxy_keyboard_input::KeyboardManager` is a process-wide singleton that broadcasts `KeyEvent`s to every
+registered `KeyboardListener`. A driver calls `roxy_keyboard_input::publish(key)` from its IRQ handler after
 parsing one scancode byte; the manager iterates its listener list and delivers one copy of the
 event to each. This is a push model: every listener receives the event in the producer's context
 (IRQ) and is responsible for buffering or dropping it if it cannot be processed immediately.
@@ -20,9 +20,9 @@ pressed/released `KeyState`. Layout mapping, byte encoding, buffer filling, sign
 echo, canonical processing, terminal attributes, blocking APIs, and device enumeration are
 absent from this boundary; they belong to consumers such as the TTY.
 
-## InputManager
+## KeyboardManager
 
-The `InputManager` holds a `Lock<Vec<Weak<dyn InputListener>>>`. Registration happens once per
+The `KeyboardManager` holds a `Lock<Vec<Weak<dyn KeyboardListener>>>`. Registration happens once per
 consumer at boot, before interrupts are enabled, and stores a weak reference so that a dropped
 consumer is automatically unregistered on the next `publish` traversal.
 
@@ -46,7 +46,7 @@ A keyboard driver:
 1. receives hardware scancode bytes in its IRQ handler,
 2. parses the byte into a `KeyEvent` (pressed or released, including modifiers and
    character-key releases),
-3. calls `roxy_input::publish(key)` exactly once per parsed event.
+3. calls `roxy_keyboard_input::publish(key)` exactly once per parsed event.
 
 The driver does not buffer events, notify consumers, register listeners, or keep a queue.
 Back-pressure (a consumer that cannot accept a new event) is handled by the consumer's own
@@ -55,8 +55,8 @@ bounded queue; the driver simply drops the event if the consumer's queue is full
 ## Consumer contract
 
 A consumer (TTY, evdev, …):
-1. creates an `Arc<dyn InputListener>` whose `on_recive_input` receives each `KeyEvent`,
-2. registers it with `roxy_input::register_listener(listener)` at boot,
+1. creates an `Arc<dyn KeyboardListener>` whose `on_recive_input` receives each `KeyEvent`,
+2. registers it with `roxy_keyboard_input::register_listener(listener)` at boot,
 3. buffers the event or processes it inline (including with `try_lock` in IRQ context).
 
 The consumer owns its own bounded queue and decides whether to process immediately (IRQ-path

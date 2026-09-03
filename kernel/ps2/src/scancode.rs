@@ -1,5 +1,5 @@
 use pc_keyboard::{ScancodeSet, ScancodeSet1};
-use roxy_input::{KeyCode, KeyEvent, KeyState};
+use roxy_keyboard_input::{KeyCode, KeyEvent, KeyState};
 
 pub(crate) struct ScancodeParser {
     set: ScancodeSet1,
@@ -184,7 +184,7 @@ fn map_editing_and_numpad(code: pc_keyboard::KeyCode) -> Option<KeyCode> {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use roxy_input::{KeyCode, KeyEvent, KeyState};
+    use roxy_keyboard_input::{KeyCode, KeyEvent, KeyState};
     use roxy_test::kernel_test;
 
     use super::ScancodeParser;

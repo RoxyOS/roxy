@@ -381,8 +381,8 @@ dependencies = [
  "roxy-fbterm",
  "roxy-fd",
  "roxy-futex",
- "roxy-input",
  "roxy-interrupt",
+ "roxy-keyboard-input",
  "roxy-line-discipline",
  "roxy-memory",
  "roxy-poll",
@@ -626,7 +626,7 @@ dependencies = [
  "roxy-evdev",
  "roxy-evdev-types",
  "roxy-fd",
- "roxy-input",
+ "roxy-keyboard-input",
  "roxy-poll",
  "roxy-time",
  "roxy-utils",
@@ -709,13 +709,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "roxy-input"
-version = "0.1.0"
-dependencies = [
- "roxy-utils",
-]
-
-[[package]]
 name = "roxy-interrupt"
 version = "0.1.0"
 dependencies = [
@@ -736,7 +729,14 @@ name = "roxy-key-decoder"
 version = "0.1.0"
 dependencies = [
  "pc-keyboard",
- "roxy-input",
+ "roxy-keyboard-input",
+]
+
+[[package]]
+name = "roxy-keyboard-input"
+version = "0.1.0"
+dependencies = [
+ "roxy-utils",
 ]
 
 [[package]]
@@ -814,8 +814,8 @@ dependencies = [
  "roxy-arch",
  "roxy-devfs",
  "roxy-fd",
- "roxy-input",
  "roxy-interrupt",
+ "roxy-keyboard-input",
  "roxy-poll",
  "roxy-serial",
  "roxy-test",
@@ -941,8 +941,8 @@ dependencies = [
  "linkme",
  "roxy-arch",
  "roxy-fd",
- "roxy-input",
  "roxy-key-decoder",
+ "roxy-keyboard-input",
  "roxy-line-discipline",
  "roxy-poll",
  "roxy-process",

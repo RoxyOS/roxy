@@ -1,5 +1,5 @@
-use roxy_input::KeyCode;
 use roxy_key_decoder::DecodedKey;
+use roxy_keyboard_input::KeyCode;
 
 #[derive(Clone, Copy)]
 pub(crate) struct EncodedInputEvent {
@@ -75,8 +75,8 @@ fn special_key_bytes(code: KeyCode) -> Option<&'static [u8]> {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use roxy_input::KeyCode;
     use roxy_key_decoder::DecodedKey;
+    use roxy_keyboard_input::KeyCode;
     use roxy_test::kernel_test;
 
     use super::encode_decoded;

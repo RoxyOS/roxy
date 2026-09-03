@@ -4,7 +4,7 @@
 
 `roxy-ps2` owns the x86_64 i8042 first port and ISA IRQ1. It converts Scan Code Set 1 keyboard
 traffic from a US 104-key keyboard into raw `KeyEvent` records and publishes them to the
-process-wide input manager. It does not buffer events, register listeners, implement a terminal
+process-wide keyboard manager. It does not buffer events, register listeners, implement a terminal
 line discipline, echo, terminal attributes, control signals, layout selection, mouse input, or
 the i8042 second port.
 
@@ -31,7 +31,7 @@ silently fall back to an output-only framebuffer terminal.
 ## Event publishing
 
 The IRQ handler reads port `0x60` before taking the parser lock, then parses the scancode byte
-into a `KeyEvent`. If the parse succeeds, the handler calls `roxy_input::publish(key)`, which
+into a `KeyEvent`. If the parse succeeds, the handler calls `roxy_keyboard_input::publish(key)`, which
 broadcasts the event to every registered input listener (TTY, evdev, …). The handler does not
 queue, buffer, or filter events; it produces at most one `KeyEvent` per IRQ.
 
@@ -42,8 +42,8 @@ no disposition.
 
 ## Consumer contract
 
-Each consumer (TTY, future evdev) registers with the input manager via
-`roxy_input::register_listener(listener)`. Registration happens at boot, before interrupts are
+Each consumer (TTY, future evdev) registers with the keyboard manager via
+`roxy_keyboard_input::register_listener(listener)`. Registration happens at boot, before interrupts are
 enabled. The consumer owns its own bounded queue and decides whether to process events immediately
 (IRQ-path for signal responsiveness) or defer to a read/wait path.
 

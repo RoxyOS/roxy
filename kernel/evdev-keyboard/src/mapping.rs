@@ -1,10 +1,10 @@
-//! Mapping between `roxy_input::KeyCode` and Linux `KEY_*` evdev codes.
+//! Mapping between `roxy_keyboard_input::KeyCode` and Linux `KEY_*` evdev codes.
 //!
 //! The mapping is a large flat `match` over the 104-key `KeyCode` enum.  All codes use the
 //! constants from `roxy_evdev_types::codes` so that the symbolic name is visible next to the
 //! numeric value.
 
-use roxy_input::KeyCode;
+use roxy_keyboard_input::KeyCode;
 
 use roxy_evdev_types::{
     KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_A, KEY_APOSTROPHE,

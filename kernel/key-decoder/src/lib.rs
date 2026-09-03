@@ -1,7 +1,7 @@
 #![no_std]
 
 use pc_keyboard::{EventDecoder as PcDecoder, HandleControl, layouts::Us104Key};
-use roxy_input::{KeyCode, KeyEvent, KeyState};
+use roxy_keyboard_input::{KeyCode, KeyEvent, KeyState};
 
 /// A decoded key from the US 104-key layout engine.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

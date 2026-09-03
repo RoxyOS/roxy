@@ -75,12 +75,12 @@ impl TtyFile {
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_fd::{FileType, SeekError, SeekFrom};
-    use roxy_input::{KeyCode, KeyState};
+    use roxy_keyboard_input::{KeyCode, KeyState};
     use roxy_test::kernel_test;
 
     use crate::test_support::{key, open};
 
-    fn press(code: KeyCode) -> roxy_input::KeyEvent {
+    fn press(code: KeyCode) -> roxy_keyboard_input::KeyEvent {
         key(code, KeyState::Pressed)
     }
 

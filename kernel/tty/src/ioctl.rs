@@ -251,13 +251,13 @@ fn validate_fixed(operation: &'static str, actual: u32, expected: u32) -> Result
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_fd::{IoctlError, IoctlRequest};
-    use roxy_input::{KeyCode, KeyState};
+    use roxy_keyboard_input::{KeyCode, KeyState};
     use roxy_test::kernel_test;
     use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
 
     use crate::test_support::{key, open};
 
-    fn press(code: KeyCode) -> roxy_input::KeyEvent {
+    fn press(code: KeyCode) -> roxy_keyboard_input::KeyEvent {
         key(code, KeyState::Pressed)
     }
 

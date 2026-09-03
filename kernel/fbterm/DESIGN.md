@@ -30,7 +30,7 @@ The endpoint renders printable ASCII with the regular Terminus 8x16 bitmap font 
 Apache-2.0 license, and provides a fixed bitmap whose dimensions match the cell renderer without
 font parsing, allocation, or scaling. LF advances a row, CR returns to column zero, backspace
 clears the preceding cell, and tab advances to the next eight-column stop. Reaching the bottom
-scrolls the framebuffer by one glyph row. Input is supplied by `roxy-input` implementations through
+scrolls the framebuffer by one glyph row. Input is supplied by `roxy-keyboard-input` implementations through
 `roxy-tty`; the framebuffer console itself only owns output rendering.
 
 Only Limine RGB 32-bit modes are accepted. Color masks determine packed foreground/background

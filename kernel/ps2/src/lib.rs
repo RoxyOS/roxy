@@ -72,7 +72,7 @@ fn handle_irq() {
         return;
     };
 
-    roxy_input::publish(event);
+    roxy_keyboard_input::publish(event);
 }
 
 fn handle_mouse_irq() {

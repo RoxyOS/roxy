@@ -9,8 +9,8 @@ use alloc::{
 
 use roxy_utils::Lock;
 
-/// Receives every parsed key event published to the input manager.
-pub trait InputListener: Send + Sync {
+/// Receives every parsed key event published to the keyboard manager.
+pub trait KeyboardListener: Send + Sync {
     /// Called once per parsed key event, in the producer's context (IRQ).
     fn on_recive_input(&self, key: KeyEvent);
 }
@@ -20,19 +20,19 @@ pub trait InputListener: Send + Sync {
 /// The manager is a global singleton: drivers publish events via [`publish`], and consumers
 /// register via [`register_listener`]. Registration happens at boot (before interrupts are
 /// enabled), after which `publish` is called only from IRQ context.
-pub struct InputManager {
-    listeners: Lock<Vec<Weak<dyn InputListener>>>,
+pub struct KeyboardManager {
+    listeners: Lock<Vec<Weak<dyn KeyboardListener>>>,
 }
 
-static INPUT_MANAGER: InputManager = InputManager::new();
+static KEYBOARD_MANAGER: KeyboardManager = KeyboardManager::new();
 
-impl Default for InputManager {
+impl Default for KeyboardManager {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl InputManager {
+impl KeyboardManager {
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -44,7 +44,7 @@ impl InputManager {
     ///
     /// The manager stores a weak reference; the caller must keep the `Arc` alive for the
     /// listener to remain registered.
-    pub fn register(&self, listener: &Arc<dyn InputListener>) {
+    pub fn register(&self, listener: &Arc<dyn KeyboardListener>) {
         self.listeners.lock().push(Arc::downgrade(listener));
     }
 
@@ -64,18 +64,18 @@ impl InputManager {
     }
 }
 
-/// Registers a listener with the process-wide input manager.
+/// Registers a listener with the process-wide keyboard manager.
 ///
-/// Called at boot for each consumer (TTY, future evdev, etc.).
-pub fn register_listener(listener: &Arc<dyn InputListener>) {
-    INPUT_MANAGER.register(listener);
+/// Called at boot for each consumer (TTY, keyboard evdev, etc.).
+pub fn register_listener(listener: &Arc<dyn KeyboardListener>) {
+    KEYBOARD_MANAGER.register(listener);
 }
 
 /// Publishes one parsed key event to every registered listener.
 ///
 /// Called by the keyboard driver's IRQ handler.
 pub fn publish(key: KeyEvent) {
-    INPUT_MANAGER.publish(key);
+    KEYBOARD_MANAGER.publish(key);
 }
 
 /// One physical key press or release.

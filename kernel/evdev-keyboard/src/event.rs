@@ -4,7 +4,7 @@
 //! the keyboard device feeds to [`encode_input_event`] to produce a serialised [`InputEvent`].
 
 use roxy_evdev_types::{EV_KEY, EV_SYN, InputEvent, SYN_REPORT};
-use roxy_input::{KeyCode, KeyState};
+use roxy_keyboard_input::{KeyCode, KeyState};
 
 /// A semantic evdev event that the keyboard device can produce.
 ///
