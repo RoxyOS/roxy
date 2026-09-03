@@ -8,7 +8,7 @@ use std::{
 use anyhow::{Context, Result, ensure};
 use xshell::Shell;
 
-const IMAGE_SIZE: u64 = 256 * 1024 * 1024;
+const IMAGE_SIZE: u64 = 512 * 1024 * 1024;
 const EXT4_MAGIC_OFFSET: u64 = 1024 + 0x38;
 const EXT4_MAGIC: [u8; 2] = [0x53, 0xef];
 
