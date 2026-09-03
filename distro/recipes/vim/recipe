@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=9.2.0854
-revision=1
+revision=3
 
 tarball_url="https://github.com/vim/vim/archive/refs/tags/v${version}.tar.gz"
 tarball_sha256="b0e3afbc106a0aff2f945e60bf305dc249170cd13ef4d3c5c6cbd34760585c12"
@@ -22,6 +22,8 @@ configure() {
 	cp -a "${source_dir}/." .
 	autotools_configure_script="${PWD}/configure"
 
+	export CPPFLAGS=-D_GNU_SOURCE
+
 	autotools_configure \
 		--disable-acl \
 		--disable-canberra \
@@ -31,7 +33,6 @@ configure() {
 		--disable-libsodium \
 		--disable-nls \
 		--disable-selinux \
-		--with-features=tiny \
 		--with-tlib=ncursesw \
 		--without-x
 }
