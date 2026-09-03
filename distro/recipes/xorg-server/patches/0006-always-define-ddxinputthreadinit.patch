@@ -1,0 +1,22 @@
+diff --git xorg-server-clean/hw/xfree86/common/xf86Init.c xorg-server-workdir/hw/xfree86/common/xf86Init.c
+index 5695e71..9cb1a7a 100644
+--- xorg-server-clean/hw/xfree86/common/xf86Init.c
++++ xorg-server-workdir/hw/xfree86/common/xf86Init.c
+@@ -1343,12 +1343,13 @@ ddxBeforeReset(void)
+ }
+ #endif
+ 
+-#if INPUTTHREAD
+-/** This function is called in Xserver/os/inputthread.c when starting
+-    the input thread. */
++/* ddxInputThreadInit is declared unconditionally in os.h and referenced by the
++   auto-generated sdksyms.c, so it must be defined even when INPUTTHREAD is
++   disabled.  When input-thread support is off, no caller invokes it at runtime;
++   the os-support stub provides an empty xf86OSInputThreadInit(). */
+ void
+ ddxInputThreadInit(void)
+ {
+     xf86OSInputThreadInit();
+ }
+-#endif
++
