@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+version=2.8.4
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/driver/xf86-input-evdev-${version}.tar.bz2"
+tarball_sha256="85fade9f5e9cf70f02c877165e95b3df4cdb9e08282416122ca80218e254100c"
+
+cross_compile=yes
+
+deps="mlibc xorg-server xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	# The evdev driver is a Linux-personality driver: it expects __linux__ so that
+	# xorg-server's xf86str.h undefs its BUS_* enum (guarded by #if defined(__linux__))
+	# and avoids colliding with linux/input.h's BUS_* macros.  Roxy's evdev ABI is
+	# Linux-compatible, so exposing __linux__ here is correct.
+	CPPFLAGS="-D__linux__" autotools_configure
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+
+	# Define the evdev keyboard and mouse input devices, wired to Roxy's evdev
+	# nodes.  The xorg-server 10-fbdev.conf ServerLayout references Keyboard0 as
+	# CoreKeyboard and Mouse0 as CorePointer.
+	install -D -m 0644 "${base_dir}/recipes/xf86-input-evdev/evdev-input.conf" \
+		"${dest_dir}/usr/share/X11/xorg.conf.d/20-evdev-input.conf"
+}
