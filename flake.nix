@@ -81,6 +81,7 @@
               pkgs.gdb
               pkgs.git
               pkgs.meson
+              pkgs.wget
               pkgs.ninja
               pkgs.openssl
               pkgs.OVMF.fd
