@@ -42,12 +42,20 @@ impl FdFile for VfsFile {
         output: &mut [u8],
         _nonblocking: bool,
     ) -> Result<usize, FdFileError> {
-        self.seek(VfsSeekFrom::Start(*position))
-            .map_err(map_file_error)?;
+        // Seek to the requested offset only when the object supports it (regular files).
+        // Character devices (devfs) maintain no offset and report `VfsError::Unsupported`;
+        // for those, read proceeds without seeking, matching Linux semantics.
+        let seekable = match self.seek(VfsSeekFrom::Start(*position)) {
+            Ok(_) => true,
+            Err(VfsError::Unsupported) => false,
+            Err(error) => return Err(map_file_error(error)),
+        };
 
         let read = self.read(output).map_err(map_file_error)?;
 
-        *position = self.seek(VfsSeekFrom::Current(0)).map_err(map_file_error)?;
+        if seekable {
+            *position = self.seek(VfsSeekFrom::Current(0)).map_err(map_file_error)?;
+        }
 
         Ok(read)
     }
@@ -58,12 +66,19 @@ impl FdFile for VfsFile {
         input: &[u8],
         _nonblocking: bool,
     ) -> Result<usize, FdFileError> {
-        self.seek(VfsSeekFrom::Start(*position))
-            .map_err(map_file_error)?;
+        // See `read`: only seek when the object is seekable (regular files); character
+        // devices report `VfsError::Unsupported` and are written without seeking.
+        let seekable = match self.seek(VfsSeekFrom::Start(*position)) {
+            Ok(_) => true,
+            Err(VfsError::Unsupported) => false,
+            Err(error) => return Err(map_file_error(error)),
+        };
 
         let written = self.write(input).map_err(map_file_error)?;
 
-        *position = self.seek(VfsSeekFrom::Current(0)).map_err(map_file_error)?;
+        if seekable {
+            *position = self.seek(VfsSeekFrom::Current(0)).map_err(map_file_error)?;
+        }
 
         Ok(written)
     }
