@@ -9,6 +9,13 @@ pub use self::x86_64::X86_64;
 #[cfg(target_arch = "x86_64")]
 pub type UserContext = self::x86_64::X86_64UserContext;
 
+/// Byte length of the `syscall` instruction on the current architecture.
+///
+/// `SA_RESTART` rewinds the saved user instruction pointer by this amount so the CPU re-executes
+/// the `syscall` instruction (and thus re-enters the kernel with the original arguments) after
+/// the signal handler returns.
+pub const SYSCALL_INSTRUCTION_SIZE: u64 = 2;
+
 #[cfg(target_arch = "x86_64")]
 pub type FloatState = self::x86_64::X86_64FloatState;
 

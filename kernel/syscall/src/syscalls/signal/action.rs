@@ -16,6 +16,8 @@ use super::SignalSetAbi;
 
 /// `SA_SIGINFO`: invoke the handler with `(signo, siginfo_t *, ucontext_t *)`.
 const SA_SIGINFO: u64 = 4;
+/// `SA_RESTART`: an interrupted blocking syscall is re-executed after the handler returns.
+const SA_RESTART: u64 = 0x1000_0000;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -91,20 +93,20 @@ fn handle(
 }
 
 fn decode(value: SigactionAbi, signal: Signal) -> Result<SignalAction, Errno> {
-    // Only `SA_SIGINFO` (which switches the handler to the three-argument form and supplies a
-    // `siginfo_t`/`ucontext_t` on the frame) is defined in the Roxy ABI today; anything else is
-    // rejected through the centralized diagnostic.
-    let include_siginfo = match value.flags {
-        0 => false,
-        SA_SIGINFO => true,
-        flags => {
-            return Err(unsupported_argument(
-                "sigaction.flags",
-                flags,
-                Errno::NotSupported,
-            ));
-        }
-    };
+    // Only `SA_SIGINFO` (three-argument form with `siginfo_t`/`ucontext_t`) and `SA_RESTART`
+    // (re-execute an interrupted blocking syscall after the handler) are defined in the Roxy ABI
+    // today; any other flag is rejected through the centralized diagnostic.
+    let unknown = value.flags & !(SA_SIGINFO | SA_RESTART);
+    if unknown != 0 {
+        return Err(unsupported_argument(
+            "sigaction.flags",
+            unknown,
+            Errno::NotSupported,
+        ));
+    }
+
+    let include_siginfo = value.flags & SA_SIGINFO != 0;
+    let restart = value.flags & SA_RESTART != 0;
 
     // The kernel injects its own sigreturn trampoline, so a user-supplied restorer is never
     // required or consulted.
@@ -117,6 +119,7 @@ fn decode(value: SigactionAbi, signal: Signal) -> Result<SignalAction, Errno> {
             address,
             mask,
             include_siginfo,
+            restart,
         },
     })
 }
@@ -129,7 +132,17 @@ fn encode(action: SignalAction) -> SigactionAbi {
             address,
             mask,
             include_siginfo,
-        } => (address, mask, if include_siginfo { SA_SIGINFO } else { 0 }),
+            restart,
+        } => {
+            let mut flags = 0;
+            if include_siginfo {
+                flags |= SA_SIGINFO;
+            }
+            if restart {
+                flags |= SA_RESTART;
+            }
+            (address, mask, flags)
+        }
     };
 
     SigactionAbi {

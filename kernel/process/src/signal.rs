@@ -1,4 +1,4 @@
-use roxy_arch::{ResumeInfo, UserContext};
+use roxy_arch::{ResumeInfo, SYSCALL_INSTRUCTION_SIZE, UserContext};
 use roxy_signal::{DefaultAction, Signal, SignalSet};
 use roxy_thread::scheduler;
 
@@ -16,11 +16,13 @@ pub enum SignalAction {
     /// `mask` is added to the process mask for the duration of the handler. When `include_siginfo` is
     /// set the handler was installed with `SA_SIGINFO`, so it is invoked as
     /// `(signo, siginfo_t *, ucontext_t *)` with real structures on the signal frame; otherwise
-    /// it receives the signal number as its only argument.
+    /// it receives the signal number as its only argument. `restart` indicates that `SA_RESTART`
+    /// was set, so an interrupted blocking syscall is re-executed after the handler returns.
     Handler {
         address: u64,
         mask: SignalSet,
         include_siginfo: bool,
+        restart: bool,
     },
 }
 
@@ -191,7 +193,7 @@ pub fn send_signal_to_pgid(pgid: ProcessGroupId, signal: Signal) {
 /// and return the resume that enters the handler. Must run only where abandoning the current
 /// userspace return is safe, exactly once per userspace return boundary.
 #[must_use]
-pub fn deliver_pending_signal(context: &UserContext) -> Option<ResumeInfo> {
+pub fn deliver_pending_signal(context: &UserContext, is_interrupted: bool) -> Option<ResumeInfo> {
     let pending = take_pending_unmasked_signal()?;
     let signal = pending.signal;
     let action = signal_action_of(signal);
@@ -207,14 +209,31 @@ pub fn deliver_pending_signal(context: &UserContext) -> Option<ResumeInfo> {
             address,
             mask,
             include_siginfo,
-        } => Some(prepare_handler_resume(
-            context,
-            signal,
-            address,
-            mask,
-            include_siginfo,
-            pending,
-        )),
+            restart,
+        } => {
+            // When the handler has SA_RESTART and the interrupted syscall returned EINTR,
+            // adjust the saved instruction pointer back to the `syscall` instruction so that
+            // after the handler returns (via sigreturn) the CPU re-executes the syscall with
+            // the original arguments (still in registers from the syscall entry context).
+            let adjusted = if restart && is_interrupted {
+                let mut adjusted = *context;
+                adjusted.instruction_pointer = adjusted
+                    .instruction_pointer
+                    .wrapping_sub(SYSCALL_INSTRUCTION_SIZE);
+                adjusted
+            } else {
+                *context
+            };
+
+            Some(prepare_handler_resume(
+                &adjusted,
+                signal,
+                address,
+                mask,
+                include_siginfo,
+                pending,
+            ))
+        }
     }
 }
 

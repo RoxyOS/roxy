@@ -40,7 +40,12 @@ fn syscall_result_to_exit(result: crate::SyscallResult, request: &RawSyscall) ->
 /// Wraps a computed return value into a `SyscallExit`, delivering any pending signal first: a
 /// handler turns it into a `Resume`; otherwise the value is returned as-is.
 fn with_pending_signal(value: u64, context: &UserContext) -> SyscallExit {
-    match roxy_process::deliver_pending_signal(context) {
+    // An interrupted blocking syscall returns `EINTR`; that is the only case where a `SA_RESTART`
+    // handler should re-execute the syscall after returning. Pass the signal down so delivery can
+    // rewind the saved instruction pointer accordingly.
+    let is_interrupted = value == Errno::Interrupted.encode();
+
+    match roxy_process::deliver_pending_signal(context, is_interrupted) {
         Some(resume) => SyscallExit::Resume {
             return_value: value,
             resume,
