@@ -23,6 +23,7 @@ mod getpid;
 mod getppid;
 mod getuid;
 mod ioctl;
+mod iovec;
 mod isatty;
 mod open;
 mod open_dir;
@@ -44,10 +45,11 @@ mod uname;
 mod vm;
 mod waitpid;
 mod write;
+mod writev;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 71] = [
+pub(super) const SYSCALLS: [Syscall; 72] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -119,4 +121,5 @@ pub(super) const SYSCALLS: [Syscall; 71] = [
     setpgid::SYSCALL,
     getpgid::SYSCALL,
     setsid::SYSCALL,
+    writev::SYSCALL,
 ];

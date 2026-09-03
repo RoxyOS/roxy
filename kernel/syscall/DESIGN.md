@@ -49,6 +49,14 @@ syscall. It therefore returns at most 4096 bytes even when userspace requests mo
 require additional data must issue another read. This uniform short-read policy keeps file-type
 semantics, including terminal line boundaries, inside the owning file implementation.
 
+`writev` (syscall 71) gathers data from a userspace `iovec` array and writes it through the
+addressed descriptor, honoring the file's own nonblocking flag. The `struct iovec` record and the
+gather/write helper live in the shared `syscalls::iovec` module, which both this syscall and the
+`recvmsg`/`sendmsg` handlers reuse, so the record layout and its 16-byte size assertion exist in
+only one place. The handler caps the iovec count at Linux's `IOV_MAX` (1024) and returns `EINVAL`
+above it; a `BrokenPipe` write delivers `SIGPIPE` and returns `EPIPE`, matching `write`. Like
+`write`, a short write on one iovec stops the loop and reports the bytes written so far.
+
 Path-based `stat` and `open` copy the userspace byte string before passing it to the global VFS
 interface. The VFS leaves absolute paths independent of cwd and obtains the process-owned cwd
 through its registered provider only for relative paths. Syscall handlers do not duplicate path

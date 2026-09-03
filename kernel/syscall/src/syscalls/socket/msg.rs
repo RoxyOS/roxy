@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use core::mem::{offset_of, size_of};
 
 use bitflags::bitflags;
@@ -88,16 +87,6 @@ impl ParsedMsgHdr {
     }
 }
 
-/// ABI-compatible `struct iovec` for `x86_64`.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct Iovec {
-    pub(crate) base: UserAddress,
-    pub(crate) length: usize,
-}
-
-const _: () = assert!(size_of::<Iovec>() == 16);
-
 // ── Flags ──────────────────────────────────────────────────────────────────
 
 bitflags! {
@@ -150,40 +139,6 @@ impl SyscallArg for ParsedMsgHdr {
         Ok(Self { header, source })
     }
 }
-
-// ── Shared parsing ─────────────────────────────────────────────────────────
-
-/// Reads the `iovec` array at `address` (count = `count`) from user space.
-///
-/// Returns an empty vector when `count` is zero or negative.
-///
-/// # Errors
-///
-/// Returns `Fault` when the iovec array cannot be read.
-pub(crate) fn read_iovecs(address: UserAddress, count: i32) -> Result<Vec<Iovec>, Errno> {
-    if count <= 0 {
-        return Ok(Vec::new());
-    }
-
-    #[allow(clippy::cast_sign_loss)]
-    let count = count as usize;
-    let mut iovecs = Vec::<Iovec>::new();
-    iovecs.try_reserve_exact(count).map_err(|_| Errno::NoMem)?;
-    iovecs.resize(
-        count,
-        Iovec {
-            base: UserAddress::sentinel(),
-            length: 0,
-        },
-    );
-
-    // SAFETY: Iovec is repr(C) with integer/pointer fields that accept every bit pattern.
-    unsafe { user_memory::read_slice(address, &mut iovecs) }?;
-
-    Ok(iovecs)
-}
-
-// ── Diagnostics ────────────────────────────────────────────────────────────
 
 fn unsupported(operation: &str, argument: impl core::fmt::Display) -> Errno {
     crate::unsupported::unsupported_argument(operation, argument, Errno::NotSupported)

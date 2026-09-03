@@ -6,8 +6,9 @@ use crate::{SyscallResult, args::user_memory, errno::Errno, numbers::SyscallNumb
 
 use super::{
     map_file_error,
-    msg::{Iovec, MsgFlags, ParsedMsgHdr, read_iovecs},
+    msg::{MsgFlags, ParsedMsgHdr},
 };
+use crate::syscalls::iovec::{Iovec, read_iovecs};
 
 /// Maximum local buffer for a single recvmsg transfer.
 const MAX_RECV_BUFFER: usize = 65536;
