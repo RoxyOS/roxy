@@ -1,33 +1,46 @@
-use std::{fs, path::Path, path::PathBuf};
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result, ensure};
 
-const REVISION: &str = "5be26a73d7b7b4d4477d18be94e1d16e615adf56";
+const VERSION: &str = "v12.7.0";
 
 pub(super) fn prepare(root: &Path) -> Result<PathBuf> {
     let cache = root.join("cache/limine");
 
-    if assets_exist(&cache) {
+    if cache_valid(&cache) {
         return Ok(cache);
     }
 
     reset_cache(&cache)?;
     fetch(&cache)?;
-    ensure!(assets_exist(&cache), "fixed Limine revision is incomplete");
+    mark_version(&cache)?;
+    ensure!(cache_valid(&cache), "Limine {VERSION} fetch is incomplete");
 
     Ok(cache)
 }
 
-fn assets_exist(cache: &Path) -> bool {
-    ["limine-uefi-cd.bin", "BOOTX64.EFI"]
-        .iter()
-        .all(|file| cache.join(file).is_file())
+fn cache_valid(cache: &Path) -> bool {
+    let version = fs::read_to_string(cache.join("version")).unwrap_or_default();
+    version.trim() == VERSION
+        && ["limine-uefi-cd.bin", "BOOTX64.EFI"]
+            .iter()
+            .all(|file| cache.join(file).is_file())
+}
+
+fn mark_version(cache: &Path) -> Result<()> {
+    let mut file = File::create(cache.join("version"))?;
+    file.write_all(VERSION.as_bytes())?;
+    Ok(())
 }
 
 fn reset_cache(cache: &Path) -> Result<()> {
     if cache.exists() {
-        println!("==> Removing incomplete Limine cache");
-        fs::remove_dir_all(cache).context("failed to remove incomplete Limine cache")?;
+        println!("==> Removing stale Limine cache");
+        fs::remove_dir_all(cache).context("failed to remove stale Limine cache")?;
     }
     fs::create_dir_all(cache).context("failed to create Limine cache directory")?;
 
@@ -35,13 +48,17 @@ fn reset_cache(cache: &Path) -> Result<()> {
 }
 
 fn fetch(cache: &Path) -> Result<()> {
-    println!("==> Fetching Limine");
-    crate::cmd!("git -C {cache} init --quiet")?;
-    crate::cmd!(
-        "git -C {cache} remote add origin https://github.com/limine-bootloader/limine.git"
-    )?;
-    crate::cmd!("git -C {cache} fetch --depth 1 origin {REVISION}")?;
-    crate::cmd!("git -C {cache} checkout --quiet --detach FETCH_HEAD")?;
+    println!("==> Fetching Limine {VERSION}");
+
+    let url = format!(
+        "https://github.com/limine-bootloader/limine/releases/download/{VERSION}/\
+         limine-binary.tar.xz"
+    );
+    let tarball = cache.join("limine-binary.tar.xz");
+
+    crate::cmd!("wget -q -O {tarball} {url}")?;
+    crate::cmd!("tar -xJf {tarball} -C {cache} --strip-components=1")?;
+    fs::remove_file(&tarball).context("failed to remove Limine tarball")?;
 
     Ok(())
 }

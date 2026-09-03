@@ -1,4 +1,8 @@
-use std::{fs, path::Path, path::PathBuf};
+use std::{
+    fs::{self, File},
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+};
 
 use anyhow::{Context, Result};
 
@@ -29,11 +33,32 @@ pub(super) fn build(
 
 fn stage_kernel(staging: &Path, kernel: &Path, rootfs: &Path) -> Result<()> {
     copy(kernel, &staging.join("boot/kernel-main"))?;
-    copy(rootfs, &staging.join("boot/rootfs.img"))?;
+    gzip(rootfs, &staging.join("boot/rootfs.img"))?;
     copy(
         &workspace_root().join("kernel/limine.conf"),
         &staging.join("boot/limine/limine.conf"),
     )
+}
+
+/// Compress the root filesystem image for Limine. Limine v12.x transparently
+/// decompresses gzip-compressed modules (selected by the `$` prefix in
+/// `limine.conf`), so staging the module gzipped sharply cuts the ISO read and
+/// copy time during boot.
+fn gzip(source: &Path, destination: &Path) -> Result<()> {
+    let output = File::create(destination).context("failed to create gzipped rootfs file")?;
+    let status = Command::new("gzip")
+        .arg("-1")
+        .arg("-c")
+        .arg(source)
+        .stdout(Stdio::from(output))
+        .status()
+        .context("failed to run gzip")?;
+
+    if !status.success() {
+        anyhow::bail!("gzip failed to compress root filesystem");
+    }
+
+    Ok(())
 }
 
 fn stage_limine(staging: &Path, limine: &Path) -> Result<()> {
