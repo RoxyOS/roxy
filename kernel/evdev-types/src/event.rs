@@ -59,17 +59,19 @@ pub struct EvdevAbsInfo {
 
 /// Static capability description for a generic evdev device.
 ///
-/// The device owner (e.g. `roxy-evdev-keyboard`) provides these when constructing the core
-/// `EvdevDevice`. The core uses them to answer `EVIOCGBIT` queries per-device rather than
-/// relying on global keyboard-specific constants in the syscall layer.
+/// The device owner (e.g. `roxy-evdev-keyboard` or `roxy-evdev-mouse`) provides these when
+/// constructing the core `EvdevDevice`. The core uses them to answer `EVIOCGBIT` queries
+/// per-device rather than relying on global device-specific constants in the syscall layer.
 #[derive(Clone, Copy)]
 pub struct EvdevCapabilities {
     /// Event types the device supports (`EVIOCGBIT(0, …)`).
     ///
-    /// Typically `[EV_SYN, EV_KEY]` for a keyboard.
+    /// Typically `[EV_SYN, EV_KEY]` for a keyboard, `[EV_SYN, EV_KEY, EV_REL]` for a mouse.
     pub event_types: &'static [u16],
     /// Supported key codes (`EVIOCGBIT(EV_KEY, …)`).
     pub key_codes: &'static [u16],
+    /// Supported relative axis codes (`EVIOCGBIT(EV_REL, …)`).
+    pub rel_codes: &'static [u16],
     /// Supported LED codes (`EVIOCGBIT(EV_LED, …)`).
     pub led_codes: &'static [u16],
     /// Supported switch codes (`EVIOCGBIT(EV_SW, …)`).

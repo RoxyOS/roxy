@@ -7,15 +7,17 @@ use alloc::sync::Arc;
 use heapless::Deque;
 use roxy_devfs::Device;
 use roxy_evdev_types::{
-    EV_KEY, EV_LED, EV_SW, EV_SYN, EV_VERSION, EvdevCapabilities, EvdevDeviceId, InputEvent,
-    encode_bits_bitmap,
+    EV_KEY, EV_LED, EV_REL, EV_SW, EV_SYN, EV_VERSION, EvdevCapabilities, EvdevDeviceId,
+    InputEvent, encode_bits_bitmap,
 };
 use roxy_fd::{FileError, FileMetadata, FileType, IoctlError, IoctlRequest, PollEvents};
 use roxy_poll::{PollListener, PollListeners, PollRegistration};
 use roxy_utils::Lock;
 
-/// Maximum number of queued events. The device owner queues serialised `InputEvent` records; a
-/// keyboard producer queues two per key transition (the change plus its `SYN_REPORT` commit).
+/// Maximum number of queued events. The device owner queues serialised `InputEvent` records.
+/// A keyboard producer queues two per key transition (the change plus its `SYN_REPORT`
+/// commit); a mouse producer queues up to 7 per hardware sample (axes, button changes, plus
+/// `SYN_REPORT`).
 const EVENT_QUEUE_CAPACITY: usize = 256;
 
 /// Static identity a generic evdev device exposes to user space and to the devfs registry.
@@ -156,6 +158,7 @@ impl Device for EvdevDevice {
                     // EVIOCGBIT(0) queries the set of supported event *types*.
                     code if code == EV_SYN => self.capabilities.event_types,
                     code if code == EV_KEY => self.capabilities.key_codes,
+                    code if code == EV_REL => self.capabilities.rel_codes,
                     code if code == EV_LED => self.capabilities.led_codes,
                     code if code == EV_SW => self.capabilities.switch_codes,
                     _ => &[],

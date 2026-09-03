@@ -19,6 +19,7 @@ roxy-arch.workspace = true
 roxy-devfs.workspace = true
 roxy-fd.workspace = true
 roxy-keyboard-input.workspace = true
+roxy-mouse-input.workspace = true
 roxy-interrupt.workspace = true
 roxy-poll.workspace = true
 roxy-serial.workspace = true

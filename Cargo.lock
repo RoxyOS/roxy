@@ -376,6 +376,7 @@ dependencies = [
  "roxy-elf",
  "roxy-evdev",
  "roxy-evdev-keyboard",
+ "roxy-evdev-mouse",
  "roxy-ext4",
  "roxy-fbdev",
  "roxy-fbterm",
@@ -385,6 +386,7 @@ dependencies = [
  "roxy-keyboard-input",
  "roxy-line-discipline",
  "roxy-memory",
+ "roxy-mouse-input",
  "roxy-poll",
  "roxy-process",
  "roxy-ps2",
@@ -633,6 +635,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-evdev-mouse"
+version = "0.1.0"
+dependencies = [
+ "roxy-devfs",
+ "roxy-evdev",
+ "roxy-evdev-types",
+ "roxy-fd",
+ "roxy-mouse-input",
+ "roxy-poll",
+ "roxy-time",
+ "roxy-utils",
+]
+
+[[package]]
 name = "roxy-evdev-types"
 version = "0.1.0"
 
@@ -764,6 +780,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-mouse-input"
+version = "0.1.0"
+dependencies = [
+ "roxy-utils",
+]
+
+[[package]]
 name = "roxy-pipe"
 version = "0.1.0"
 dependencies = [
@@ -816,6 +839,7 @@ dependencies = [
  "roxy-fd",
  "roxy-interrupt",
  "roxy-keyboard-input",
+ "roxy-mouse-input",
  "roxy-poll",
  "roxy-serial",
  "roxy-test",

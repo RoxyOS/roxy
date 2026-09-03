@@ -62,6 +62,7 @@ fn keyboard_capabilities() -> EvdevCapabilities {
     EvdevCapabilities {
         event_types: &[roxy_evdev_types::EV_SYN, roxy_evdev_types::EV_KEY],
         key_codes: mapping::supported_key_codes(),
+        rel_codes: &[],
         led_codes: &[roxy_evdev_types::LED_CAPSL, roxy_evdev_types::LED_SCROLLL],
         switch_codes: &[],
     }

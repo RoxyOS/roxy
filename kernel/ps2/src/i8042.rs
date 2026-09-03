@@ -21,9 +21,12 @@ const COMMAND_ENABLE_SECOND: u8 = 0xa8;
 const COMMAND_WRITE_PORT2: u8 = 0xd4;
 const MOUSE_RESET: u8 = 0xff;
 const MOUSE_ENABLE_REPORTING: u8 = 0xf4;
+const MOUSE_SET_SAMPLE_RATE: u8 = 0xf3;
+const MOUSE_GET_DEVICE_ID: u8 = 0xf2;
 const MOUSE_ACK: u8 = 0xfa;
 const MOUSE_BAT_OK: u8 = 0xaa;
 const MOUSE_STANDARD_ID: u8 = 0x00;
+const INTELLIMOUSE_ID: u8 = 0x03;
 const TIMEOUT: usize = 100_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -182,12 +185,18 @@ pub(crate) struct I8042SecondPort {
 }
 
 impl I8042SecondPort {
-    /// Enables the auxiliary device, enables IRQ2, and starts mouse data reporting.
+    /// Enables the auxiliary device, enables IRQ2, and starts mouse data reporting, returning
+    /// the negotiated packet format.
+    ///
+    /// Detection follows the `IntelliMouse` magic: after reset, set sample rates 200/100/80 and
+    /// read the device ID (Linux `psmouse-base.c` `intellimouse_detect`; `OSDev` Wiki "PS/2
+    /// Mouse").  ID `0x03` selects 4-byte packets with a Z-axis wheel byte; otherwise the mouse
+    /// stays on standard 3-byte packets.
     ///
     /// Unlike the keyboard, a missing or failed mouse is tolerated: the controller may simply
     /// have no second port (common on real hardware without an aux device), so failure is
     /// reported to the caller rather than panicking.
-    pub(crate) fn initialize() -> Result<(), InitError> {
+    pub(crate) fn initialize() -> Result<crate::packet::PacketMode, InitError> {
         let mut port = Self::new();
 
         port.wait_input_clear()?;
@@ -203,7 +212,9 @@ impl I8042SecondPort {
         port.write_data(config)?;
         port.wait_input_clear()?;
         port.reset_mouse()?;
-        port.enable_reporting()
+        let mode = port.detect_packet_mode();
+        port.enable_reporting()?;
+        Ok(mode)
     }
 
     pub(crate) fn read_data() -> u8 {
@@ -314,6 +325,50 @@ impl I8042SecondPort {
         }
 
         Err(InitError::ResetFailed)
+    }
+
+    /// Runs the `IntelliMouse` sample-rate magic and returns the negotiated packet mode.
+    ///
+    /// Any failure (timeout on a rate command, or a non-`IntelliMouse` ID) falls back to the
+    /// standard 3-byte format rather than failing initialization.
+    fn detect_packet_mode(&mut self) -> crate::packet::PacketMode {
+        if self.set_sample_rate(200).is_ok()
+            && self.set_sample_rate(100).is_ok()
+            && self.set_sample_rate(80).is_ok()
+            && self.get_device_id().ok() == Some(INTELLIMOUSE_ID)
+        {
+            return crate::packet::PacketMode::Intellimouse;
+        }
+        crate::packet::PacketMode::Standard
+    }
+
+    /// Sets the mouse sample rate: the `0xf3` command followed by the rate parameter, each
+    /// acknowledged.
+    fn set_sample_rate(&mut self, rate: u8) -> Result<(), InitError> {
+        self.write_mouse_command(MOUSE_SET_SAMPLE_RATE)?;
+        self.expect_mouse_ack()?;
+        self.write_mouse_command(rate)?;
+        self.expect_mouse_ack()
+    }
+
+    /// Reads the mouse device ID via the `0xf2` command.
+    fn get_device_id(&mut self) -> Result<u8, InitError> {
+        self.write_mouse_command(MOUSE_GET_DEVICE_ID)?;
+        self.expect_mouse_ack()?;
+        self.read_response()
+    }
+
+    /// Waits for the single `0xfa` acknowledgement of a mouse command.
+    fn expect_mouse_ack(&mut self) -> Result<(), InitError> {
+        for _ in 0..TIMEOUT {
+            if self.read_status() & STATUS_OUTPUT_FULL != 0 {
+                return (self.read_response()? == MOUSE_ACK)
+                    .then_some(())
+                    .ok_or(InitError::ResetFailed);
+            }
+            spin_loop();
+        }
+        Err(InitError::Timeout)
     }
 
     fn enable_reporting(&mut self) -> Result<(), InitError> {

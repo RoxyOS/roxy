@@ -64,8 +64,14 @@ pub extern "C" fn _start() -> ! {
         .expect("keyboard evdev device registered exactly once");
     let keyboard_listener: alloc::sync::Arc<dyn roxy_keyboard_input::KeyboardListener> =
         keyboard_listener;
+    let (mouse_event, mouse_listener) = roxy_evdev_mouse::create(roxy_ps2::mouse_has_wheel());
+    device_registry
+        .register(b"mouse_event", mouse_event)
+        .expect("mouse evdev device registered exactly once");
+    let mouse_listener: alloc::sync::Arc<dyn roxy_mouse_input::MouseListener> = mouse_listener;
     let tty = roxy_tty::initialize(roxy_terminal::kernel_terminal());
     roxy_keyboard_input::register_listener(&keyboard_listener);
+    roxy_mouse_input::register_listener(&mouse_listener);
     roxy_keyboard_input::register_listener(&tty);
     roxy_process::initialize(initial_fds::inject);
     roxy_futex::initialize();

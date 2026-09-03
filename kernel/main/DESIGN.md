@@ -14,7 +14,7 @@ The startup sequence is intentionally ordered:
 ```text
 clear BSS → serial → BootInfo → architecture → memory → select kernel terminal → time → rootfs
 → interrupt controller (ACPI MADT/IOAPIC) → CPU-local state → periodic timer backend → scheduler
-timer handler → PS/2 keyboard → TTY FD adapter → process → futex → syscall → start timer
+timer handler → PS/2 keyboard + mouse → TTY FD adapter → process → futex → syscall → start timer
 → enable interrupts → run/test
 ```
 
@@ -28,12 +28,15 @@ process registers its scheduler address-space hook before user threads can run, 
 configures the architecture entry before interrupts are enabled.
 
 PS/2 initialization follows scheduler registration and precedes both periodic timer startup and
-global interrupt enable. The PS/2 subsystem completes its controller and keyboard handshake,
-registers IRQ1, and unmasks the route in that window. The composition root then combines the
-resulting input device with the selected terminal output through `roxy-tty`, which creates the
-shared line discipline, before process initialization registers the initial-FD injector. This
-hardware is required on the supported platform; a missing controller or handshake timeout is
-boot-fatal rather than a reason to expose an output-only framebuffer terminal.
+global interrupt enable. The PS/2 subsystem completes its controller, keyboard, and mouse
+handshakes, registers IRQ1 and IRQ12, and unmasks both routes in that window. The composition
+root then combines the keyboard input with the selected terminal output through `roxy-tty`, which
+creates the shared line discipline, registers the keyboard evdev device, the mouse evdev device,
+and the keyboard and mouse listeners with their respective managers, before process initialization
+registers the initial-FD injector. PS/2 keyboard hardware is required on the supported platform; a
+missing controller or keyboard handshake timeout is boot-fatal rather than a reason to expose an
+output-only framebuffer terminal. A missing or failed mouse is tolerated (the controller may have
+no second port) and only logs a diagnostic message.
 
 Timer handlers run in registration order. The time handler is registered before the scheduler
 handler so each periodic interrupt advances the monotonic clock before timer-wait deadlines are

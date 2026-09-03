@@ -53,6 +53,30 @@ pub const BUS_I2C: u16 = 0x18;
 /// The value returned by `EVIOCGVERSION`.
 pub const EV_VERSION: u32 = 0x0001_0001;
 
+// ── Relative axis codes (REL_*) ──────────────────────────────────────────────
+
+pub const REL_X: u16 = 0x00;
+pub const REL_Y: u16 = 0x01;
+pub const REL_Z: u16 = 0x02;
+pub const REL_RX: u16 = 0x03;
+pub const REL_RY: u16 = 0x04;
+pub const REL_RZ: u16 = 0x05;
+pub const REL_HWHEEL: u16 = 0x06;
+pub const REL_DIAL: u16 = 0x07;
+pub const REL_WHEEL: u16 = 0x08;
+pub const REL_MAX: u16 = 0x0f;
+
+// ── Button codes (BTN_*) ─────────────────────────────────────────────────────
+// 0x100–0x11f are mouse buttons; 0x110–0x116 are the primary mouse button set.
+
+pub const BTN_LEFT: u16 = 0x110;
+pub const BTN_RIGHT: u16 = 0x111;
+pub const BTN_MIDDLE: u16 = 0x112;
+pub const BTN_SIDE: u16 = 0x113;
+pub const BTN_EXTRA: u16 = 0x114;
+pub const BTN_FORWARD: u16 = 0x115;
+pub const BTN_BACK: u16 = 0x116;
+
 // ── Key codes (KEY_*) ───────────────────────────────────────────────────────
 // 1–255  (KEY_RESERVED=0 is not emitted)
 
