@@ -982,6 +982,7 @@ dependencies = [
  "heapless",
  "linkme",
  "roxy-arch",
+ "roxy-devfs",
  "roxy-fd",
  "roxy-key-decoder",
  "roxy-keyboard-input",

@@ -28,6 +28,16 @@ pub trait Device: Send + Sync {
         false
     }
 
+    /// Returns this terminal's openable pathname within the device filesystem (for example
+    /// `/dev/tty0` or `/dev/pts/3`), when the device is a terminal.
+    ///
+    /// The path is the one the device was registered under (or, for dynamic devices such as pty
+    /// slaves, is resolved from), so a `ttyname` consumer can reopen it. Non-terminal devices
+    /// return `None`.
+    fn terminal_path(&self) -> Option<Vec<u8>> {
+        None
+    }
+
     /// Reports the events that are currently ready for this device.
     #[must_use]
     fn poll(&self) -> PollEvents {

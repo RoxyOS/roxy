@@ -243,3 +243,13 @@ address that the kernel's refusal of client-side `bind` guarantees.
 
 Other families, types, protocols, and socket operations emit the centralized unsupported
 diagnostic when they reach this ABI boundary.
+
+### `TTYNAME`
+
+`ROXY_SYS_TTYNAME(fd, buf, size)` (72) writes the NUL-terminated openable pathname of the terminal
+backing `fd` into a user buffer. The name is owned by the terminal object — the descriptor layer's
+ABI-neutral `File::terminal_path` — not synthesized here, so each terminal reports its own path
+(`/dev/tty0` for the console, `/dev/pts/N` for a pty slave). Errors: `ENOTTY` when `fd` is not a
+terminal, `ERANGE` when the buffer cannot hold the name plus its terminator, `EBADF` for an invalid
+descriptor. No structured ABI record is involved; the payload is a plain null-terminated byte
+string like `getcwd`.

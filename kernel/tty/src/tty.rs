@@ -12,6 +12,16 @@ use crate::encoder::encode_decoded;
 
 pub(crate) const PENDING_CAPACITY: usize = 256;
 
+/// The console terminal's openable device path, reported by `terminal_path` for `ttyname`. It must
+/// match the devfs node `CONSOLE_NODE` is registered under, so a `ttyname` consumer can reopen it.
+/// There is a single console, so the path is a crate constant rather than a per-terminal field.
+pub(crate) const CONSOLE_PATH: &[u8] = b"/dev/tty0";
+
+/// The mount-relative devfs node name the console is registered under (devfs is mounted at `/dev`,
+/// so opening `/dev/tty0` resolves to leaf node `tty0` below it). This must be the node that
+/// `CONSOLE_PATH` reopens.
+pub(crate) const CONSOLE_NODE: &[u8] = b"tty0";
+
 /// Turns raw keyboard key events into the byte stream consumed by the shared terminal core.
 ///
 /// This is the console-specific side of the terminal: it owns the pending key queue, the US 104-key
@@ -147,5 +157,10 @@ impl Tty {
         request: roxy_fd::IoctlRequest<'_>,
     ) -> Result<(), roxy_fd::IoctlError> {
         self.core.ioctl(request)
+    }
+
+    /// Returns the console's openable device path for `ttyname`.
+    pub(super) fn terminal_path() -> &'static [u8] {
+        CONSOLE_PATH
     }
 }

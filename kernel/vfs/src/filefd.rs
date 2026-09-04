@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use roxy_fd::{
     File as FdFile, FileError as FdFileError, FileMetadata as FdFileMetadata,
@@ -24,6 +25,10 @@ impl FdFile for VfsFile {
         // A terminal reaches the descriptor layer only through a character-device handle (devfs);
         // a pty slave reports itself as a terminal through this path.
         self.handle.is_terminal()
+    }
+
+    fn terminal_path(&self) -> Option<Vec<u8>> {
+        self.handle.terminal_path()
     }
 
     fn metadata(&self) -> Result<FdFileMetadata, FdFileError> {

@@ -63,3 +63,11 @@ The layout decoder is fixed to the US 104-key layout (`Us104Key`); layout select
 are outside the current scope. Remaining terminal limits (unsupported `termios` fields, control
 characters, job control, `SIGWINCH`, input/output transformations) live in
 `roxy-tty-core/DESIGN.md` and apply to the console exactly as to a pty slave.
+### Terminal name and `/dev/tty0`
+
+The console exposes its openable device path through a path capability: `Tty::terminal_path`
+returns the crate constant `CONSOLE_PATH` (`/dev/tty0`), surfaced to `ttyname` both by `TtyFile::terminal_path`
+(direct-descriptor path for fd 0/1/2) and by the registered `TtyDevice` node's `Device::terminal_path`
+(dynamic directory path). `kernel-main` calls `register_console_device` after initialization so the
+same terminal is reopenable at `/dev/tty0`. The descriptor and the node share one `Arc<Tty>`, so
+their names agree — the contract that makes the returned path reopenable.

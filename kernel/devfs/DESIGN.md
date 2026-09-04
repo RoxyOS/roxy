@@ -74,3 +74,8 @@ open("/dev/pts/0") → registry miss → dynamic resolvers → slave
   through unchanged because they already use descriptor-layer types.
 - There is no device enumeration, hotplug, or devtmpfs-style node persistence; the device set is
   fixed at boot.
+
+`Device` also answers `terminal_path()` (default `None`) with a terminal's openable device pathname —
+the console's `/dev/tty0` and each pty slave's `/dev/pts/N`. `DeviceFile::terminal_path` forwards
+it to the device so a descriptor opened from a devfs node can be named by `ttyname`. Only terminals
+report a name; non-terminal devices return `None`.

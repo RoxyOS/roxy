@@ -20,6 +20,16 @@ pub trait FileHandle: Send {
         false
     }
 
+    /// Returns this terminal's openable device pathname, when the handle is a terminal whose
+    /// controlling device is reachable through the device filesystem (for example `/dev/tty0` or
+    /// `/dev/pts/0`).
+    ///
+    /// A `ttyname` consumer reopens the returned path, so it must resolve to a registered device
+    /// node. Non-terminal handles return `None`.
+    fn terminal_path(&self) -> Option<Vec<u8>> {
+        None
+    }
+
     /// Sets the permission bits of the file behind this handle.
     ///
     /// # Errors

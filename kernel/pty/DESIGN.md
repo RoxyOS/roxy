@@ -77,3 +77,6 @@ no slave is open lets the pair drop.
   the process model has no `SIGWINCH` delivery.
 - Input/output transformations and non-default termios continue to be unsupported (rejected by
   `TtyCore`).
+`PtySlave::terminal_path` reports the slave's openable path `/dev/pts/N` (from `pair.number`), matching
+the dynamic resolver's namespace, so `ttyname` on a slave descriptor returns a reopenable path. The
+master is not a terminal and returns no name.

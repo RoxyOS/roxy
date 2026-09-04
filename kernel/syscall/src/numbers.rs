@@ -73,6 +73,7 @@ pub(crate) enum SyscallNumber {
     GetPgid = 69,
     SetSid = 70,
     Writev = 71,
+    Ttyname = 72,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -152,6 +153,7 @@ impl TryFrom<u64> for SyscallNumber {
             69 => Ok(Self::GetPgid),
             70 => Ok(Self::SetSid),
             71 => Ok(Self::Writev),
+            72 => Ok(Self::Ttyname),
             _ => Err(()),
         }
     }
@@ -235,6 +237,7 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(69), Ok(SyscallNumber::GetPgid));
         assert_eq!(SyscallNumber::try_from(70), Ok(SyscallNumber::SetSid));
         assert_eq!(SyscallNumber::try_from(71), Ok(SyscallNumber::Writev));
-        assert!(SyscallNumber::try_from(72).is_err());
+        assert_eq!(SyscallNumber::try_from(72), Ok(SyscallNumber::Ttyname));
+        assert!(SyscallNumber::try_from(73).is_err());
     });
 }

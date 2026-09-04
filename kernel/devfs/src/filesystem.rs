@@ -169,6 +169,10 @@ impl FileHandle for DeviceFile {
         self.device.is_terminal()
     }
 
+    fn terminal_path(&self) -> Option<Vec<u8>> {
+        self.device.terminal_path()
+    }
+
     fn sync(&mut self) -> Result<(), VfsError> {
         Ok(())
     }

@@ -1,4 +1,4 @@
-use alloc::{collections::VecDeque, sync::Arc};
+use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_fd::{FileError, FileMetadata, FileType, IoctlError, IoctlRequest, PollEvents};
@@ -224,6 +224,10 @@ impl roxy_devfs::Device for PtySlave {
         true
     }
 
+    fn terminal_path(&self) -> Option<Vec<u8>> {
+        Some(alloc::format!("/dev/pts/{}", self.pair.number).into_bytes())
+    }
+
     fn read(&self, output: &mut [u8]) -> Result<usize, FileError> {
         self.pair.slave_core.read(output)
     }
@@ -243,4 +247,28 @@ impl roxy_devfs::Device for PtySlave {
     fn ioctl(&self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
         self.pair.slave_core.ioctl(request)
     }
+}
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use roxy_devfs::Device;
+    use roxy_test::kernel_test;
+
+    use super::{PtyMaster, PtyPair, PtySlave};
+
+    kernel_test!("roxy-pty::slave-name", names_slave_under_dev_pts, {
+        let pair = PtyPair::new(7);
+        let slave = PtySlave::new(pair);
+
+        assert!(slave.is_terminal());
+        assert_eq!(slave.terminal_path().unwrap(), b"/dev/pts/7".to_vec());
+    });
+
+    kernel_test!("roxy-pty::master-is-not-terminal", master_has_no_name, {
+        let pair = PtyPair::new(0);
+        let master = PtyMaster::new(pair);
+
+        assert!(!master.is_terminal());
+        assert!(master.terminal_path().is_none());
+    });
 }

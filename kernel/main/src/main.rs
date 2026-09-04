@@ -78,6 +78,7 @@ pub extern "C" fn _start() -> ! {
     roxy_keyboard_input::register_listener(&keyboard_listener);
     roxy_mouse_input::register_listener(&mouse_listener);
     roxy_keyboard_input::register_listener(&tty);
+    roxy_tty::register_console_device(&device_registry);
     roxy_process::initialize(initial_fds::inject);
     roxy_futex::initialize();
     roxy_syscall::initialize();

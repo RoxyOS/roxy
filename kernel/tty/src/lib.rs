@@ -2,9 +2,12 @@
 
 extern crate alloc;
 
+mod device;
 mod encoder;
 mod file;
 mod tty;
+
+pub use crate::device::register_console_device;
 
 use alloc::sync::Arc;
 
@@ -22,7 +25,7 @@ use tty::Tty;
 /// The singleton is created between kernel terminal selection and process start; process 0/1/2
 /// descriptors are opened from it by `kernel-main`.
 struct Console {
-    tty: Arc<Tty>,
+    pub(crate) tty: Arc<Tty>,
 }
 
 static CONSOLE: Once<Arc<Console>> = Once::new();

@@ -40,6 +40,7 @@ mod socket;
 mod socketpair;
 mod stat;
 mod tcb_set;
+mod ttyname;
 mod umask;
 mod uname;
 mod vm;
@@ -49,7 +50,7 @@ mod writev;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 72] = [
+pub(super) const SYSCALLS: [Syscall; 73] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -122,4 +123,5 @@ pub(super) const SYSCALLS: [Syscall; 72] = [
     getpgid::SYSCALL,
     setsid::SYSCALL,
     writev::SYSCALL,
+    ttyname::SYSCALL,
 ];

@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 
 use roxy_poll::{PollListener, PollRegistration};
 
@@ -16,6 +16,10 @@ pub(super) struct TtyFile {
 impl File for TtyFile {
     fn is_terminal(&self) -> bool {
         true
+    }
+
+    fn terminal_path(&self) -> Option<Vec<u8>> {
+        Some(Tty::terminal_path().to_vec())
     }
 
     fn metadata(&self) -> Result<FileMetadata, FileError> {
