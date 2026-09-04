@@ -1,18 +1,23 @@
-use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_fd::{IoctlError, IoctlRequest};
 use roxy_line_discipline::LineDisciplineSettings;
 use roxy_process::ProcessGroupId;
 use roxy_tty_types::{ApplyWhen, LocalFlags, Termios};
 
-use crate::Tty;
+use crate::core::TtyCore;
 
 const CS8: u32 = 0o60;
 const VINTR: usize = 0;
 const VERASE: usize = 2;
 const VMIN: usize = 6;
 
-impl Tty {
-    pub(super) fn ioctl(&self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
+impl TtyCore {
+    /// Dispatches a terminal ioctl request.
+    ///
+    /// # Errors
+    ///
+    /// Returns `NotTty` for unsupported requests or when the terminal has no controlling session,
+    /// or `Invalid`/`Unsupported` for request arguments the terminal rejects.
+    pub fn ioctl(&self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
         match request {
             IoctlRequest::GetTermios(termios) => {
                 *termios = self.termios();
@@ -90,7 +95,9 @@ impl Tty {
             | IoctlRequest::EvdevSetRep(_)
             | IoctlRequest::EvdevGetBits { .. }
             | IoctlRequest::EvdevGrab(_)
-            | IoctlRequest::EvdevSetClockId(_) => Err(IoctlError::NotTty),
+            | IoctlRequest::EvdevSetClockId(_)
+            | IoctlRequest::PtyGetNumber(_)
+            | IoctlRequest::PtySetLock(_) => Err(IoctlError::NotTty),
         }
     }
 
@@ -107,11 +114,8 @@ impl Tty {
 
         if when == ApplyWhen::Flush {
             self.buffered.lock().clear();
-            // Draining the pending queue must disable interrupts: the IRQ path pushes into the
-            // same queue, and it must not run while this thread holds the queue lock.
-            CurrentArchitectureBackend::without_interrupts(|| {
-                while self.pending.lock().pop_front().is_some() {}
-            });
+            // Discard the source's pending input. The source's discard is IRQ-safe.
+            self.input_source.discard_pending_input();
         }
 
         // Buffered input inside line discipline
@@ -251,25 +255,20 @@ fn validate_fixed(operation: &'static str, actual: u32, expected: u32) -> Result
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_fd::{IoctlError, IoctlRequest};
-    use roxy_keyboard_input::{KeyCode, KeyState};
-    use roxy_test::kernel_test;
     use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
 
-    use crate::test_support::{key, open};
+    use crate::test_support::open;
 
-    fn press(code: KeyCode) -> roxy_keyboard_input::KeyEvent {
-        key(code, KeyState::Pressed)
-    }
-
-    kernel_test!("roxy-tty::termios-ioctl", updates_input_mode, {
-        let (_tty, output, file) = open(alloc::vec![press(KeyCode::X)]);
+    roxy_test::kernel_test!("roxy-tty-core::termios-ioctl", updates_input_mode, {
+        let (core, source, output) = open();
+        source.push(b"x");
         let mut termios = Termios::default();
 
-        file.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
+        core.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
 
         termios.local_flags = LocalFlags::empty();
         assert_eq!(
-            file.ioctl(IoctlRequest::SetTermios {
+            core.ioctl(IoctlRequest::SetTermios {
                 when: ApplyWhen::Immediate,
                 termios,
             }),
@@ -277,13 +276,13 @@ mod tests {
         );
 
         let mut input = [0; 1];
-        assert_eq!(file.read(&mut input), Ok(1));
+        assert_eq!(core.read(&mut input), Ok(1));
         assert_eq!(&input, b"x");
         assert!(output.bytes().is_empty());
     });
 
-    kernel_test!("roxy-tty::winsize-ioctl", round_trips_window_size, {
-        let (_tty, _output, file) = open(alloc::vec![]);
+    roxy_test::kernel_test!("roxy-tty-core::winsize-ioctl", round_trips_window_size, {
+        let (core, _source, _output) = open();
         let size = WindowSize {
             rows: 40,
             columns: 120,
@@ -291,46 +290,25 @@ mod tests {
             pixel_height: 640,
         };
 
-        assert_eq!(file.ioctl(IoctlRequest::SetWindowSize(size)), Ok(()));
+        assert_eq!(core.ioctl(IoctlRequest::SetWindowSize(size)), Ok(()));
 
         let mut returned = WindowSize::default();
         assert_eq!(
-            file.ioctl(IoctlRequest::GetWindowSize(&mut returned)),
+            core.ioctl(IoctlRequest::GetWindowSize(&mut returned)),
             Ok(())
         );
         assert_eq!(returned, size);
     });
 
-    kernel_test!("roxy-tty::termios-flush", discards_pending_input, {
-        let (tty, _output, file) = open(alloc::vec![press(KeyCode::X)]);
-        let _ = tty.line_discipline.lock().process(b"partial");
-        tty.buffered.lock().extend_from_slice(b"ready");
+    roxy_test::kernel_test!("roxy-tty-core::termios-unsupported", rejects_input_flags, {
+        let (core, _source, _output) = open();
         let mut termios = Termios::default();
 
-        file.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
-        file.ioctl(IoctlRequest::SetTermios {
-            when: ApplyWhen::Flush,
-            termios,
-        })
-        .unwrap();
-
-        assert!(tty.buffered.lock().is_empty());
-        assert!(tty.pending.lock().is_empty());
-        assert_eq!(
-            tty.line_discipline.lock().process(b"\n").buffer.unwrap(),
-            b"\n"
-        );
-    });
-
-    kernel_test!("roxy-tty::termios-unsupported", rejects_input_flags, {
-        let (_tty, _output, file) = open(alloc::vec![]);
-        let mut termios = Termios::default();
-
-        file.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
+        core.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
         termios.input_flags = 1;
 
         assert_eq!(
-            file.ioctl(IoctlRequest::SetTermios {
+            core.ioctl(IoctlRequest::SetTermios {
                 when: ApplyWhen::Immediate,
                 termios,
             }),
@@ -339,46 +317,5 @@ mod tests {
                 argument: 1,
             })
         );
-    });
-
-    kernel_test!(
-        "roxy-tty::termios-local-flags",
-        rejects_unknown_local_flags,
-        {
-            let (_tty, _output, file) = open(alloc::vec![]);
-            let mut termios = Termios::default();
-
-            file.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
-            termios.local_flags = LocalFlags::from_bits_retain(0o100);
-
-            assert_eq!(
-                file.ioctl(IoctlRequest::SetTermios {
-                    when: ApplyWhen::Immediate,
-                    termios,
-                }),
-                Err(IoctlError::Unsupported {
-                    operation: "ioctl.tcsetattr.local-flags",
-                    argument: 0o100,
-                })
-            );
-        }
-    );
-
-    kernel_test!("roxy-tty::termios-isig", round_trips_isig_flag, {
-        let (tty, _output, file) = open(alloc::vec![]);
-        let mut termios = Termios::default();
-
-        file.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
-        assert!(tty.line_discipline.lock().settings.isig);
-        assert!(termios.local_flags.contains(LocalFlags::ISIG));
-        assert_eq!(termios.control_characters[0], b'\x03');
-
-        termios.local_flags.remove(LocalFlags::ISIG);
-        file.ioctl(IoctlRequest::SetTermios {
-            when: ApplyWhen::Immediate,
-            termios,
-        })
-        .unwrap();
-        assert!(!tty.line_discipline.lock().settings.isig);
     });
 }

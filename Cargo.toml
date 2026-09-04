@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask", "kernel/arch", "kernel/block", "kernel/boot", "kernel/cpu", "kernel/devfs", "kernel/elf", "kernel/evdev", "kernel/evdev-keyboard", "kernel/evdev-mouse", "kernel/evdev-types", "kernel/ext4", "kernel/fb-types", "kernel/fbdev", "kernel/fbterm", "kernel/fd", "kernel/futex", "kernel/keyboard-input", "kernel/interrupt", "kernel/key-decoder", "kernel/line-discipline", "kernel/main", "kernel/memory", "kernel/mouse-input", "kernel/poll", "kernel/pipe", "kernel/process", "kernel/ps2", "kernel/serial", "kernel/signal", "kernel/syscall", "kernel/terminal", "kernel/test", "kernel/thread", "kernel/time", "kernel/timer-wait", "kernel/tty", "kernel/tty-types", "kernel/utils", "kernel/vfs", "kernel/vm"]
+members = ["xtask", "kernel/arch", "kernel/block", "kernel/boot", "kernel/cpu", "kernel/devfs", "kernel/elf", "kernel/evdev", "kernel/evdev-keyboard", "kernel/evdev-mouse", "kernel/evdev-types", "kernel/ext4", "kernel/fb-types", "kernel/fbdev", "kernel/fbterm", "kernel/fd", "kernel/futex", "kernel/keyboard-input", "kernel/interrupt", "kernel/key-decoder", "kernel/line-discipline", "kernel/main", "kernel/memory", "kernel/mouse-input", "kernel/poll", "kernel/pipe", "kernel/process", "kernel/ps2", "kernel/pty", "kernel/serial", "kernel/signal", "kernel/syscall", "kernel/terminal", "kernel/test", "kernel/thread", "kernel/time", "kernel/timer-wait", "kernel/tty", "kernel/tty-core", "kernel/tty-types", "kernel/utils", "kernel/vfs", "kernel/vm"]
 
 [workspace.package]
 edition = "2024"
@@ -58,6 +58,7 @@ roxy-poll.path = "kernel/poll"
 roxy-pipe.path = "kernel/pipe"
 roxy-process.path = "kernel/process"
 roxy-ps2.path = "kernel/ps2"
+roxy-pty.path = "kernel/pty"
 roxy-serial.path = "kernel/serial"
 roxy-signal.path = "kernel/signal"
 roxy-syscall.path = "kernel/syscall"
@@ -67,6 +68,7 @@ roxy-thread.path = "kernel/thread"
 roxy-time.path = "kernel/time"
 roxy-timer-wait.path = "kernel/timer-wait"
 roxy-tty.path = "kernel/tty"
+roxy-tty-core.path = "kernel/tty-core"
 roxy-tty-types.path = "kernel/tty-types"
 roxy-unix-socket.path = "kernel/unix-socket"
 roxy-utils.path = "kernel/utils"

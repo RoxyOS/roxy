@@ -20,6 +20,10 @@ pub enum IoctlRequest<'a> {
     SetControllingTerminal {
         force: bool,
     },
+    /// Reads the allocated pty slave number from a pty master (`TIOCGPTN`).
+    PtyGetNumber(&'a mut u32),
+    /// Sets whether the pty slave device is locked (`TIOCSPTLCK`).
+    PtySetLock(bool),
     FbGetVarInfo(&'a mut FbVarInfo),
     FbSetVarInfo(FbVarInfo),
     FbGetFixedInfo(&'a mut FbFixedInfo),

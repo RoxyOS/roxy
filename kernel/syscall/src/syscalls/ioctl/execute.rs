@@ -1,7 +1,7 @@
 use roxy_fd::{IoctlError, OpenFile};
 use roxy_tty_types::ApplyWhen;
 
-use super::{evdev, framebuffer, terminal};
+use super::{evdev, framebuffer, pty, terminal};
 use crate::errno::Errno;
 
 pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> Result<u64, Errno> {
@@ -27,6 +27,8 @@ pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> R
         terminal::TIOCGPGRP => terminal::get_foreground_pgid(file, raw_argument).map(|()| 0),
         terminal::TIOCSPGRP => terminal::set_foreground_pgid(file, raw_argument).map(|()| 0),
         terminal::TIOCSCTTY => terminal::set_controlling_terminal(file, raw_argument).map(|()| 0),
+        pty::TIOCGPTN => pty::get_pty_number(file, raw_argument).map(|()| 0),
+        pty::TIOCSPTLCK => pty::set_pty_lock(file, raw_argument).map(|()| 0),
         framebuffer::FBIOGET_VSCREENINFO => {
             framebuffer::get_var_screen_info(file, raw_argument).map(|()| 0)
         }

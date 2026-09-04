@@ -73,6 +73,7 @@ their state and register their listeners with a shared device queue. Duplication
 other per-descriptor flags remain unsupported.
 
 The typed request set covers terminal attribute get/set operations with their application timing,
-terminal window-size get/set operations, and framebuffer screen-information get operations.
+terminal window-size get/set operations, framebuffer screen-information get operations, and the
+pty master operations (`PtyGetNumber`, `PtySetLock`) routed to the holding device.
 `File::mmap` describes device physical memory for a file-backed `mmap`; only device-backed files
 implement it, and the descriptor layer never installs or owns the mapping itself.

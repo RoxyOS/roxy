@@ -8,4 +8,4 @@ mod registry;
 
 pub use filesystem::DevFs;
 pub use null::{NullDevice, register_null};
-pub use registry::{Device, DeviceRegistry, RegisterError};
+pub use registry::{Device, DeviceRegistry, DynamicDeviceResolver, RegisterError};

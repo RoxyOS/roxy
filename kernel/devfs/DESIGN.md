@@ -37,12 +37,17 @@ across open and directory listing.
 open("/dev/fb0")
   → VFS mount routing → DevFs::open → registry lookup → DeviceFile { device }
   → VfsFile → descriptor-layer File
-
 open("/dev/null")
   → (same path, NullDevice)
+
+open("/dev/ptmx") → registry lookup → factory open → per-pair master
+open("/dev/pts/0") → registry miss → dynamic resolvers → slave
 ```
 
-- `Device::metadata` returns the character-device metadata including a stable per-device file ID.
+- `Device::metadata` returns the character-device metadata including a stable per-file ID; a
+  factory device's `Device::open` allocates a fresh instance per `open`, and dynamically resolved
+  devices are supplied by the registry's `DynamicDeviceResolver`s after the static table misses.
+  `Device::is_terminal` reports whether the device looks like a terminal (a pty slave).
   `NullDevice` reports file ID 2, character-device type, mode 0666, and zero size.
 - `Device::ioctl` receives the same typed `IoctlRequest` the descriptor layer dispatches; the
   device returns `IoctlError` values that the syscall layer maps to errno.
@@ -55,8 +60,11 @@ open("/dev/null")
 
 ## Invariants and limits
 
-- Registration is idempotent-failing: a second registration under an existing path returns
-  `AlreadyExists` and never replaces the existing device.
+- Static registration is idempotent-failing: a second registration under an existing path returns
+  `AlreadyExists` and never replaces the existing device. Dynamic paths (pty slaves) are not
+  statically registered; any registered `DynamicDeviceResolver`s are consulted (in registration
+  order, first match wins) after the static table misses and extend resolution without mutating the
+  static table.
 - `DevFs` rejects all namespace mutations with `ReadOnly`, so the mount never observes
   unregistered nodes and active-handle tracking cannot race device removal.
 - The mount root must exist as a logical path even though the root filesystem may not contain a

@@ -27,3 +27,26 @@ model remains minimal: `setsid` skips the POSIX "caller must not already be a pr
 leader" check because the spawn model makes every top-level process a leader, and `setpgid` does
 not validate that target and group share a session. Both gaps are marked with `TODO(session)` in
 `kernel/process/src/setpgid.rs`.
+
+## pty and terminal semantics are only partially implemented
+
+`roxy-tty-core`/`roxy-pty` do not yet implement several terminal behaviors. Each is marked with a
+`TODO(<missing-capability>)` at its code site and described further in `kernel/pty/DESIGN.md`:
+
+- `TODO(master-close-hangup)`: closing the last pty master does not signal EOF or `SIGHUP` to the
+  slave, because `Device` has no per-open drop hook to detect it.
+- `TODO(pty-lock)`: `TIOCSPTLCK` records the lock flag but a slave `open` does not yet reject a
+  locked slave.
+- `TODO(pty-gptpeer)`: `TIOCGPTPEER` is unsupported because the syscall layer cannot return a newly
+  allocated descriptor from ioctl; callers open `/dev/pts/N` by number instead.
+- `TODO(sigwinch)`: the process model has no `SIGWINCH`; master `TIOCSWINSZ` does not yet propagate
+  to the slave.
+
+## xtest aborts at the VFS root-mount test before most tests run
+
+`cargo xtest` panics with "no current thread" in `kernel/thread/src/scheduler/state.rs`
+(`current_thread_id`) inside the `kernel-main::hardcoded-root-device-is-mounted` test, aborting
+before the rest of the distributed suite (including the `roxy-tty-core`/`roxy-pty` tests) runs. This
+reproduced unchanged on a clean `HEAD`, so it is a pre-existing harness/ordering issue independent
+of the terminal work; it blocks runtime validation of new tests but not `cargo xcheck` (format,
+clippy, and both kernel builds).

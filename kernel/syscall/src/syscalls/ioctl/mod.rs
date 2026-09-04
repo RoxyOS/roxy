@@ -3,6 +3,7 @@ mod evdev_abi;
 mod execute;
 mod framebuffer;
 mod framebuffer_abi;
+mod pty;
 mod terminal;
 mod terminal_abi;
 

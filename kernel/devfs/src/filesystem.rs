@@ -44,8 +44,9 @@ impl FileSystem for DevFs {
     ) -> Result<Box<dyn FileHandle>, VfsError> {
         let device = self
             .registry
-            .get(path.as_bytes())
+            .resolve(path.as_bytes())
             .ok_or(VfsError::NotFound)?;
+        let device = device.open().unwrap_or(device);
 
         Ok(Box::new(DeviceFile::new(device)))
     }
@@ -57,7 +58,7 @@ impl FileSystem for DevFs {
 
         let device = self
             .registry
-            .get(path.as_bytes())
+            .resolve(path.as_bytes())
             .ok_or(VfsError::NotFound)?;
 
         Ok(to_vfs_metadata(device.metadata()))
@@ -162,6 +163,10 @@ impl FileHandle for DeviceFile {
 
     fn metadata(&self) -> Result<Metadata, VfsError> {
         Ok(to_vfs_metadata(self.device.metadata()))
+    }
+
+    fn is_terminal(&self) -> bool {
+        self.device.is_terminal()
     }
 
     fn sync(&mut self) -> Result<(), VfsError> {

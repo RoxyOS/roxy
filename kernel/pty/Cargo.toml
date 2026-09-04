@@ -1,5 +1,5 @@
 [package]
-name = "roxy-tty"
+name = "roxy-pty"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
@@ -9,18 +9,14 @@ publish.workspace = true
 kernel-test = ["dep:linkme", "dep:roxy-test", "roxy-tty-core/kernel-test"]
 
 [dependencies]
-heapless.workspace = true
 linkme = { workspace = true, optional = true }
 spin.workspace = true
 
 roxy-arch.workspace = true
+roxy-devfs.workspace = true
 roxy-fd.workspace = true
-roxy-keyboard-input.workspace = true
-roxy-key-decoder.workspace = true
 roxy-poll.workspace = true
 roxy-process.workspace = true
-roxy-signal.workspace = true
-roxy-terminal.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-tty-core.workspace = true
 roxy-tty-types.workspace = true

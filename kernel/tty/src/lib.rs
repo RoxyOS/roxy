@@ -4,114 +4,73 @@ extern crate alloc;
 
 mod encoder;
 mod file;
-mod ioctl;
 mod tty;
 
-use alloc::{sync::Arc, vec::Vec};
+use alloc::sync::Arc;
 
-use heapless::Deque;
 use roxy_fd::OpenFile;
-use roxy_key_decoder::KeyDecoder;
 use roxy_keyboard_input::{KeyEvent, KeyboardListener};
-use roxy_line_discipline::LineDiscipline;
-use roxy_poll::PollListeners;
-use roxy_process::ProcessGroupId;
-use roxy_process::SessionId;
+use roxy_process::{ProcessGroupId, SessionId};
 use roxy_terminal::TerminalOutput;
-use roxy_tty_types::WindowSize;
-use roxy_utils::Lock;
 use spin::Once;
 
 use file::TtyFile;
+use tty::Tty;
 
-const PENDING_CAPACITY: usize = 256;
-
-struct Tty {
-    output: Arc<dyn TerminalOutput>,
-    line_discipline: Lock<LineDiscipline>,
-    /// Decodes raw key events into characters and special keys
-    /// (US 104-key layout, `MapLettersToUnicode`).
-    decoder: Lock<KeyDecoder>,
-    window_size: Lock<WindowSize>,
-    buffered: Lock<Vec<u8>>,
-    /// Bounded queue of raw key events received from the input manager.
-    ///
-    /// The IRQ path pushes events here and tries to process them immediately (with `try_lock`
-    /// on decoder and line discipline). The read path pops events from here when the buffer is
-    /// empty. The queue is sized to match the previous PS/2 driver queue depth.
-    pending: Lock<Deque<KeyEvent, PENDING_CAPACITY>>,
-    read_lock: Lock<()>,
-    poll_listeners: Arc<PollListeners>,
-    /// The process group that receives terminal-generated signals, when one is selected.
-    foreground_pgid: Lock<Option<ProcessGroupId>>,
-    /// The session that owns this controlling terminal, when one is established.
-    owner_session_id: Lock<Option<SessionId>>,
+/// One console terminal, bound to the kernel's selected output endpoint and keyboard manager.
+///
+/// The singleton is created between kernel terminal selection and process start; process 0/1/2
+/// descriptors are opened from it by `kernel-main`.
+struct Console {
+    tty: Arc<Tty>,
 }
 
-static TTY: Once<Arc<Tty>> = Once::new();
+static CONSOLE: Once<Arc<Console>> = Once::new();
 
-/// Publishes the one TTY used for initial process descriptors.
+/// Publishes the console terminal used for initial process descriptors.
 ///
-/// Returns an `KeyboardListener` that main registers with the process-wide input manager.
+/// Returns a `KeyboardListener` that main registers with the process-wide input manager.
 ///
 /// # Panics
 ///
 /// Panics when called more than once.
 pub fn initialize(output: Arc<dyn TerminalOutput>) -> Arc<dyn KeyboardListener> {
-    assert!(TTY.get().is_none(), "TTY initialized twice");
+    assert!(
+        CONSOLE.get().is_none(),
+        "console terminal initialized twice"
+    );
     let tty = Arc::new(Tty::new(output));
-    TTY.call_once(|| tty.clone());
-    roxy_process::register_session_leader_exit_handler(on_session_leader_exit);
-    tty
+    let console = Arc::new(Console { tty });
+    CONSOLE.call_once(|| console.clone());
+    console
 }
 
-/// Sends SIGHUP to the foreground process group of this terminal when its controlling session's
-/// leader exits, then releases the terminal (Linux `disassociate_ctty`/hangup semantics).
-///
-/// Runs on the exiting session leader's own thread via the process-side callback, so no
-/// process-table lock is held; the locks taken here are the terminal's own.
-fn on_session_leader_exit(session: roxy_process::SessionId) {
-    let Some(tty) = TTY.get() else {
-        return;
-    };
-
-    let owns_terminal = *tty.owner_session_id.lock() == Some(session);
-    if !owns_terminal {
-        return;
-    }
-
-    let foreground = tty.foreground_pgid.lock().take();
-    *tty.owner_session_id.lock() = None;
-
-    if let Some(pgid) = foreground {
-        roxy_process::send_signal_to_pgid(pgid, roxy_signal::Signal::Hangup);
-    }
-}
-
-impl KeyboardListener for Tty {
+impl KeyboardListener for Console {
     fn on_recive_input(&self, key: KeyEvent) {
-        // IRQ context: interrupts are already disabled, so a plain lock on the pending queue
-        // is safe (the read path disables interrupts while holding it).
-        let _ = self.pending.lock().push_back(key);
-        self.try_process_input_arrival();
-        self.poll_listeners.notify();
+        // IRQ context: interrupts are already disabled.
+        self.tty.push_key(key);
+        // Fast path: deliver VINTR/SIGINT immediately even when nobody is reading.
+        self.tty.try_process_input_arrival();
+        self.tty.observe_input();
     }
 }
 
-/// Opens an independent descriptor for the initialized TTY.
+/// Opens an independent descriptor for the console terminal.
 ///
 /// # Panics
 ///
-/// Panics when the TTY has not been initialized.
+/// Panics when the console has not been initialized.
 #[must_use]
 pub fn open() -> Arc<OpenFile> {
-    let tty = TTY.get().expect("TTY must be initialized before opening");
+    let console = CONSOLE
+        .get()
+        .expect("console must be initialized before opening");
 
-    TtyFile::open(tty.clone())
+    TtyFile::open(console.tty.clone())
 }
 
-/// Binds the terminal to a session as its controlling terminal, setting the session's initial
-/// foreground process group.
+/// Binds the console terminal to a session as its controlling terminal, setting the session's
+/// initial foreground process group.
 ///
 /// This is how the composition root establishes the initial controlling terminal in the role
 /// that a login/getty program plays on Linux: the terminal is acquired by a fresh session leader
@@ -119,28 +78,26 @@ pub fn open() -> Arc<OpenFile> {
 ///
 /// # Panics
 ///
-/// Panics when the TTY has not been initialized or is already bound to a session.
+/// Panics when the console has not been initialized or is already bound to a session.
 pub fn bind_controlling_terminal(session: SessionId, pgid: ProcessGroupId) {
-    let tty = TTY.get().expect("TTY must be initialized before binding");
-    let mut current_session = tty.owner_session_id.lock();
+    let console = CONSOLE
+        .get()
+        .expect("console must be initialized before binding");
 
-    assert!(
-        current_session.is_none(),
-        "TTY controlling terminal bound twice"
-    );
-    *current_session = Some(session);
-    *tty.foreground_pgid.lock() = Some(pgid);
+    console.tty.bind_session(session, pgid);
 }
+
+// Expose pass-throughs used by `TtyFile` through the concrete type.
 
 #[cfg(feature = "kernel-test")]
 mod test_support {
-    use alloc::{sync::Arc, vec::Vec};
-    use core::sync::atomic::{AtomicUsize, Ordering};
+    use alloc::sync::Arc;
+    use alloc::vec::Vec;
 
-    use roxy_fd::OpenFile;
+    use roxy_fd::{IoctlRequest, OpenFile};
     use roxy_keyboard_input::{KeyCode, KeyEvent, KeyState};
     use roxy_terminal::{OutputError, TerminalOutput};
-    use roxy_tty_types::WindowSize;
+    use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
     use spin::Mutex;
 
     use crate::Tty;
@@ -149,13 +106,10 @@ mod test_support {
     pub(super) struct MockOutput {
         bytes: Mutex<Vec<u8>>,
         window_size: WindowSize,
-        calls: AtomicUsize,
-        fail_call: AtomicUsize,
-        max_write: AtomicUsize,
     }
 
     impl MockOutput {
-        fn new() -> Self {
+        pub(super) fn new() -> Self {
             Self {
                 bytes: Mutex::new(Vec::new()),
                 window_size: WindowSize {
@@ -164,37 +118,18 @@ mod test_support {
                     pixel_width: 800,
                     pixel_height: 480,
                 },
-                calls: AtomicUsize::new(0),
-                fail_call: AtomicUsize::new(0),
-                max_write: AtomicUsize::new(usize::MAX),
             }
         }
 
         pub(super) fn bytes(&self) -> Vec<u8> {
             self.bytes.lock().clone()
         }
-
-        pub(super) fn fail_on_call(&self, call: usize) {
-            self.fail_call.store(call, Ordering::Relaxed);
-        }
-
-        pub(super) fn limit_writes(&self, count: usize) {
-            self.max_write.store(count, Ordering::Relaxed);
-        }
     }
 
     impl TerminalOutput for MockOutput {
         fn write(&self, input: &[u8]) -> Result<usize, OutputError> {
-            let call = self.calls.fetch_add(1, Ordering::Relaxed) + 1;
-
-            if self.fail_call.load(Ordering::Relaxed) == call {
-                return Err(OutputError::Io);
-            }
-
-            let count = input.len().min(self.max_write.load(Ordering::Relaxed));
-            self.bytes.lock().extend_from_slice(&input[..count]);
-
-            Ok(count)
+            self.bytes.lock().extend_from_slice(input);
+            Ok(input.len())
         }
 
         fn window_size(&self) -> WindowSize {
@@ -207,12 +142,25 @@ mod test_support {
         KeyEvent { code, state }
     }
 
+    /// Sets the line-discipline `echo`/`canonical` flags through the ioctl path.
+    pub(super) fn set_settings(tty: &Arc<Tty>, echo: bool, canonical: bool) {
+        let mut termios = Termios::default();
+        tty.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
+        termios.local_flags.set(LocalFlags::ECHO, echo);
+        termios.local_flags.set(LocalFlags::ICANON, canonical);
+        tty.ioctl(IoctlRequest::SetTermios {
+            when: ApplyWhen::Immediate,
+            termios,
+        })
+        .unwrap();
+    }
+
     pub(super) fn open(events: Vec<KeyEvent>) -> (Arc<Tty>, Arc<MockOutput>, Arc<OpenFile>) {
         let output = Arc::new(MockOutput::new());
         let tty = Arc::new(Tty::new(output.clone()));
         // Inject events directly into the pending queue (no IRQ-path processing).
         for event in events {
-            let _ = tty.pending.lock().push_back(event);
+            tty.push_key(event);
         }
         let file = TtyFile::open(tty.clone());
 
@@ -222,12 +170,13 @@ mod test_support {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
+    use roxy_fd::IoctlRequest;
     use roxy_keyboard_input::{KeyCode, KeyEvent, KeyState};
     use roxy_test::kernel_test;
     use roxy_tty_types::WindowSize;
 
     use super::file::TtyFile;
-    use super::test_support::{key, open};
+    use super::test_support::{key, open, set_settings};
 
     /// Helper that constructs a key-press event for test brevity.
     fn press(code: KeyCode) -> KeyEvent {
@@ -281,7 +230,7 @@ mod tests {
 
     kernel_test!("roxy-tty::disabled-echo", skips_disabled_echo, {
         let (tty, output, file) = open(alloc::vec![press(KeyCode::X), press(KeyCode::Return),]);
-        tty.line_discipline.lock().settings.echo = false;
+        set_settings(&tty, false, true);
         let mut buffer = [0; 2];
 
         assert_eq!(file.read(&mut buffer), Ok(2));
@@ -290,10 +239,13 @@ mod tests {
     });
 
     kernel_test!("roxy-tty::initial-window-size", inherits_output_size, {
-        let (tty, _output, _file) = open(alloc::vec![]);
+        let (tty, _output, file) = open(alloc::vec![]);
+        let mut window_size = WindowSize::default();
 
+        file.ioctl(IoctlRequest::GetWindowSize(&mut window_size))
+            .unwrap();
         assert_eq!(
-            *tty.window_size.lock(),
+            window_size,
             WindowSize {
                 rows: 30,
                 columns: 100,
@@ -301,5 +253,6 @@ mod tests {
                 pixel_height: 480,
             }
         );
+        let _ = &tty;
     });
 }

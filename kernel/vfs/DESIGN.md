@@ -37,6 +37,8 @@ cwd lookup. Filesystems own persistent filesystem state. `VfsFile` owns a boxed 
 until close/drop so namespace mutations and unmount cannot invalidate an open object.
 These VFS-owned types implement the descriptor-layer `File` and `Directory` capabilities directly;
 the descriptor crate remains independent of VFS and contains no concrete file implementations.
+`VfsFile::is_terminal` asks the boxed `FileHandle`: regular files keep the default `false`, while a
+character-device handle (e.g. a pty slave) reports `true`, so `isatty` works on `devfs` descriptors.
 
 Creation operations receive validated `FilePermissions` from their caller. In particular, directory
 creation passes the requested permission bits through the global facade, mount routing, and the

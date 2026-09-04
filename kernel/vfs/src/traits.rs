@@ -12,6 +12,14 @@ pub trait FileHandle: Send {
     fn metadata(&self) -> Result<Metadata, VfsError>;
     fn sync(&mut self) -> Result<(), VfsError>;
 
+    /// Reports whether the object behind this handle is a terminal.
+    ///
+    /// The default is `false` for regular files; character-device handles that expose a terminal
+    /// (e.g. a pty slave) override it so `isatty` on the descriptor reports `true`.
+    fn is_terminal(&self) -> bool {
+        false
+    }
+
     /// Sets the permission bits of the file behind this handle.
     ///
     /// # Errors

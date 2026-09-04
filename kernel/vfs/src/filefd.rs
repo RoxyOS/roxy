@@ -21,7 +21,9 @@ impl FdFile for VfsFile {
     }
 
     fn is_terminal(&self) -> bool {
-        false
+        // A terminal reaches the descriptor layer only through a character-device handle (devfs);
+        // a pty slave reports itself as a terminal through this path.
+        self.handle.is_terminal()
     }
 
     fn metadata(&self) -> Result<FdFileMetadata, FdFileError> {

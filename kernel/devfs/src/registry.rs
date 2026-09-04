@@ -14,6 +14,20 @@ pub trait Device: Send + Sync {
     /// Returns metadata for the device node.
     fn metadata(&self) -> FileMetadata;
 
+    /// Returns the device instance an `open` of this node should hand out, or `None` to use `self`.
+    ///
+    /// A factory device (such as `/dev/ptmx`) overrides this so that opening the path yields a
+    /// fresh instance rather than the node itself; ordinary devices return `None` and are opened as
+    /// themselves.
+    fn open(&self) -> Option<Arc<dyn Device>> {
+        None
+    }
+
+    /// Reports whether this device is a terminal (for example a pty slave).
+    fn is_terminal(&self) -> bool {
+        false
+    }
+
     /// Reports the events that are currently ready for this device.
     #[must_use]
     fn poll(&self) -> PollEvents {
@@ -72,6 +86,19 @@ pub trait Device: Send + Sync {
 /// Names device drivers under the device filesystem mount point.
 pub struct DeviceRegistry {
     devices: Lock<BTreeMap<Vec<u8>, Arc<dyn Device>>>,
+    /// Resolvers for device paths created dynamically at runtime (e.g. `/dev/pts/N` pty slaves);
+    /// each resolver may own a distinct dynamic namespace, consulted in registration order.
+    dynamic: Lock<Vec<Arc<dyn DynamicDeviceResolver>>>,
+}
+
+/// Resolves device paths that appear only at runtime (after registration).
+///
+/// The static registry names devices created during initialization; a dynamic resolver supplies
+/// devices whose identity depends on runtime state, such as per-pair pty slave nodes. It is read
+/// after the static table misses and never mutates the static registry.
+pub trait DynamicDeviceResolver: Send + Sync {
+    /// Returns the device for a mount-relative path, or `None` when it does not exist.
+    fn resolve(&self, path: &[u8]) -> Option<Arc<dyn Device>>;
 }
 
 impl Default for DeviceRegistry {
@@ -90,7 +117,14 @@ impl DeviceRegistry {
     pub fn new() -> Self {
         Self {
             devices: Lock::new(BTreeMap::new()),
+            dynamic: Lock::new(Vec::new()),
         }
+    }
+
+    /// Registers a dynamic path resolver consulted (in registration order) after the static table
+    /// misses. The static table always wins, so static devices shadow dynamic ones.
+    pub fn register_dynamic_resolver(&self, resolver: Arc<dyn DynamicDeviceResolver>) {
+        self.dynamic.lock().push(resolver);
     }
 
     /// Registers a device under a mount-relative path such as `b"fb0"`.
@@ -112,6 +146,24 @@ impl DeviceRegistry {
 
     pub(crate) fn get(&self, path: &[u8]) -> Option<Arc<dyn Device>> {
         self.devices.lock().get(path).cloned()
+    }
+
+    /// Resolves a mount-relative path: the static registry first, then each dynamic resolver in
+    /// registration order (first match wins).
+    pub(crate) fn resolve(&self, path: &[u8]) -> Option<Arc<dyn Device>> {
+        let static_device = self.devices.lock().get(path).cloned();
+        if static_device.is_some() {
+            return static_device;
+        }
+
+        let resolvers: Vec<_> = self.dynamic.lock().clone();
+        for resolver in resolvers {
+            if let Some(device) = resolver.resolve(path) {
+                return Some(device);
+            }
+        }
+
+        None
     }
 
     pub(crate) fn names(&self) -> Vec<Vec<u8>> {

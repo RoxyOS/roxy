@@ -29,6 +29,7 @@ kernel-test = [
     "roxy-poll/kernel-test",
     "roxy-process/kernel-test",
     "roxy-ps2/kernel-test",
+    "roxy-pty/kernel-test",
     "roxy-syscall/kernel-test",
     "roxy-terminal/kernel-test",
     "roxy-thread/kernel-test",
@@ -72,6 +73,7 @@ roxy-memory.workspace = true
 roxy-poll.workspace = true
 roxy-process.workspace = true
 roxy-ps2.workspace = true
+roxy-pty.workspace = true
 roxy-serial.workspace = true
 roxy-signal.workspace = true
 roxy-syscall.workspace = true

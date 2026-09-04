@@ -390,6 +390,7 @@ dependencies = [
  "roxy-poll",
  "roxy-process",
  "roxy-ps2",
+ "roxy-pty",
  "roxy-serial",
  "roxy-signal",
  "roxy-syscall",
@@ -849,6 +850,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-pty"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-arch",
+ "roxy-devfs",
+ "roxy-fd",
+ "roxy-poll",
+ "roxy-process",
+ "roxy-test",
+ "roxy-tty-core",
+ "roxy-tty-types",
+ "roxy-utils",
+ "spin 0.12.2",
+]
+
+[[package]]
 name = "roxy-serial"
 version = "0.1.0"
 dependencies = [
@@ -967,11 +985,28 @@ dependencies = [
  "roxy-fd",
  "roxy-key-decoder",
  "roxy-keyboard-input",
- "roxy-line-discipline",
  "roxy-poll",
  "roxy-process",
  "roxy-signal",
  "roxy-terminal",
+ "roxy-test",
+ "roxy-tty-core",
+ "roxy-tty-types",
+ "roxy-utils",
+ "spin 0.12.2",
+]
+
+[[package]]
+name = "roxy-tty-core"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-arch",
+ "roxy-fd",
+ "roxy-line-discipline",
+ "roxy-poll",
+ "roxy-process",
+ "roxy-signal",
  "roxy-test",
  "roxy-tty-types",
  "roxy-utils",
