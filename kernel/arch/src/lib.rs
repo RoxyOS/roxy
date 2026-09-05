@@ -9,4 +9,4 @@ pub use arch::{
     FloatState, Interrupt, InterruptDispatcher, IrqLine, LocalInterruptKind, RawSyscall,
     ResumeInfo, SYSCALL_INSTRUCTION_SIZE, SyscallExit, SyscallHandler, UserContext, X86_64,
 };
-pub use cpuid::CpuId;
+pub use cpuid::{CpuId, MAX_CPUS};

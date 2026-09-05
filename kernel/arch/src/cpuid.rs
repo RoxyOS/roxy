@@ -1,5 +1,11 @@
 use core::fmt;
 
+/// Upper bound on the number of CPUs the kernel can address. `CpuId` values index per-CPU storage
+/// such as `CpuLocal`, so this bounds those arrays. It is a kernel policy constant, not a hardware
+/// limit: it must be large enough for the intended platform (current target uses one vCPU) without
+/// wasting per-slot static storage.
+pub const MAX_CPUS: usize = 64;
+
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CpuId(u32);

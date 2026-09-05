@@ -8,8 +8,9 @@ global time policy, or process state.
 
 ## Ownership and boundaries
 
-`CpuLocal<T>` owns one initialized value for the current CPU. The current implementation exposes a
-BSP-only model, so initialization and access assert that the caller is running on the BSP. The
+`CpuLocal<T>` owns one initialized value for every CPU, stored in a fixed array indexed by the
+typed `CpuId`. Initialization and access select the current CPU's slot through the architecture's
+`current_cpu_id`, so there is no bootstrap-processor assertion inside the storage primitive. The
 interrupt subsystem discovers the local APIC hardware identifier and passes it to CPU
 initialization. Timer-device programming belongs to the time subsystem.
 
@@ -18,10 +19,19 @@ hardware identifier after `roxy-interrupt` has configured the local controller.
 
 ## Invariants
 
-- A CPU-local slot cannot be read before initialization or initialized twice.
+- A CPU-local slot cannot be read before initialization or initialized twice. Each slot is a
+  `spin::Once`, which guarantees exactly one initialization and orders the value write before
+  publish (release on completion, acquire on read), so a written value is never observed partially.
+- Slot count is bounded by the exported `MAX_CPUS` constant in `roxy-arch`; `current_cpu_id` must
+  stay below that bound or the access panics.
 - Hardware identifiers are architecture values; public callers use the typed `CpuId` wrapper.
+- The storage layer is per-CPU capable. Making a non-bootstrap slot meaningful still requires the
+  architecture to report a real per-CPU identity; today `current_cpu_id` returns the bootstrap
+  processor, so only slot zero is exercised.
 
 ## Limits
 
-SMP support is not represented by the current `CpuLocal` implementation. Extending it requires
-replacing the BSP-only storage and revisiting lock, timer, and scheduler assumptions together.
+`CpuLocal` storage now supports one value per CPU, but the kernel is still BSP-only: the
+architecture `current_cpu_id` returns the bootstrap processor, and per-CPU identity (typically a
+segment-register per-CPU area) is not yet implemented. Raising non-bootstrap CPUs requires that
+identity mechanism and a revisit of lock, timer, and scheduler assumptions together.
