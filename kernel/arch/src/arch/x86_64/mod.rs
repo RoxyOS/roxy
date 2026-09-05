@@ -1,3 +1,4 @@
+mod cpu_map;
 mod exception;
 mod float;
 mod init;
@@ -20,6 +21,14 @@ impl sealed::Sealed for X86_64 {}
 
 impl Architecture for X86_64 {
     fn initialize(exception_handler: ExceptionHandler) {
+        // The BSP registers itself before any other code can query `current_cpu_id`, so slot 0
+        // is claimed before `Lock`/`CpuLocal` first index per-CPU storage during memory setup.
+        cpu_map::register(cpu_map::read_current_apic_id());
+        assert_eq!(
+            Self::current_cpu_id(),
+            CpuId::BSP,
+            "BSP must claim logical slot 0"
+        );
         init::initialize(exception_handler);
     }
 
@@ -32,7 +41,7 @@ impl Architecture for X86_64 {
     }
 
     fn current_cpu_id() -> CpuId {
-        CpuId::BSP
+        cpu_map::current_id()
     }
 
     fn interrupts_enabled() -> bool {

@@ -19,6 +19,13 @@ ownership rules.
   contract for IDT entry. x86_64 currently installs IRQ0..IRQ15 at vectors `0x20..0x2f`.
 - `RawSyscall` is the normalized boundary value passed from the backend to the syscall subsystem.
 - `UserContext` describes the user resume state needed by fork and ordinary syscall return.
+- `CpuId` is a logical slot index (`0..n-1`) into per-CPU storage arrays (`CpuLocal`, indexed by
+  `current_cpu_id`). The architecture layer maps the physical CPU identity (the APIC id on x86)
+  to a densely numbered `CpuId` through a fixed registration table. The x86_64 backend reads the
+  current CPU's APIC id via CPUID leaf 1 (`EBX[31:24]`, Initial APIC ID) so that identity is
+  available before x2APIC mode is enabled. BSP registration happens during `Architecture::initialize`,
+  before any kernel code queries per-CPU storage; application processors register as their first
+  kernel action by calling the backend CPU map directly.
 - The architecture layer does not own process address spaces, file descriptors, or syscall policy.
 
 ## Invariants and flows
@@ -56,7 +63,14 @@ assumes the BSP-oriented CPU model exposed by the rest of the kernel and provide
 promise beyond the implemented target.
 
 ## Design decisions
-
-The trait exposes semantic operations such as `resume_user` and `set_kernel_stack_top` rather than
-register-level helpers. This keeps syscall and process code independent of x86 register names and
-prevents architecture details from leaking into generic subsystems.
+- The trait exposes semantic operations such as `resume_user` and `set_kernel_stack_top` rather than
+  register-level helpers. This keeps syscall and process code independent of x86 register names and
+  prevents architecture details from leaking into generic subsystems.
+- The CPU identity map uses a fixed `[(u32, CpuId); MAX_CPUS]` array with a linear scan on every
+  `current_cpu_id` call. This avoids allocation and a hasher in the per-CPU hot path, keeps the
+  `roxy-arch` crate free of an allocator dependency, and guarantees deterministic slot assignment.
+  The key is the CPUID Initial APIC ID rather than the x2APIC MSR because the map must be readable
+  before x2APIC mode is enabled. On the current single-vCPU platform the two are identical; on
+  future SMP the post-enable x2APIC linear id may differ from the Initial APIC ID, and matching
+  the map key to the hardware id consumed by the interrupt backend (`local_apic.id()`) is an open
+  TODO.
