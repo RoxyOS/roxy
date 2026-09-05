@@ -9,6 +9,8 @@ publish.workspace = true
 limine.workspace = true
 
 roxy-arch.workspace = true
+roxy-interrupt.workspace = true
+roxy-memory.workspace = true
 roxy-serial.workspace = true
 
 [lints]

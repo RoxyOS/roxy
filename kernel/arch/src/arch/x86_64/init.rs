@@ -21,6 +21,7 @@ use super::{cpu_map, exception, float, interrupt};
 const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 const DOUBLE_FAULT_STACK_SIZE: usize = 4096 * 5;
 const DOUBLE_FAULT_STACK_OFFSET: u64 = 4096 * 5;
+const AP_KERNEL_STACK_SIZE: usize = 4096 * 4;
 
 // ── BSP state ───────────────────────────────────────────────────────────────
 
@@ -44,6 +45,12 @@ static AP_GDT: ApStorage<GlobalDescriptorTable> =
 static AP_TSS: ApStorage<TaskStateSegment> =
     ApStorage(UnsafeCell::new([const { MaybeUninit::uninit() }; MAX_CPUS]));
 static AP_DF_STACK: ApStorage<[u8; DOUBLE_FAULT_STACK_SIZE]> =
+    ApStorage(UnsafeCell::new([const { MaybeUninit::uninit() }; MAX_CPUS]));
+
+#[repr(C, align(16))]
+struct ApStack([u8; AP_KERNEL_STACK_SIZE]);
+
+static AP_KERNEL_STACK: ApStorage<ApStack> =
     ApStorage(UnsafeCell::new([const { MaybeUninit::uninit() }; MAX_CPUS]));
 
 struct Selectors {
@@ -105,11 +112,26 @@ pub(super) fn shared_idt() -> &'static InterruptDescriptorTable {
 }
 
 #[allow(clippy::ptr_cast_constness)]
+pub(super) fn register_ap() {
+    // Register CPU identity first so `current_cpu_id` resolves on this CPU.
+    cpu_map::register(cpu_map::read_current_apic_id());
+}
+
+/// Returns the top of this CPU's dedicated kernel stack.
+///
+/// The stack lives in the kernel image's `.bss`, so it is mapped under both the bootloader and
+/// kernel page tables, allowing the AP to switch onto it before switching CR3.
+pub(super) fn kernel_stack_top(cpu_id: CpuId) -> u64 {
+    let index = cpu_id.get() as usize;
+    let slot = unsafe { &mut (*AP_KERNEL_STACK.0.get())[index] };
+    let ptr = slot.as_mut_ptr().cast::<u8>();
+    // SAFETY: the slot is an initialized zeroed `.bss` array for the lifetime of the kernel.
+    VirtAddr::from_ptr(ptr).as_u64() + AP_KERNEL_STACK_SIZE as u64
+}
+
+#[allow(clippy::ptr_cast_constness)]
 pub(super) fn initialize_ap(kernel_stack_top: u64) {
     x86_64::instructions::interrupts::disable();
-
-    // Register CPU identity first so `current_cpu_id` works.
-    cpu_map::register(cpu_map::read_current_apic_id());
     float::initialize();
     let cpu_id = cpu_map::current_id();
     let index = cpu_id.get() as usize;
@@ -164,10 +186,46 @@ pub(super) fn initialize_ap(kernel_stack_top: u64) {
 
     super::syscall::set_kernel_stack_top(kernel_stack_top);
     super::user::set_kernel_stack_top(kernel_stack_top);
+}
 
-    // TODO(smp-pagetable): The AP still runs under the bootloader's page tables (the BSP switched
-    // to its own during memory init). Until this AP switches CR3 to the kernel page tables, it
-    // cannot use kernel heap or device mappings.
+/// Switches onto `stack_top`, loads `page_table_root_phys` into CR3, then jumps to
+/// `continuation`, never returning to the caller.
+///
+/// The AP reaches this while still on the bootloader stack and page tables; afterwards it runs on
+/// `stack_top` in the new address space. `continuation` is the first kernel code that runs there,
+/// so everything after the switch is ordinary Rust.
+///
+/// # Safety
+///
+/// `stack_top` must be the top of a valid, mapped stack; `continuation` must never return; and
+/// both the current and target page tables must map the stack and this code, since interrupts are
+/// disabled to keep the stack switch and CR3 load atomic w.r.t. exceptions.
+#[allow(clippy::ptr_cast_constness)]
+pub(super) unsafe fn switch_stack_pt_and_call(
+    stack_top: u64,
+    page_table_root_phys: u64,
+    continuation: extern "C" fn() -> !,
+) -> ! {
+    let continuation = continuation as usize;
+    // `continuation` is a normal `extern "C" fn` compiled for the SysV ABI: when reached via
+    // `call` it sees RSP = entry_rsp - 8 (the pushed return-address slot). The `jmp` below skips
+    // that push, so switch RSP to `stack_top - 8` to reproduce the post-call entry alignment
+    // (`stack_top` is 16-byte aligned, so the continuation sees RSP ≡ 8 (mod 16)) and reserve the
+    // return-address slot, which the callee prologue and any aligned stack accesses rely on.
+    let stack = stack_top - 8;
+
+    // SAFETY: the caller satisfies the contract documented above.
+    unsafe {
+        core::arch::asm!(
+            "mov rsp, {stack}",
+            "mov cr3, {cr3}",
+            "jmp {cont}",
+            stack = in(reg) stack,
+            cr3 = in(reg) page_table_root_phys,
+            cont = in(reg) continuation,
+            options(noreturn),
+        );
+    }
 }
 
 pub(super) fn tss_pointer() -> *mut TaskStateSegment {

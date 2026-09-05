@@ -55,6 +55,16 @@ pub fn initialize(platform: InterruptPlatformInfo) -> InterruptInitResult {
     InterruptInitResult { hardware_id }
 }
 
+/// Initialises the current application processor's local interrupt controller and accounting
+/// state, without the BSP-only IOAPIC/dispatcher setup (the BSP already owns those).
+pub fn initialize_ap() -> u32 {
+    assert!(!CurrentArchitectureBackend::interrupts_enabled());
+
+    let hardware_id = arch::CurrentInterruptBackend::initialize_ap();
+    state::INTERRUPT_STATE.initialize_current(state::InterruptState::new());
+    hardware_id
+}
+
 /// Registers one consumer for a local interrupt kind.
 ///
 /// # Panics

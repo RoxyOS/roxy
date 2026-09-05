@@ -909,6 +909,8 @@ version = "0.1.0"
 dependencies = [
  "limine",
  "roxy-arch",
+ "roxy-interrupt",
+ "roxy-memory",
  "roxy-serial",
 ]
 

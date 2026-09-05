@@ -26,16 +26,20 @@ impl InterruptBackend for X86_64Interrupt {
     fn initialize(platform: InterruptPlatformInfo) -> u32 {
         assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
-        let mut local_apic = build_local_apic();
+        let (local_apic, hardware_id) = build_enabled_local_apic();
         // SAFETY: This is the BSP's unique local controller and interrupts remain disabled.
         unsafe {
-            local_apic.enable();
-            local_apic.disable_timer();
             assert!(local_apic.is_bsp());
         }
-        // SAFETY: The local controller is enabled and uniquely borrowed.
-        let hardware_id = unsafe { local_apic.id() };
         ioapic::initialize(platform, hardware_id);
+        LOCAL_APIC.initialize_current(Lock::new(X2Apic { local_apic }));
+        hardware_id
+    }
+
+    fn initialize_ap() -> u32 {
+        assert!(!CurrentArchitectureBackend::interrupts_enabled());
+
+        let (local_apic, hardware_id) = build_enabled_local_apic();
         LOCAL_APIC.initialize_current(Lock::new(X2Apic { local_apic }));
         hardware_id
     }
@@ -76,6 +80,19 @@ fn build_local_apic() -> LocalApic {
             Interrupt::Local(LocalInterruptKind::Spurious),
         )));
     builder.build().unwrap()
+}
+
+/// Builds and enables this CPU's local APIC (timer masked), returning it with its hardware id.
+fn build_enabled_local_apic() -> (LocalApic, u32) {
+    let mut local_apic = build_local_apic();
+    // SAFETY: The local controller is uniquely borrowed and interrupts remain disabled.
+    unsafe {
+        local_apic.enable();
+        local_apic.disable_timer();
+    }
+    // SAFETY: The local controller is enabled and uniquely borrowed.
+    let hardware_id = unsafe { local_apic.id() };
+    (local_apic, hardware_id)
 }
 
 fn with_local_apic<T>(function: impl FnOnce(&mut LocalApic) -> T) -> T {

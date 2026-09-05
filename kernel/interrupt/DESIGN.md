@@ -22,7 +22,9 @@ is masked when APIC mode is selected. Hardware types from `acpi`, `x2apic`, and 
 private to this backend.
 
 `initialize` enables the local controller with timer delivery masked and returns the hardware CPU
-identifier for `roxy-cpu`. Consumers register local handlers with `register_local_handler` and
+identifier for `roxy-cpu`. `initialize_ap` does the same for each application processor but skips
+the BSP-only IOAPIC/dispatcher setup (the BSP owns those once). Consumers register local handlers
+with `register_local_handler` and
 external handlers with `register_irq_handler` before interrupts are enabled. Initialization installs
 the controller's APIC error and spurious-statistics handlers in the same registry as time and
 scheduler consumers. Registration is append-only for the boot lifetime and preserves call order.

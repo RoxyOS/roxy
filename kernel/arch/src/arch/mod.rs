@@ -186,6 +186,28 @@ pub trait Architecture: sealed::Sealed {
     /// register.
     fn initialize_application_processor(kernel_stack_top: u64);
 
+    /// Registers the current application processor's CPU identity in the arch CPU map.
+    ///
+    /// Runs before [`initialize_application_processor`] so the AP can resolve its `CpuId` and
+    /// select its per-CPU kernel stack.
+    fn register_application_processor();
+
+    /// Returns the top of the given CPU's dedicated kernel stack.
+    fn ap_kernel_stack_top(cpu_id: CpuId) -> u64;
+
+    /// Switches the current CPU onto `stack_top`, loads `page_table_root_phys` into CR3, then
+    /// calls `continuation`, never returning to the caller.
+    ///
+    /// # Safety
+    ///
+    /// `stack_top` must be the top of a valid, mapped stack; `continuation` must never return; and
+    /// both the current and target page tables must map the stack and this code.
+    unsafe fn switch_stack_pt_and_call(
+        stack_top: u64,
+        page_table_root_phys: u64,
+        continuation: extern "C" fn() -> !,
+    ) -> !;
+
     fn interrupts_enabled() -> bool;
 
     fn without_interrupts<T>(function: impl FnOnce() -> T) -> T;

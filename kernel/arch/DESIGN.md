@@ -30,12 +30,23 @@ ownership rules.
 
 ## Application-processor bring-up
 
-`Architecture::initialize_application_processor` runs on each AP after the bootloader hands over
-control. It registers CPU identity, initialises per-CPU floating point, then builds a per-CPU GDT
-(with a per-CPU TSS entry over shared code/data/user descriptors), loads the global IDT, and
-configures the TSS RSP0/syscall kernel stack. IDT and the standard segment descriptors are shared;
-per-CPU GDT, TSS, and double-fault stack state live in `AP_*` arrays indexed by `CpuId`, each written
-once by its owning CPU with interrupts disabled.
+AP bring-up is split so an AP can resolve its `CpuId` and pick its per-CPU kernel stack before
+tables are installed:
+
+- `register_application_processor` claims the CPU in the identity map (so `current_cpu_id`
+  resolves earlier than `initialize_application_processor`).
+- `ap_kernel_stack_top` returns the top of the AP's dedicated kernel-`.bss` stack (mapped under
+  both bootloader and kernel page tables).
+- `initialize_application_processor` builds a per-CPU GDT (with a per-CPU TSS entry over shared
+  code/data/user descriptors), loads the global IDT, and configures the TSS RSP0/syscall kernel
+  stack.
+- `switch_stack_pt_and_call` loads the kernel page tables, switches onto the per-CPU kernel
+  stack, and enters an interrupt-enabled idle loop; it never returns.
+
+IDT and the standard segment descriptors are shared; per-CPU GDT, TSS, dual-fault stack, and kernel
+stack state live in `AP_*` arrays indexed by `CpuId`, each written once by its owning CPU with
+interrupts disabled and read before any heap or device mapping is touched (the bring-up before the
+switch must not use the kernel heap).
 
 ## Invariants and flows
 

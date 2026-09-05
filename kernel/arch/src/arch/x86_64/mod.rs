@@ -52,7 +52,24 @@ impl Architecture for X86_64 {
     }
 
     fn initialize_application_processor(kernel_stack_top: u64) {
-        init::initialize_ap(kernel_stack_top)
+        init::initialize_ap(kernel_stack_top);
+    }
+
+    fn register_application_processor() {
+        init::register_ap();
+    }
+
+    fn ap_kernel_stack_top(cpu_id: CpuId) -> u64 {
+        init::kernel_stack_top(cpu_id)
+    }
+
+    unsafe fn switch_stack_pt_and_call(
+        stack_top: u64,
+        page_table_root_phys: u64,
+        continuation: extern "C" fn() -> !,
+    ) -> ! {
+        // SAFETY: the caller guarantees the stack/page-table contract documented on the trait.
+        unsafe { init::switch_stack_pt_and_call(stack_top, page_table_root_phys, continuation) }
     }
 
     fn interrupts_enabled() -> bool {

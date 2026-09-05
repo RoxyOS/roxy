@@ -10,6 +10,9 @@ pub(crate) type CurrentInterruptBackend = X86_64Interrupt;
 pub(crate) trait InterruptBackend: sealed::Sealed {
     fn initialize(platform: crate::InterruptPlatformInfo) -> u32;
 
+    /// Initialises the local APIC of an application processor without the BSP-only IOAPIC setup.
+    fn initialize_ap() -> u32;
+
     fn end_of_interrupt();
 
     fn error_flags() -> u8;

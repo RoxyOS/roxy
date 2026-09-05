@@ -8,7 +8,7 @@ mod ap;
 use limine::mp::MP_FLAG_X2APIC;
 use limine::request::MpRequest;
 
-pub use ap::ap_main;
+pub use ap::ap_main_1;
 
 /// Limine Multi-Processor request that parks application processors at boot and lets us release
 /// them later.
@@ -17,7 +17,7 @@ pub use ap::ap_main;
 static MP: MpRequest = MpRequest::new(MP_FLAG_X2APIC);
 
 /// Starts every application processor reported by the bootloader, handing each over to
-/// [`ap_main`].
+/// [`ap_main_1`].
 ///
 /// # Panics
 ///
@@ -44,6 +44,6 @@ pub fn initialize() {
         // `bootstrap` stores `extra_argument` (relaxed) then publishes `goto_addr` (release),
         // matching the Limine MP hand-over contract. The AP reads its own RSP on entry to
         // determine the kernel stack, so extra_argument is unused.
-        cpu.bootstrap(ap_main, 0);
+        cpu.bootstrap(ap_main_1, 0);
     }
 }

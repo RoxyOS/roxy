@@ -4,25 +4,48 @@
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_serial::s_println;
 
-/// The kernel entry point for an application processor.
+/// The bootloader hand-over entry point for an application processor.
+///
+/// Runs on the bootloader-provided stack under the bootloader page tables, where nothing that
+/// needs kernel heap or device mappings is available. It registers the AP's identity, sets up its
+/// per-CPU GDT/TSS/IDT, then switches onto the AP's own kernel stack under the kernel page tables
+/// and hands control to [`ap_main_2`].
 ///
 /// # Safety
 ///
 /// The caller must invoke this only through the bootloader's per-CPU hand-over contract: on a
 /// fresh AP, with interrupts disabled, on a bootloader-provided stack, and via a call that never
 /// returns to the caller.
-pub unsafe extern "C" fn ap_main(_info: &limine::mp::MpInfo) -> ! {
-    let kernel_stack_top = CurrentArchitectureBackend::current_stack_pointer();
-    CurrentArchitectureBackend::initialize_application_processor(kernel_stack_top);
+#[allow(clippy::missing_safety_doc)]
+pub unsafe extern "C" fn ap_main_1(_info: &limine::mp::MpInfo) -> ! {
+    CurrentArchitectureBackend::register_application_processor();
     let cpu_id = CurrentArchitectureBackend::current_cpu_id();
+    let kernel_stack_top = CurrentArchitectureBackend::ap_kernel_stack_top(cpu_id);
 
-    s_println!("AP main on cpu {cpu_id}: hello world\n");
+    CurrentArchitectureBackend::initialize_application_processor(kernel_stack_top);
 
-    // TODO(smp-worker): Parking is a stopgap until APs can do real work. Each AP currently runs
-    // under the bootloader's page tables (the BSP switched to its own after memory init), owns no
-    // per-CPU local APIC/timer, and the scheduler is BSP-only, so the parked loop must keep
-    // interrupts disabled and never touch kernel heap or device mappings. A real per-CPU idle
-    // loop requires a per-CPU local-APIC/timer, the kernel page tables on this CPU, and a
-    // scheduler that can migrate threads here.
-    CurrentArchitectureBackend::halt_forever()
+    let page_table_root = roxy_memory::kernel_page_table_root().as_u64();
+    unsafe {
+        CurrentArchitectureBackend::switch_stack_pt_and_call(
+            kernel_stack_top,
+            page_table_root,
+            ap_main_2,
+        )
+    }
+}
+
+/// Runs on the AP's own kernel stack under the kernel page tables.
+///
+/// Everything after the stack/page-table switch is ordinary kernel code: it can use the heap and
+/// device mappings, so this is also where the AP would enter a per-CPU scheduler idle loop in a
+/// later phase.
+extern "C" fn ap_main_2() -> ! {
+    let cpu_id = CurrentArchitectureBackend::current_cpu_id();
+    s_println!("AP main on cpu {cpu_id}: hello world");
+
+    roxy_interrupt::initialize_ap();
+
+    loop {
+        CurrentArchitectureBackend::wait_for_interrupt();
+    }
 }
