@@ -166,6 +166,20 @@ pub trait Architecture: sealed::Sealed {
 
     fn current_cpu_id() -> CpuId;
 
+    /// Registers the current application processor's CPU identity and per-CPU floating-point
+    /// state, and returns its logical slot.
+    ///
+    /// This is the first action an AP takes after the bootloader hands over control. It assigns
+    /// the next free slot in the bootloader-provided CPU map (the BSP already claims slot 0 during
+    /// [`Architecture::initialize`]) and initializes this CPU's own x87/SSE state so the AP can run
+    /// kernel code safely.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the current CPU is already registered or when more than `MAX_CPUS` CPUs
+    /// register.
+    fn initialize_application_processor() -> CpuId;
+
     fn interrupts_enabled() -> bool;
 
     fn without_interrupts<T>(function: impl FnOnce() -> T) -> T;

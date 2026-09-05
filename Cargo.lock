@@ -394,6 +394,7 @@ dependencies = [
  "roxy-pty",
  "roxy-serial",
  "roxy-signal",
+ "roxy-smp",
  "roxy-syscall",
  "roxy-terminal",
  "roxy-test",
@@ -900,6 +901,15 @@ dependencies = [
  "linkme",
  "roxy-test",
  "strum",
+]
+
+[[package]]
+name = "roxy-smp"
+version = "0.1.0"
+dependencies = [
+ "limine",
+ "roxy-arch",
+ "roxy-serial",
 ]
 
 [[package]]

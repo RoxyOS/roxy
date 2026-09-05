@@ -58,6 +58,7 @@ pub extern "C" fn _start() -> ! {
         hhdm_offset: boot_info.hhdm_offset,
     });
     roxy_cpu::current_cpu().initialize(interrupt_init_result.hardware_id());
+    roxy_smp::initialize();
     roxy_time::initialize_periodic_timer();
     roxy_timer_wait::initialize();
     roxy_posix_timer::initialize();
