@@ -8,11 +8,14 @@ global time policy, or process state.
 
 ## Ownership and boundaries
 
+## Ownership and boundaries
+
 `CpuLocal<T>` owns one initialized value for every CPU, stored in a fixed array indexed by the
 typed `CpuId`. Initialization and access select the current CPU's slot through the architecture's
 `current_cpu_id`, so there is no bootstrap-processor assertion inside the storage primitive. The
 interrupt subsystem discovers the local APIC hardware identifier and passes it to CPU
-initialization. Timer-device programming belongs to the time subsystem.
+initialization. Timer-device programming belongs to the time subsystem. AP identity is registered
+by the architecture's application-processor bring-up, not by `roxy-cpu`.
 
 Initialization must occur with interrupts disabled and exactly once. It installs the CPU-local
 hardware identifier after `roxy-interrupt` has configured the local controller.
@@ -31,7 +34,9 @@ hardware identifier after `roxy-interrupt` has configured the local controller.
 
 ## Limits
 
-`CpuLocal` storage now supports one value per CPU, but the kernel is still BSP-only: the
-architecture `current_cpu_id` returns the bootstrap processor, and per-CPU identity (typically a
-segment-register per-CPU area) is not yet implemented. Raising non-bootstrap CPUs requires that
-identity mechanism and a revisit of lock, timer, and scheduler assumptions together.
+`CpuLocal` storage supports one value per CPU, and non-bootstrap CPUs now register through the
+architecture CPU map (during `Architecture::initialize_application_processor`), so slots beyond
+the BSP are populated and `current_cpu_id` resolves real per-CPU identity. The kernel is still
+BSP-oriented operationally: APs park with interrupts disabled and no scheduler runs on them, so
+lock, timer, and scheduler assumptions remain single-CPU until a real AP idle loop, per-CPU
+local-APIC/timer, and thread migration are added (see `roxy-smp`).

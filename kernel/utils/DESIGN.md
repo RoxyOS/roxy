@@ -12,8 +12,10 @@ must remain narrow and must not become a dumping ground for unrelated helpers.
 before restoring preemption, preventing the current CPU from being rescheduled while it owns a
 non-sleeping kernel lock. Guards are not transferable between CPUs.
 
-Preemption disablement is nestable and represented by an RAII guard. The current implementation is
-BSP-only; unbalanced drops, cross-CPU drops, and depth overflow are kernel faults.
+Preemption disablement is nestable and represented by an RAII guard. Depth is tracked per CPU in a
+fixed `[u32; MAX_CPUS]` slot indexed by `current_cpu_id`, so each CPU maintains its own nest level;
+it is not BSP-only. Unbalanced drops, drops on a different CPU than the disabling one, and depth
+overflow are kernel faults.
 
 Callers must not perform a context switch while holding `LockGuard`. A wait path must update its
 protected state, prepare the scheduler transition, release the lock, and only then switch.

@@ -6,7 +6,6 @@
 mod ap;
 
 use limine::mp::MP_FLAG_X2APIC;
-use limine::mp::MpGotoFunction;
 use limine::request::MpRequest;
 
 pub use ap::ap_main;
@@ -33,7 +32,7 @@ static MP: MpRequest = MpRequest::new(MP_FLAG_X2APIC);
 /// `roxy-cpu` state is initialized.
 pub fn initialize() {
     let Some(response) = MP.response() else {
-        panic!()
+        return;
     };
 
     for &cpu in response.cpus() {
@@ -42,9 +41,9 @@ pub fn initialize() {
             continue;
         }
 
-        let entry: MpGotoFunction =
-            unsafe { core::mem::transmute(ap_main as unsafe extern "C" fn() -> !) };
-
-        cpu.bootstrap(entry, 0);
+        // `bootstrap` stores `extra_argument` (relaxed) then publishes `goto_addr` (release),
+        // matching the Limine MP hand-over contract. The AP reads its own RSP on entry to
+        // determine the kernel stack, so extra_argument is unused.
+        cpu.bootstrap(ap_main, 0);
     }
 }

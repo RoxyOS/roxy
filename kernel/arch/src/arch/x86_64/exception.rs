@@ -6,7 +6,8 @@ use x86_64::{
 };
 
 use crate::{
-    Architecture, CpuId, ExceptionContext, ExceptionHandler, ExceptionVector, arch::X86_64,
+    Architecture, CurrentArchitectureBackend, ExceptionContext, ExceptionHandler, ExceptionVector,
+    arch::X86_64,
 };
 
 static HANDLER: AtomicUsize = AtomicUsize::new(0);
@@ -30,7 +31,7 @@ fn dispatch(
         stack_segment: u64::from(frame.stack_segment.0),
         cpu_flags: frame.cpu_flags.bits(),
         fault_address,
-        cpu_id: CpuId::BSP,
+        cpu_id: CurrentArchitectureBackend::current_cpu_id(),
     };
 
     let address = HANDLER.load(Ordering::Acquire);

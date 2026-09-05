@@ -28,6 +28,15 @@ ownership rules.
   kernel action by calling the backend CPU map directly.
 - The architecture layer does not own process address spaces, file descriptors, or syscall policy.
 
+## Application-processor bring-up
+
+`Architecture::initialize_application_processor` runs on each AP after the bootloader hands over
+control. It registers CPU identity, initialises per-CPU floating point, then builds a per-CPU GDT
+(with a per-CPU TSS entry over shared code/data/user descriptors), loads the global IDT, and
+configures the TSS RSP0/syscall kernel stack. IDT and the standard segment descriptors are shared;
+per-CPU GDT, TSS, and double-fault stack state live in `AP_*` arrays indexed by `CpuId`, each written
+once by its owning CPU with interrupts disabled.
+
 ## Invariants and flows
 
 Architecture initialization installs the exception callback and IDT before interrupts are enabled.

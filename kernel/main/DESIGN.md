@@ -13,9 +13,9 @@ The startup sequence is intentionally ordered:
 
 ```text
 clear BSS → serial → BootInfo → architecture → memory → select kernel terminal → time → rootfs
-→ interrupt controller (ACPI MADT/IOAPIC) → CPU-local state → periodic timer backend → scheduler and POSIX-timer
-handlers → PS/2 keyboard + mouse → TTY FD adapter → process → futex → syscall → start timer
-→ enable interrupts → run/test
+→ interrupt controller (ACPI MADT/IOAPIC) → CPU-local state → SMP AP bring-up → periodic timer backend
+→ scheduler and POSIX-timer handlers → PS/2 keyboard + mouse → TTY FD adapter → process → futex
+→ syscall → start timer → enable interrupts → run/test
 ```
 
 The composition root converts Limine's HHDM-mapped RSDP pointer back to a physical address, then

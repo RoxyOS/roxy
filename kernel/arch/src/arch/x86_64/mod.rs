@@ -44,13 +44,15 @@ impl Architecture for X86_64 {
         cpu_map::current_id()
     }
 
-    fn initialize_application_processor() -> CpuId {
-        // The AP registers with the same CPUID source the BSP used so `current_cpu_id` resolves
-        // through one identity map; per-CPU floating point is initialized before any kernel code
-        // that might use x87/SSE runs on this CPU.
-        cpu_map::register(cpu_map::read_current_apic_id());
-        float::initialize();
-        Self::current_cpu_id()
+    fn current_stack_pointer() -> u64 {
+        let rsp: u64;
+        // SAFETY: Reading RSP is always safe and has no side effects.
+        unsafe { core::arch::asm!("mov {}, rsp", out(reg) rsp, options(nostack, preserves_flags)) };
+        rsp
+    }
+
+    fn initialize_application_processor(kernel_stack_top: u64) {
+        init::initialize_ap(kernel_stack_top)
     }
 
     fn interrupts_enabled() -> bool {
