@@ -41,15 +41,15 @@ pub(super) struct PendingSignal {
     /// Why the signal was generated; mapped to the ABI `si_code` only when the `siginfo_t` is
     /// serialized onto a frame.
     pub(super) source: SignalSource,
+    /// Userspace payload reported to `SA_SIGINFO` handlers through `si_value`. Only set for
+    /// kernel-raised timer signals carrying a POSIX `sigval`.
+    pub(super) value: Option<u64>,
 }
 
 /// The origin of a pending signal, kept ABI-neutral by `roxy-process`.
 ///
 /// Converted to the Linux `si_code` integer only at the frame-serialization boundary, so the
 /// process layer never depends on an ABI's numeric conventions.
-///
-/// `Tkill` and `Kernel` are reserved for `tgkill`-directed and kernel-raised signals, which Roxy
-/// does not produce yet; only `Process` is currently queued.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[allow(dead_code)]
 pub(super) enum SignalSource {
@@ -59,6 +59,8 @@ pub(super) enum SignalSource {
     Tkill,
     /// The kernel itself generated it (exceptions, hardware faults).
     Kernel,
+    /// A POSIX timer generated it; reported with `si_code == SI_TIMER` and the timer's `sigval`.
+    Timer,
 }
 
 /// Queues a signal for a process and wakes its thread when the process should resume.
@@ -73,13 +75,62 @@ pub(super) enum SignalSource {
 /// Returns an error when the target process does not exist or the effective default action is
 /// not implemented.
 pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalError> {
+    let (sender_pid, source) = sender_identity();
+
+    send_signal_impl(process_id, signal, source, sender_pid, None)
+}
+
+/// Queues a POSIX-timer-expiration signal for `process_id` with the timer's `sigval` payload.
+///
+/// Reports `si_code == SI_TIMER` and `si_value == value` to `SA_SIGINFO` handlers. The sender
+/// is attributed to the kernel (`sender_pid == 0`). Shares all process-state and disposition
+/// rules with [`send_signal`].
+///
+/// # Errors
+///
+/// Returns an error when the target process does not exist or the effective default action is
+/// not implemented.
+#[allow(clippy::needless_pass_by_value)]
+pub fn send_timer_signal(
+    process_id: ProcessId,
+    signal: Signal,
+    value: u64,
+) -> Result<(), SignalError> {
+    send_signal_impl(process_id, signal, SignalSource::Timer, 0, Some(value))
+}
+
+/// Resolves the identity attributed to an ordinary [`send_signal`] delivery.
+///
+/// Called from IRQ context (e.g. terminal ISIG) there may be no "current" thread; in that case
+/// the sender is 0 (kernel) and the signal is attributed to the kernel.
+fn sender_identity() -> (u64, SignalSource) {
+    let table = PROCESS_TABLE.lock();
+    let sender_pid = roxy_thread::scheduler::try_current_thread_id()
+        .and_then(|tid| table.thread_owners.get(&tid).copied())
+        .map_or(0, ProcessId::as_u64);
+    let source = if sender_pid == 0 {
+        SignalSource::Kernel
+    } else {
+        SignalSource::Process
+    };
+
+    (sender_pid, source)
+}
+
+/// Shared delivery core for [`send_signal`] and [`send_timer_signal`].
+///
+/// Resolves the target's state, queues the pending signal, and wakes the target thread **after**
+/// releasing the process-table lock, so scheduling never runs while the table is held.
+fn send_signal_impl(
+    process_id: ProcessId,
+    signal: Signal,
+    source: SignalSource,
+    sender_pid: u64,
+    value: Option<u64>,
+) -> Result<(), SignalError> {
     let thread_id = {
         let mut table = PROCESS_TABLE.lock();
-        // Called from IRQ context (e.g. terminal ISIG) there may be no "current" thread;
-        // use 0 (kernel) as the sender pid in that case.
-        let sender_pid = roxy_thread::scheduler::try_current_thread_id()
-            .and_then(|tid| table.thread_owners.get(&tid).copied())
-            .map_or(0, ProcessId::as_u64);
+
         let Some(process) = table.processes.get_mut(&process_id) else {
             return Err(SignalError::NoSuchProcess);
         };
@@ -110,7 +161,8 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
                     process.queue_signal(PendingSignal {
                         signal,
                         sender_pid,
-                        source: SignalSource::Kernel,
+                        source,
+                        value,
                     });
                     process.main_thread_id
                 }
@@ -123,7 +175,8 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
                     process.queue_signal(PendingSignal {
                         signal,
                         sender_pid,
-                        source: SignalSource::Kernel,
+                        source,
+                        value,
                     });
                     return Ok(());
                 }
@@ -146,18 +199,11 @@ pub fn send_signal(process_id: ProcessId, signal: Signal) -> Result<(), SignalEr
                     SignalAction::Handler { .. } | SignalAction::Default => {}
                 }
 
-                // A signal with no sender (IRQ-generated, e.g. terminal ISIG) is attributed
-                // to the kernel; otherwise it is a user-process signal.
-                let source = if sender_pid == 0 {
-                    SignalSource::Kernel
-                } else {
-                    SignalSource::Process
-                };
-
                 process.queue_signal(PendingSignal {
                     signal,
                     sender_pid,
                     source,
+                    value,
                 });
                 process.main_thread_id
             }
@@ -558,6 +604,7 @@ mod tests {
             signal,
             sender_pid: 1,
             source: SignalSource::Process,
+            value: None,
         }
     }
 

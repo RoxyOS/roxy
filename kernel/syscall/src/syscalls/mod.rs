@@ -40,6 +40,7 @@ mod socket;
 mod socketpair;
 mod stat;
 mod tcb_set;
+mod timer;
 mod ttyname;
 mod umask;
 mod uname;
@@ -50,7 +51,7 @@ mod writev;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 73] = [
+pub(super) const SYSCALLS: [Syscall; 78] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -124,4 +125,9 @@ pub(super) const SYSCALLS: [Syscall; 73] = [
     setsid::SYSCALL,
     writev::SYSCALL,
     ttyname::SYSCALL,
+    timer::CREATE_SYSCALL,
+    timer::SETTIME_SYSCALL,
+    timer::GETTIME_SYSCALL,
+    timer::GETOVERRUN_SYSCALL,
+    timer::DELETE_SYSCALL,
 ];

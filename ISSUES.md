@@ -50,3 +50,18 @@ before the rest of the distributed suite (including the `roxy-tty-core`/`roxy-pt
 reproduced unchanged on a clean `HEAD`, so it is a pre-existing harness/ordering issue independent
 of the terminal work; it blocks runtime validation of new tests but not `cargo xcheck` (format,
 clippy, and both kernel builds).
+
+## POSIX timer semantics are only partially implemented
+
+`roxy-posix-timer` implements `timer_create`/`timer_settime`/`timer_gettime`/`timer_getoverrun`/
+`timer_delete` for `SIGEV_NONE` and `SIGEV_SIGNAL`. Two POSIX behaviors are knowingly approximated
+or absent, each marked with a `TODO(<missing-capability>)` at its code site:
+
+- `TODO(pending-aware-overrun)`: overrun counts expirations coalesced into a single delivered
+  notification when the 250 Hz tick catches a timer up, rather than expirations missed while the
+  previous expiration signal is still undelivered. Roxy has no pending-signal introspection.
+- `SIGEV_THREAD` and `SIGEV_THREAD_ID` are rejected with `EINVAL` in the roxy mlibc sysdeps
+  (`timer_create`) because the process model has no per-thread signal delivery (`tgkill`).
+
+The syscall surface and ABI records for these are in `kernel/syscall/src/syscalls/timer/`, and the
+overrun approximation is documented in `kernel/posix-timer/DESIGN.md`.

@@ -13,8 +13,8 @@ The startup sequence is intentionally ordered:
 
 ```text
 clear BSS → serial → BootInfo → architecture → memory → select kernel terminal → time → rootfs
-→ interrupt controller (ACPI MADT/IOAPIC) → CPU-local state → periodic timer backend → scheduler
-timer handler → PS/2 keyboard + mouse → TTY FD adapter → process → futex → syscall → start timer
+→ interrupt controller (ACPI MADT/IOAPIC) → CPU-local state → periodic timer backend → scheduler and POSIX-timer
+handlers → PS/2 keyboard + mouse → TTY FD adapter → process → futex → syscall → start timer
 → enable interrupts → run/test
 ```
 
@@ -38,9 +38,9 @@ missing controller or keyboard handshake timeout is boot-fatal rather than a rea
 output-only framebuffer terminal. A missing or failed mouse is tolerated (the controller may have
 no second port) and only logs a diagnostic message.
 
-Timer handlers run in registration order. The time handler is registered before the scheduler
-handler so each periodic interrupt advances the monotonic clock before timer-wait deadlines are
-evaluated and scheduler preemption is considered.
+Timer handlers run in registration order. The time handler is registered before the scheduler and
+POSIX-timer handlers so each periodic interrupt advances the monotonic clock before timer-wait
+deadlines are evaluated, POSIX timers expire, and scheduler preemption is considered.
 
 After memory initialization, normal builds initialize `fbterm` and select it as the kernel
 terminal, falling back to serial after a serial diagnostic when the framebuffer mode is

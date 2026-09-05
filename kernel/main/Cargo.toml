@@ -34,6 +34,7 @@ kernel-test = [
     "roxy-terminal/kernel-test",
     "roxy-thread/kernel-test",
     "roxy-time/kernel-test",
+    "roxy-posix-timer/kernel-test",
     "roxy-timer-wait/kernel-test",
     "roxy-vfs/kernel-test",
     "roxy-vm/kernel-test",
@@ -81,6 +82,7 @@ roxy-terminal.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-thread.workspace = true
 roxy-time.workspace = true
+roxy-posix-timer.workspace = true
 roxy-timer-wait.workspace = true
 roxy-tty.workspace = true
 roxy-vfs.workspace = true

@@ -17,11 +17,14 @@ use crate::signal::{PendingSignal, SignalSource};
 /// Must match `SyscallNumber::Sigreturn` in `roxy-syscall`; a kernel test pins both sides.
 pub const SIGRETURN_SYSCALL_NUMBER: u64 = 54;
 
-/// The Linux-compatible `siginfo_t` (musl-derived `abis/linux/signal.h` layout), architecture
-/// neutral for the ABIs Roxy targets.
+/// The `siginfo_t` written into a signal frame, laid out to match Roxy's userland
+/// `siginfo_t` (`sysdeps/roxy/include/abi-bits/signal.h`). Only the fields the kernel can produce
+/// are named; the fault/poll/sys members Roxy never raises stay zero.
 ///
-/// Only the fields the kernel can produce are named; the remaining `si_*` slots stay zeroed.
-/// `_pad` models the alignment that pushes the pid/uid union to offset 16.
+/// `_pad` pushes `sifields` to offset 16, matching the alignment of the userland `__si_fields`
+/// union (its 8-byte-aligned members force it past the 12-byte header). `sifields` is a union
+/// because the region is a runtime-typed overlay: at offset 16..24 it is either `_kill`
+/// (`si_pid`/`si_uid`) or `_timer` (`si_tid`/`si_overrun`), and `si_value` follows at 24.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub(super) struct Siginfo {
@@ -29,17 +32,50 @@ pub(super) struct Siginfo {
     si_errno: i32,
     si_code: i32,
     _pad: i32,
-    si_pid: i32,
-    si_uid: u32,
-    _rest: [u8; 104],
+    sifields: Sifields,
+}
+
+/// The `siginfo_t` union at offset 16 (the userland `__si_fields` overlay). Only the `kill` and
+/// `timer` variants Roxy produces are named; `_pad` sizes the union to the 112-byte tail so the
+/// whole `siginfo_t` is 128 bytes.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(super) union Sifields {
+    kill: SifieldKill,
+    timer: SifieldTimer,
+    _pad: [u8; 112],
+}
+
+/// The `_kill` variant: `si_pid`/`si_uid` at 16.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct SifieldKill {
+    pid: i32,
+    uid: u32,
+}
+
+/// The `_timer` variant: `si_tid`/`si_overrun` at 16, `si_value` at 24.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct SifieldTimer {
+    tid: i32,
+    overrun: i32,
+    value: u64,
 }
 
 const _: () = assert!(core::mem::size_of::<Siginfo>() == 128);
 const _: () = assert!(core::mem::offset_of!(Siginfo, si_code) == 8);
-const _: () = assert!(core::mem::offset_of!(Siginfo, si_pid) == 16);
+const _: () = assert!(core::mem::offset_of!(Siginfo, sifields) == 16);
+const _: () = assert!(core::mem::offset_of!(SifieldKill, pid) == 0);
+const _: () = assert!(core::mem::offset_of!(SifieldTimer, value) == 8);
+// `si_value` sits at sifields (16) + timer.value's offset (8) = 24.
+const _: () = assert!(
+    core::mem::offset_of!(Siginfo, sifields) + core::mem::offset_of!(SifieldTimer, value) == 24
+);
 
 /// Linux `si_code` values, used only at this ABI-serialization boundary.
 const SI_USER: i32 = 0;
+const SI_TIMER: i32 = -2;
 const SI_TKILL: i32 = -6;
 const SI_KERNEL: i32 = 128;
 
@@ -49,18 +85,33 @@ const SI_KERNEL: i32 = 128;
 /// boundary, so the process layer never depends on an ABI's numeric conventions.
 #[must_use]
 pub(super) fn build_siginfo(pending: PendingSignal) -> Siginfo {
-    // SAFETY: `Siginfo` is a POD of `i32`/`u32`/`u8` fields, so an all-zero bit pattern is a valid
-    // `siginfo_t`; `si_errno`, `si_uid`, and the `_rest` tail stay zeroed.
+    // SAFETY: `Siginfo` is POD over a union whose every variant accepts an all-zero bit pattern,
+    // so an all-zero representation is a valid `siginfo_t`; `si_errno` and the unraised fields
+    // stay zeroed.
     let mut value = unsafe { core::mem::zeroed::<Siginfo>() };
     value.si_signo = i32::from(pending.signal.number());
     value.si_code = abi_si_code(pending.source);
-    value.si_pid = i32::try_from(pending.sender_pid).expect("pid fits in i32");
+
+    if pending.source == SignalSource::Timer {
+        // Write the `timer` variant (the handler reads the same variant). `si_tid`/`si_overrun`
+        // stay zero (Roxy has no per-thread timer ids and reports no overrun); `si_value`
+        // publishes the timer's `sigval` payload.
+        value.sifields.timer.tid = 0;
+        value.sifields.timer.overrun = 0;
+        value.sifields.timer.value = pending.value.unwrap_or(0);
+    } else {
+        // Write the `kill` variant; `si_uid` stays zero.
+        value.sifields.kill.pid = i32::try_from(pending.sender_pid).expect("pid fits in i32");
+        value.sifields.kill.uid = 0;
+    }
+
     value
 }
 
 fn abi_si_code(source: SignalSource) -> i32 {
     match source {
         SignalSource::Process => SI_USER,
+        SignalSource::Timer => SI_TIMER,
         SignalSource::Tkill => SI_TKILL,
         SignalSource::Kernel => SI_KERNEL,
     }

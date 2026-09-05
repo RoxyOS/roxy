@@ -74,6 +74,11 @@ pub(crate) enum SyscallNumber {
     SetSid = 70,
     Writev = 71,
     Ttyname = 72,
+    TimerCreate = 73,
+    TimerSettime = 74,
+    TimerGettime = 75,
+    TimerGetoverrun = 76,
+    TimerDelete = 77,
 }
 
 impl TryFrom<u64> for SyscallNumber {

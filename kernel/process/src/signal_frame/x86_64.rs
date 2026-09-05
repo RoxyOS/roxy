@@ -294,6 +294,7 @@ mod tests {
             signal: Signal::Interrupt,
             sender_pid: 1,
             source: SignalSource::Process,
+            value: None,
         };
         let frame = build_bytes(&context, old_mask, pending);
 
@@ -306,6 +307,7 @@ mod tests {
             signal: Signal::Cancellation,
             sender_pid: 7,
             source: SignalSource::Tkill,
+            value: None,
         };
         let frame = build_bytes(&sample_context(), SignalSet::empty(), pending);
         let siginfo = &frame[super::SIGINFO_OFFSET..];
@@ -320,11 +322,34 @@ mod tests {
         assert_eq!(read_i32(20), 0);
     });
 
+    kernel_test!("roxy-signal::frame", timer_siginfo_carries_value, {
+        let pending = PendingSignal {
+            signal: Signal::Alarm,
+            sender_pid: 0,
+            source: SignalSource::Timer,
+            value: Some(0xdead_beef),
+        };
+        let frame = build_bytes(&sample_context(), SignalSet::empty(), pending);
+        let siginfo = &frame[super::SIGINFO_OFFSET..];
+
+        let read_i32 =
+            |offset: usize| i32::from_le_bytes(siginfo[offset..offset + 4].try_into().unwrap());
+        let read_u32 =
+            |offset: usize| u32::from_le_bytes(siginfo[offset..offset + 4].try_into().unwrap());
+        assert_eq!(read_i32(0), i32::from(Signal::Alarm.number()));
+        assert_eq!(read_i32(8), -2, "SI_TIMER");
+        // `si_tid` @16 and `si_overrun` @20 stay zero; `si_sigval` @24 carries the payload.
+        assert_eq!(read_i32(16), 0);
+        assert_eq!(read_i32(20), 0);
+        assert_eq!(read_u32(24), 0xdead_beef);
+    });
+
     kernel_test!("roxy-signal::frame", aims_return_address_at_trampoline, {
         let pending = crate::signal::PendingSignal {
             signal: Signal::Interrupt,
             sender_pid: 1,
             source: SignalSource::Process,
+            value: None,
         };
         let frame = build_bytes(&sample_context(), SignalSet::empty(), pending);
 

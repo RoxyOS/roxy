@@ -35,7 +35,7 @@ use signal::PendingSignal;
 pub use signal::{
     SignalAction, SignalError, block_signals, currently_blocked_signals, deliver_pending_signal,
     has_pending_signal, pop_signal_frame, replace_masked_signals, replace_signal_action,
-    send_signal, send_signal_to_pgid, signal_action_of, unblock_signals,
+    send_signal, send_signal_to_pgid, send_timer_signal, signal_action_of, unblock_signals,
 };
 pub use table::{
     current_parent_process_id, current_process_group_id, current_process_id,

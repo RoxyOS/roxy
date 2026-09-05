@@ -388,6 +388,7 @@ dependencies = [
  "roxy-memory",
  "roxy-mouse-input",
  "roxy-poll",
+ "roxy-posix-timer",
  "roxy-process",
  "roxy-ps2",
  "roxy-pty",
@@ -810,6 +811,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-posix-timer"
+version = "0.1.0"
+dependencies = [
+ "linkme",
+ "roxy-arch",
+ "roxy-interrupt",
+ "roxy-process",
+ "roxy-signal",
+ "roxy-test",
+ "roxy-time",
+ "roxy-utils",
+]
+
+[[package]]
 name = "roxy-process"
 version = "0.1.0"
 dependencies = [
@@ -901,6 +916,7 @@ dependencies = [
  "roxy-memory",
  "roxy-pipe",
  "roxy-poll",
+ "roxy-posix-timer",
  "roxy-process",
  "roxy-signal",
  "roxy-test",
