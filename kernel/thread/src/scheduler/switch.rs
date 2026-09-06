@@ -5,7 +5,7 @@ use roxy_memory::activate_kernel_page_table;
 use spin::Once;
 
 use super::WaitKey;
-use super::state::{BlockState, Scheduler, ThreadIndex, ThreadKind, ThreadState};
+use super::state::{BlockState, Scheduler, ThreadIndex, ThreadKind, ThreadState, local};
 use crate::{SavedContext, ThreadId};
 
 /// Activates the target user thread's address space immediately before switching to it.
@@ -58,7 +58,7 @@ impl Scheduler {
             };
         }
 
-        assert!(self.current.is_none(), "scheduler control resumed early");
+        assert!(local().current.is_none(), "scheduler control resumed early");
         let Some(next) = self.next_runnable(ThreadIndex(0)) else {
             return ScheduleResult {
                 pending_switch: None,
@@ -66,8 +66,11 @@ impl Scheduler {
                 exiting: None,
             };
         };
-        let control = self.control_context.get_or_insert_with(SavedContext::empty);
-        self.current = Some(next);
+        let mut local = local();
+        local.current = Some(next);
+        let control = local
+            .control_context
+            .get_or_insert_with(SavedContext::empty);
         let previous = ptr::from_mut(control);
         let pending_switch = Some(self.prepare_switch_from(previous, next));
 
@@ -85,7 +88,7 @@ impl Scheduler {
     /// lock; no context switch occurs in this method.
     pub(super) fn prepare_preemption(&mut self) -> ScheduleResult {
         let reaped = self.reap_pending();
-        let Some(current) = self.current else {
+        let Some(current) = local().current else {
             return ScheduleResult {
                 pending_switch: None,
                 reaped,
@@ -111,7 +114,7 @@ impl Scheduler {
         }
 
         let previous = ptr::from_mut(self.entry(current).thread.context());
-        self.current = Some(next);
+        local().current = Some(next);
 
         ScheduleResult {
             pending_switch: Some(self.prepare_switch_from(previous, next)),
@@ -121,7 +124,7 @@ impl Scheduler {
     }
 
     pub(super) fn prepare_block(&mut self, wait_key: Option<WaitKey>) -> PendingContextSwitch {
-        let current = self.current.expect("no current thread");
+        let current = local().current.expect("no current thread");
 
         self.entry(current).state = ThreadState::Blocked(match wait_key {
             Some(wait_key) => BlockState::Keyed(wait_key),
@@ -131,13 +134,18 @@ impl Scheduler {
         let previous = ptr::from_mut(self.entry(current).thread.context());
         let next = self.next_runnable(ThreadIndex((current.0 + 1) % self.entries.len()));
 
-        self.current = next;
+        let mut local = local();
+        local.current = next;
 
         match next {
             Some(next) => self.prepare_switch_from(previous, next),
             None => PendingContextSwitch {
                 previous,
-                next: ptr::from_ref(self.control_context.get_or_insert_with(SavedContext::empty)),
+                next: ptr::from_ref(
+                    local
+                        .control_context
+                        .get_or_insert_with(SavedContext::empty),
+                ),
                 next_user_thread: None,
                 next_kernel_stack_top: None,
             },
@@ -179,10 +187,10 @@ impl Scheduler {
     /// The returned switch is performed after releasing the scheduler lock.
     pub(super) fn prepare_exit(&mut self) -> ScheduleResult {
         let reaped = self.reap_pending();
-        let current = self.current.expect("no current thread");
+        let current = local().current.expect("no current thread");
         self.entry(current).state = ThreadState::Exiting;
         let next = self.next_runnable(ThreadIndex((current.0 + 1) % self.entries.len()));
-        self.current = next;
+        local().current = next;
         self.pending_reap = Some(current);
 
         let previous = ptr::from_mut(self.entry(current).thread.context());
@@ -191,7 +199,8 @@ impl Scheduler {
             None => PendingContextSwitch {
                 previous,
                 next: ptr::from_ref(
-                    self.control_context
+                    local()
+                        .control_context
                         .as_ref()
                         .expect("scheduler not started"),
                 ),
@@ -261,6 +270,7 @@ mod tests {
     use roxy_test::kernel_test;
 
     use super::ThreadKind;
+    use super::local;
     use super::{BlockState, Scheduler, ThreadIndex, ThreadState};
     use crate::Thread;
 
@@ -271,14 +281,14 @@ mod tests {
         let mut scheduler = Scheduler::new();
         scheduler.enqueue(first, ThreadKind::Kernel);
         scheduler.enqueue(second, ThreadKind::Kernel);
-        scheduler.current = Some(ThreadIndex(0));
+        local().current = Some(ThreadIndex(0));
 
         let _pending = scheduler.prepare_block(None);
         assert_eq!(
             scheduler.entries[0].state,
             ThreadState::Blocked(BlockState::Unkeyed)
         );
-        assert_eq!(scheduler.current, Some(ThreadIndex(1)));
+        assert_eq!(local().current, Some(ThreadIndex(1)));
         assert!(scheduler.wake_unconditionally(first_id));
         assert_eq!(scheduler.entries[0].state, ThreadState::Runnable);
         assert!(!scheduler.wake_unconditionally(first_id));

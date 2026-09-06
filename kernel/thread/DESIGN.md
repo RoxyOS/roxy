@@ -28,6 +28,19 @@ select target → release scheduler lock → prepare target address space
 → update kernel stack top → switch saved context
 ```
 
+## Per-CPU scheduler state
+
+The scheduler separates shared run-queue state from per-CPU state. The shared `Scheduler` under
+one `Lock` holds the global runnable queue (`entries`) and deferred reap bookkeeping. Which thread
+is running on which CPU, and each CPU's control-context save area, is per-CPU: a `LocalScheduler`
+slot (`current` plus `control_context`) per possible CPU, indexed by the current architecture CPU
+id and stored outside the shared lock in `LOCAL`.
+
+The switch methods operate on both halves: they read or update the current CPU's `LocalScheduler`
+slot and the shared queue while the guard is held, then perform the returned switch only after
+releasing it. A CPU touches only its own slot, and only from its own scheduler context (control
+loop, timer preemption, block, exit, wake), so no cross-CPU aliasing of a slot ever occurs.
+
 The current thread cannot be removed while its kernel stack is active. Exit marks it `Exiting`,
 records a pending reap, switches away, and removes the entry on a later scheduler pass running on a
 different stack.
@@ -69,8 +82,11 @@ deadline waiters, then applies ordinary scheduler preemption policy.
 - The scheduler validates wait keys but does not own resource-specific wait queues or deadlines.
 - The dispatch hook is registered once during boot before any user thread runs.
 
-The scheduler is currently global and BSP-oriented. It has no priorities, CPU affinity, SMP run
-queues, or process-level multi-threading policy.
+The scheduler is currently single-CPU in execution: only the bootstrap processor runs the control
+loop and starts idle. The data plane is already per-CPU shaped (a `LocalScheduler` slot per CPU),
+but the run queue still round-robins by a flat index without dispatching ownership, so a thread
+could be selected by two CPUs at once. SMP dispatch, per-CPU idle and timer preemption, and IPI
+wakeups are deferred. It has no priorities, CPU affinity, or process-level multi-threading policy.
 
 The scheduler receives opaque wait keys from higher-level wait sources. It does not own timer
 deadlines or relative-duration policy. Timed waits currently have no signal interruption or

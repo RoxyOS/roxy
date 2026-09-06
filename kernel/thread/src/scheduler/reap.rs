@@ -1,6 +1,6 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use super::state::Scheduler;
+use super::state::{Scheduler, local};
 use crate::ThreadId;
 
 static REAPED_HANDLER: AtomicUsize = AtomicUsize::new(0);
@@ -77,12 +77,12 @@ impl Scheduler {
     pub(super) fn reap_pending(&mut self) -> Option<ThreadId> {
         let pending_reap = self.pending_reap.take()?;
         assert!(
-            self.current != Some(pending_reap),
+            local().current != Some(pending_reap),
             "cannot reap active thread"
         );
         let reaped = self.entries.remove(pending_reap.0).thread.id();
 
-        if let Some(current) = &mut self.current
+        if let Some(current) = &mut local().current
             && current.0 > pending_reap.0
         {
             current.0 -= 1;

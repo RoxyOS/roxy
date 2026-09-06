@@ -967,6 +967,7 @@ version = "0.1.0"
 dependencies = [
  "linkme",
  "roxy-arch",
+ "roxy-cpu",
  "roxy-interrupt",
  "roxy-memory",
  "roxy-test",

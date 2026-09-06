@@ -18,8 +18,10 @@ use crate::{Thread, ThreadCreateError, ThreadId};
 
 static SCHEDULER: Lock<Scheduler> = Lock::new(Scheduler::new());
 
-/// Registers scheduler-owned interrupt consumers.
+/// Registers scheduler-owned interrupt consumers and initialises the bootstrap processor's
+/// scheduler slot.
 pub fn initialize() {
+    state::initialize_local();
     roxy_interrupt::register_local_handler(LocalInterruptKind::Timer, control::on_timer_interrupt);
 }
 
