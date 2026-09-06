@@ -92,6 +92,49 @@ impl ProcessTable {
         assert!(previous.is_none(), "process id reused");
     }
 
+    /// Associates an already-created user thread with an existing process, so it runs against the
+    /// process's shared address space, descriptor table, and signal state.
+    pub(super) fn attach_thread(&mut self, thread_id: ThreadId, process_id: ProcessId) {
+        let previous = self.thread_owners.insert(thread_id, process_id);
+        assert!(previous.is_none(), "thread already attached to a process");
+    }
+
+    /// Returns whether `process_id` still owns any threads in the thread-owner map.
+    pub(super) fn process_has_threads(&self, process_id: ProcessId) -> bool {
+        self.thread_owners
+            .values()
+            .any(|&owner| owner == process_id)
+    }
+
+    /// Returns whether `thread_id` is the only thread `process_id` currently owns.
+    ///
+    /// A thread ending its own life accounts for itself, so the "last thread" decision must
+    /// exclude the ending thread from the ownership scan.
+    pub(super) fn is_last_thread(&self, process_id: ProcessId, thread_id: ThreadId) -> bool {
+        !self
+            .thread_owners
+            .iter()
+            .any(|(owned_thread, owner)| *owner == process_id && *owned_thread != thread_id)
+    }
+
+    /// Returns a live thread of `process_id` to wake for a process-directed signal, preferring
+    /// the main thread when it is still scheduled and otherwise any remaining thread.
+    ///
+    /// TODO(missing-capability): selection ignores per-thread signal masks; the intended final
+    /// behavior picks a thread that does not block the signal once masks move to per-thread.
+    pub(super) fn signal_target_thread(&self, process_id: ProcessId) -> ThreadId {
+        let main_thread_id = self.processes[&process_id].main_thread_id;
+        if self.thread_owners.get(&main_thread_id) == Some(&process_id) {
+            return main_thread_id;
+        }
+
+        self.thread_owners
+            .iter()
+            .find(|(_, owner)| **owner == process_id)
+            .map(|(thread_id, _)| *thread_id)
+            .expect("running process has no live thread")
+    }
+
     pub(super) fn replace_addrspace(
         &mut self,
         thread_id: ThreadId,

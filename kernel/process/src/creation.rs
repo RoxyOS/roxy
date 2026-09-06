@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
+use roxy_memory::UserAddress;
 use roxy_signal::SignalSet;
 
 use hashbrown::HashMap;
@@ -100,6 +101,35 @@ impl Process {
             continued: false,
         }
     }
+}
+
+/// Creates a user thread in the currently scheduled process and makes it runnable.
+///
+/// The new thread shares the process's address space, descriptor table, and signal state. It
+/// begins at `entry` on the already-mapped user stack described by `stack_pointer`; the caller
+/// (typically a future thread-create syscall or the runtime) is responsible for the user stack.
+///
+/// # Errors
+///
+/// Returns an error when the new thread's kernel stack cannot be allocated.
+///
+/// # Panics
+///
+/// Panics when the current scheduled thread is not owned by a running process.
+pub fn create_thread(
+    entry: UserAddress,
+    stack_pointer: UserAddress,
+) -> Result<ThreadId, ThreadCreateError> {
+    let thread = Thread::new_user(entry, stack_pointer)?;
+    let thread_id = thread.id();
+    {
+        let mut table = PROCESS_TABLE.lock();
+        let process_id = table.current_process_id();
+        table.attach_thread(thread_id, process_id);
+    }
+    scheduler::enqueue_user(thread);
+
+    Ok(thread_id)
 }
 
 fn thread_error(error: ThreadCreateError) -> ProcessError {

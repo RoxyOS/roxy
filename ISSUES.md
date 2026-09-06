@@ -76,3 +76,25 @@ to address zero (a kernel fault, not a privilege escalation). The kernel never u
 this is a deliberate no-swap, reserve-`GS` design. The supported userspaces (mlibc/Bash) never
 touch `GS`, but hard hardening (conditional `swapgs` on ring-3 interrupt/exception entries, per
 the Linux `SWAPGS_MASK` model) is future work. Documented in `kernel/arch/DESIGN.md`.
+
+## Process threads are preparational: masks, teardown, and exec are single-thread
+
+The process model can attach and reap multiple user threads sharing one address space, descriptor
+table, and signal queue (`create_thread`, `thread_owners`, last-thread reap), but several pieces of
+real threading are still missing and are marked with `TODO(<missing-capability>)` at their code
+sites in `kernel/process/`:
+
+- `TODO(missing-capability: per-thread signal masks)` in `kernel/process/src/table.rs`: signal
+  masks remain at the process level, so process-directed signal delivery (`signal_target_thread`)
+  prefers the main thread and otherwise any live thread instead of picking a thread that does not
+  block the signal; there is no `tgkill`.
+- `TODO(missing-capability: thread-teardown)` in `kernel/process/src/lifecycle.rs`: a process-level
+  exit (`exit_current`) sets `Exiting` but does not stop sibling threads, so a process whose main
+  thread exits while secondary threads remain is only finalized when its last thread reaches the
+  reap path on its own (no join, no `pthread_exit`, no forced sibling teardown).
+- `execve` from a multi-threaded process is unsupported because it replaces the whole address space
+  without quiescing other threads.
+
+No syscall reaches `create_thread` yet, so real user threads exist only through the in-kernel test
+harness; the thread direction is groundwork for a future pthread-backed `clone`/thread-create
+syscall. `kernel/process/DESIGN.md` documents the intended model.

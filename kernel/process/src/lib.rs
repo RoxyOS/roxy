@@ -18,13 +18,14 @@ mod startup_stack;
 mod table;
 mod wait;
 
-pub use creation::spawn;
+pub use creation::{create_thread, spawn};
 pub use cwd::{current_working_directory, set_current_working_directory};
 pub use execve::execve_current;
 pub use fork::{ForkError, fork_current};
 pub use initial_fds::InitialFdInjector;
 pub use lifecycle::{
     SessionLeaderExitHandler, exit_current, initialize, register_session_leader_exit_handler,
+    thread_exit_current,
 };
 pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, map_physical,
@@ -49,7 +50,7 @@ use alloc::{sync::Arc, vec::Vec};
 use hashbrown::HashMap;
 use roxy_fd::{DupError, Fd, FdTable, OpenFile};
 use roxy_signal::{Signal, SignalSet};
-use roxy_thread::ThreadId;
+pub use roxy_thread::{ThreadCreateError, ThreadId};
 use roxy_vfs::{FilePermissions, ResolvedPath};
 use roxy_vm::AddrSpaceHandle;
 

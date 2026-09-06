@@ -8,9 +8,12 @@ operations. It does not own scheduler context switching, ELF parsing policy, or 
 
 ## Ownership and dependency boundaries
 
-Each process owns exactly one optional `AddrSpaceHandle`, one main thread id in the current
-single-thread model, and one `FdTable`. The process table maps thread ids to process ids so the
-thread scheduler can request address-space activation without depending on this crate.
+Each process owns exactly one optional `AddrSpaceHandle`, one set of user threads, and one `FdTable`;
+the first thread created is the main thread, which anchors `main_thread_id`. All threads of a process
+share the same address space, descriptor table, working directory, umask, signal queue, and signal
+dispositions, while each thread carries its own kernel stack and saved context. The process table
+maps thread ids to process ids so the thread scheduler can request address-space activation without
+depending on this crate.
 
 Each process owns one normalized absolute working directory. Directly spawned processes start at
 the VFS root, fork children clone the parent's directory, and `execve` preserves it with the other
@@ -28,6 +31,26 @@ it; removing the entry clears every child's matching parent ID, making those chi
 The scheduler owns threads and saved contexts, but never owns a process address-space handle. The
 ELF and VM crates provide construction primitives; process decides when a constructed image becomes
 published.
+
+## Threads
+
+A process is created with one main thread, and `create_thread` adds a runnable user thread that
+shares the process's address space, descriptor table, and signal state. Each thread owns a kernel
+stack and saved context (via `roxy-thread`); the caller supplies the already-mapped user stack, so
+the kernel does not allocate thread stacks. No syscall currently reaches `create_thread`, so real
+user threads exist only through the in-kernel test harness; the `thread_owners` map is the single
+registry recording which threads belong to each process.
+
+Thread reaping keys process finalization on the last remaining thread: `finish_thread_reap` removes
+the reaped thread from `thread_owners`, and only when no thread of the process remains does it
+transition the process to `Exited`, release its address space, and wake waiters. A non-last thread
+reaping therefore leaves the process running. Because every real user thread ends today through the
+process-exit path (`exit_current` sets `Exiting` first), production processes remain single-threaded;
+the multi-thread reap and signal-target paths are exercised by table-level kernel tests.
+
+Process-directed signals are delivered by waking the target process's main thread when it is still
+scheduled, and fall back to any other live thread of the process otherwise, so a signal is not lost
+once the main thread has reaped. Selection does not yet consult per-thread masks (see Limits).
 
 ## Signals
 
@@ -140,9 +163,14 @@ at the syscall boundary; process reports whether a matching child is pending or 
 
 ## Limits and non-goals
 
-The current model supports one thread per process and has no `FD_CLOEXEC` state, so descriptors
-survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang interpretation,
-multi-threaded exec cleanup, credentials, asynchronous interrupt-return delivery,
+The current model supports multiple user threads sharing a process, but signal masks remain at the
+process level rather than per thread, so delivery cannot yet prefer a thread that does not block a
+signal. A process-level exit (`exit_current`) does not force-stop sibling threads before reaping, so
+a process whose main thread exits while secondary threads remain can only be finalized when its last
+thread reaps; there is no join or explicit thread-end syscall yet. `execve` remains safe only from a
+single-threaded process because it replaces the whole address space. There is no `FD_CLOEXEC` state,
+so descriptors survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang
+interpretation, multi-threaded exec cleanup, credentials, asynchronous interrupt-return delivery,
 and PID 1 reparenting are not. POSIX real-time signals are supported; standard-signal
 coalescing is not, so every delivery is queued and the most recent one is delivered first.
 Process groups are tracked (`pgid`/`session_id`), with `setpgid`/`getpgid`/`setsid` and

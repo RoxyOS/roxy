@@ -139,7 +139,7 @@ fn send_signal_impl(
         // `process`'s mutable borrow has been released below.
         let mut wake_waiter = false;
 
-        let resume_thread_id = match process.state {
+        match process.state {
             // Reaped or exiting processes are no longer reachable.
             ProcessState::Exited(_) | ProcessState::Exiting(_) => {
                 return Err(SignalError::NoSuchProcess);
@@ -153,7 +153,6 @@ fn send_signal_impl(
                     // this single resumption, and wake that waiter to report it.
                     process.continued = true;
                     wake_waiter = true;
-                    process.main_thread_id
                 }
                 // SIGKILL must still terminate a stopped process: queue it and wake the
                 // thread so it reaches the return boundary that runs the terminate default.
@@ -164,7 +163,6 @@ fn send_signal_impl(
                         source,
                         value,
                     });
-                    process.main_thread_id
                 }
                 // Further stop signals are ignored; everything else stays queued until
                 // SIGCONT resumes the process.
@@ -205,15 +203,16 @@ fn send_signal_impl(
                     source,
                     value,
                 });
-                process.main_thread_id
             }
-        };
+        }
 
         if wake_waiter {
             table.wake_state_waiter(process_id);
         }
 
-        resume_thread_id
+        // Prefer the main thread when it is still scheduled; otherwise deliver to any remaining
+        // thread of the process (e.g. when the main thread has already reaped).
+        table.signal_target_thread(process_id)
     };
 
     let _ = scheduler::wake_unconditionally(thread_id);
