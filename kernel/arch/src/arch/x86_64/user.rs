@@ -2,7 +2,7 @@ use core::arch::naked_asm;
 
 use x86_64::VirtAddr;
 
-use super::init;
+use super::{init, syscall};
 
 pub(super) unsafe fn enter(
     user_instruction_pointer: u64,
@@ -28,7 +28,7 @@ pub(super) unsafe fn enter(
 pub(super) fn set_kernel_stack_top(kernel_stack_top: u64) {
     assert!(!x86_64::instructions::interrupts::are_enabled());
 
-    let tss = init::current_cpu_tss();
+    let tss = syscall::current_cpu_tss();
 
     // SAFETY: interrupts are disabled on this CPU, so its per-CPU TSS is owned exclusively here.
     unsafe { (*tss).privilege_stack_table[0] = VirtAddr::new(kernel_stack_top) };
@@ -36,7 +36,7 @@ pub(super) fn set_kernel_stack_top(kernel_stack_top: u64) {
 
 #[cfg(feature = "kernel-test")]
 pub(super) fn kernel_stack_top() -> u64 {
-    let tss = init::current_cpu_tss();
+    let tss = syscall::current_cpu_tss();
 
     // SAFETY: tests read the current CPU's TSS without concurrent mutation.
     unsafe { (*tss).privilege_stack_table[0].as_u64() }

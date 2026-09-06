@@ -9,9 +9,23 @@ mod user;
 pub use float::X86_64FloatState;
 pub use syscall::X86_64UserContext;
 
+use core::{cell::UnsafeCell, mem::MaybeUninit};
+
 use ::x86_64::{VirtAddr, registers::model_specific::FsBase};
 
-use crate::{CpuId, ExceptionHandler, Interrupt, InterruptDispatcher, SyscallHandler};
+use crate::{CpuId, ExceptionHandler, Interrupt, InterruptDispatcher, MAX_CPUS, SyscallHandler};
+
+/// One `MaybeUninit<T>` slot per CPU, indexed by `CpuId`; each CPU owns its own slot.
+///
+/// The `init::AP_*` arrays are used only by application processors (the BSP keeps its own
+/// `init::BSP_*` singletons), while `syscall::SYSCALL_ENTRY_STATES` is written for every CPU,
+/// the BSP included. The storage is therefore per-CPU, not application-processor-only, and lives
+/// at the module level so both `init` and `syscall` reuse it.
+pub(super) struct PerCpuStorage<T>(UnsafeCell<[MaybeUninit<T>; MAX_CPUS]>);
+
+// SAFETY: Each CPU exclusively accesses its own slot; no other CPU reads or writes the same
+// slot.
+unsafe impl<T> Sync for PerCpuStorage<T> {}
 
 use super::{Architecture, sealed};
 

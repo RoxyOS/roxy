@@ -1,22 +1,95 @@
 use core::{
     arch::naked_asm,
-    mem::{offset_of, size_of, transmute},
+    cell::UnsafeCell,
+    mem::{MaybeUninit, offset_of, size_of, transmute},
     sync::atomic::{AtomicUsize, Ordering},
 };
 
 use x86_64::{
     VirtAddr,
     registers::{
-        model_specific::{Efer, EferFlags, LStar, SFMask, Star},
+        model_specific::{Efer, EferFlags, GsBase, LStar, SFMask, Star},
         rflags::RFlags,
     },
+    structures::tss::TaskStateSegment,
 };
 
-use crate::{Architecture, CurrentArchitectureBackend, RawSyscall, SyscallExit, SyscallHandler};
+use crate::{
+    Architecture, CurrentArchitectureBackend, MAX_CPUS, RawSyscall, SyscallExit, SyscallHandler,
+};
 
-use super::{float, init};
+use super::{PerCpuStorage, cpu_map, float, init};
 
 static HANDLER: AtomicUsize = AtomicUsize::new(0);
+
+/// Per-CPU state the naked syscall `entry` needs to cross the privilege boundary, plus the TSS
+/// pointer Rust keeps in sync with it.
+///
+/// Each CPU owns one slot. Every CPU sets its `IA32_GS_BASE` (`GS.base`) to the address of its own
+/// slot during bring-up, and `CR4.FSGSBASE` stays clear, so userspace cannot execute `wrgsbase` /
+/// `rdgsbase`. The naked `entry` therefore reaches this state directly through `gs:` operand
+/// segments, with no `swapgs` exchange required.
+///
+/// # Safety
+///
+/// The kernel reserves `GS` entirely for this per-CPU area. Userspace must never load a data
+/// segment selector into `GS`, since loading any flat 64-bit data segment zeroes the segment base
+/// (the base is forced to zero by long mode for data), which would redirect the next syscall
+/// `entry`'s `gs:` reads to address zero. The supported userspaces (mlibc/Bash) never touch `GS`.
+#[repr(C)]
+pub(super) struct SyscallEntryState {
+    /// Kernel stack the syscall `entry` switches onto; this is the current thread's kernel stack on
+    /// this CPU, kept in sync with the TSS `RSP0` used by the interrupt-from-user path.
+    pub(super) kernel_stack_top: u64,
+    /// Saved user `RSP` handed from the syscall prologue to its `EntryFrame` construction.
+    pub(super) user_stack_pointer: u64,
+    /// Address of this CPU's loaded TSS, so Rust can update its `RSP0` on any CPU.
+    tss_pointer: u64,
+}
+
+pub(super) const PER_CPU_KERNEL_STACK_TOP: usize = offset_of!(SyscallEntryState, kernel_stack_top);
+pub(super) const PER_CPU_USER_STACK_POINTER: usize =
+    offset_of!(SyscallEntryState, user_stack_pointer);
+
+static SYSCALL_ENTRY_STATES: PerCpuStorage<SyscallEntryState> =
+    PerCpuStorage(UnsafeCell::new([const { MaybeUninit::uninit() }; MAX_CPUS]));
+
+/// Writes and publishes the per-CPU syscall entry state and sets this CPU's `GS` base to it.
+///
+/// Called once per active CPU during bring-up (the BSP in `init::initialize`, each AP in
+/// `init::initialize_ap`, which supplies the per-CPU TSS address), before interrupts are enabled
+/// on that CPU.
+pub(super) fn initialize_syscall_entry_state(index: usize, tss_pointer: u64) {
+    let slot = unsafe { &mut (*SYSCALL_ENTRY_STATES.0.get())[index] };
+    // SAFETY: each CPU's slot is uninitialised and written exactly once during its own bring-up.
+    slot.write(SyscallEntryState {
+        kernel_stack_top: 0,
+        user_stack_pointer: 0,
+        tss_pointer,
+    });
+
+    let slot = unsafe { &mut (*SYSCALL_ENTRY_STATES.0.get())[index] };
+    let base = slot.as_mut_ptr().cast::<u8>() as u64;
+    GsBase::write(VirtAddr::new(base));
+}
+
+/// Returns the per-CPU syscall entry state belonging to `index`. The caller must run on that CPU
+/// or hold exclusive access to its brings-up/teardown.
+pub(super) fn syscall_entry_state(index: usize) -> &'static mut SyscallEntryState {
+    let slot = unsafe { &mut (*SYSCALL_ENTRY_STATES.0.get())[index] };
+    // SAFETY: each CPU's slot is initialized in bring-up before it is ever used.
+    unsafe { slot.assume_init_mut() }
+}
+
+/// Returns the per-CPU syscall entry state belonging to the current CPU.
+pub(super) fn current_syscall_entry_state() -> &'static mut SyscallEntryState {
+    syscall_entry_state(cpu_map::current_id().get() as usize)
+}
+
+/// Returns the TSS loaded on the current CPU, for updating its `RSP0` on any CPU.
+pub(super) fn current_cpu_tss() -> *mut TaskStateSegment {
+    current_syscall_entry_state().tss_pointer as *mut TaskStateSegment
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -106,12 +179,12 @@ pub(super) fn configure_cpu() {
 }
 
 pub(super) fn set_kernel_stack_top(kernel_stack_top: u64) {
-    init::current_cpu_syscall().kernel_stack_top = kernel_stack_top;
+    current_syscall_entry_state().kernel_stack_top = kernel_stack_top;
 }
 
 #[cfg(feature = "kernel-test")]
 pub(super) fn kernel_stack_top() -> u64 {
-    init::current_cpu_syscall().kernel_stack_top
+    current_syscall_entry_state().kernel_stack_top
 }
 
 #[unsafe(naked)]
@@ -154,8 +227,8 @@ unsafe extern "C" fn entry() -> ! {
         "mov r11, [rsp + {user_flags}]",
         "mov rsp, [rsp + {saved_user_stack_pointer}]",
         "sysretq",
-        kernel_stack_top = const init::PER_CPU_KERNEL_STACK_TOP,
-        user_stack_pointer = const init::PER_CPU_USER_STACK_POINTER,
+        kernel_stack_top = const PER_CPU_KERNEL_STACK_TOP,
+        user_stack_pointer = const PER_CPU_USER_STACK_POINTER,
         dispatch = sym dispatch,
         rax = const offset_of!(EntryFrame, rax),
         r15 = const offset_of!(EntryFrame, r15),

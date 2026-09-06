@@ -76,7 +76,7 @@ per-CPU syscall slot and in that CPU's TSS RSP0 while interrupts are disabled, s
 interrupts, and exceptions from ring 3 all enter on the same thread-owned stack.
 
 The syscall entry and its `RSP0` bookkeeping are per-CPU because any CPU can service a syscall
-concurrently. Each CPU owns a `PerCpuSyscall` slot (kernel stack top, the user-`RSP` handoff the
+concurrently. Each CPU owns a `SyscallEntryState` slot (kernel stack top, the user-`RSP` handoff the
 naked entry builds its frame from, and this CPU's TSS address), and sets its `GS.base` to that
 slot during bring-up. The naked `entry` reaches the slot through `gs:` operands; the syscall MSRs
 are programmed on every active CPU for the same reason.

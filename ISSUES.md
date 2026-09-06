@@ -69,7 +69,7 @@ overrun approximation is documented in `kernel/posix-timer/DESIGN.md`.
 ## Syscall per-CPU state trusts userspace not to touch `GS`
 
 The syscall entry resolves this CPU's kernel stack and user-`RSP` handoff through per-CPU
-`GS`-relative storage (`GS.base` points at a `PerCpuSyscall` slot). `CR4.FSGSBASE` stays clear so
+`GS`-relative storage (`GS.base` points at a `SyscallEntryState` slot). `CR4.FSGSBASE` stays clear so
 userspace cannot run `wrgsbase`/`rdgsbase`, but a userspace program that loads a flat 64-bit data
 selector into `GS` would zero the segment base and redirect the next syscall entry's `gs:` reads
 to address zero (a kernel fault, not a privilege escalation). The kernel never uses `swapgs`, so
