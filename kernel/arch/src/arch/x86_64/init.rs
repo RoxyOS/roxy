@@ -1,4 +1,7 @@
-use core::{cell::UnsafeCell, mem::MaybeUninit};
+use core::{
+    cell::UnsafeCell,
+    mem::{MaybeUninit, offset_of},
+};
 use spin::Once;
 use tap::Tap;
 use x86_64::{
@@ -7,6 +10,7 @@ use x86_64::{
         segmentation::{CS, DS, ES, SS, Segment},
         tables::load_tss,
     },
+    registers::model_specific::GsBase,
     structures::{
         gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector},
         idt::InterruptDescriptorTable,
@@ -53,6 +57,71 @@ struct ApStack([u8; AP_KERNEL_STACK_SIZE]);
 static AP_KERNEL_STACK: ApStorage<ApStack> =
     ApStorage(UnsafeCell::new([const { MaybeUninit::uninit() }; MAX_CPUS]));
 
+/// Per-CPU state shared between the naked syscall `entry` and Rust-side kernel-stack bookkeeping.
+///
+/// Each CPU owns one slot. Every CPU sets its `IA32_GS_BASE` (`GS.base`) to the address of its own
+/// slot during bring-up, and `CR4.FSGSBASE` stays clear, so userspace cannot execute `wrgsbase` /
+/// `rdgsbase`. The naked `entry` therefore reaches this state directly through `gs:` operand
+/// segments, with no `swapgs` exchange required.
+///
+/// # Safety
+///
+/// The kernel reserves `GS` entirely for this per-CPU area. Userspace must never load a data
+/// segment selector into `GS`, since loading any flat 64-bit data segment zeroes the segment base
+/// (the base is forced to zero by long mode for data), which would redirect the next syscall
+/// `entry`'s `gs:` reads to address zero. The supported userspaces (mlibc/Bash) never touch `GS`.
+#[repr(C)]
+pub(super) struct PerCpuSyscall {
+    /// Kernel stack the syscall `entry` switches onto; this is the current thread's kernel stack on
+    /// this CPU, kept in sync with the TSS `RSP0` used by the interrupt-from-user path.
+    pub(super) kernel_stack_top: u64,
+    /// Saved user `RSP` handed from the syscall prologue to its `EntryFrame` construction.
+    pub(super) user_stack_pointer: u64,
+    /// Address of this CPU's loaded TSS, so Rust can update its `RSP0` on any CPU.
+    tss_pointer: u64,
+}
+
+pub(super) const PER_CPU_KERNEL_STACK_TOP: usize = offset_of!(PerCpuSyscall, kernel_stack_top);
+pub(super) const PER_CPU_USER_STACK_POINTER: usize = offset_of!(PerCpuSyscall, user_stack_pointer);
+
+static PER_CPU_SYSCALL: ApStorage<PerCpuSyscall> =
+    ApStorage(UnsafeCell::new([const { MaybeUninit::uninit() }; MAX_CPUS]));
+
+/// Writes and publishes the per-CPU syscall slot and sets this CPU's `GS` base to it.
+///
+/// Called exactly once per active CPU during bring-up, before interrupts are enabled on that CPU.
+fn initialize_per_cpu_syscall(index: usize, tss_pointer: u64) {
+    let slot = unsafe { &mut (*PER_CPU_SYSCALL.0.get())[index] };
+    // SAFETY: each CPU's slot is uninitialised and written exactly once during its own bring-up.
+    slot.write(PerCpuSyscall {
+        kernel_stack_top: 0,
+        user_stack_pointer: 0,
+        tss_pointer,
+    });
+
+    let slot = unsafe { &mut (*PER_CPU_SYSCALL.0.get())[index] };
+    let base = slot.as_mut_ptr().cast::<u8>() as u64;
+    GsBase::write(VirtAddr::new(base));
+}
+
+/// Returns the per-CPU syscall slot belonging to `index`. The caller must run on that CPU or hold
+/// exclusive access to its brings-up/teardown.
+pub(super) fn per_cpu_syscall_slot(index: usize) -> &'static mut PerCpuSyscall {
+    let slot = unsafe { &mut (*PER_CPU_SYSCALL.0.get())[index] };
+    // SAFETY: each CPU's slot is initialized in bring-up before it is ever used.
+    unsafe { slot.assume_init_mut() }
+}
+
+/// Returns the per-CPU syscall slot belonging to the current CPU.
+pub(super) fn current_cpu_syscall() -> &'static mut PerCpuSyscall {
+    per_cpu_syscall_slot(cpu_map::current_id().get() as usize)
+}
+
+/// Returns the TSS loaded on the current CPU, for updating its `RSP0` on any CPU.
+pub(super) fn current_cpu_tss() -> *mut TaskStateSegment {
+    current_cpu_syscall().tss_pointer as *mut TaskStateSegment
+}
+
 struct Selectors {
     code: SegmentSelector,
     data: SegmentSelector,
@@ -96,6 +165,9 @@ pub(super) fn initialize(exception_handler: ExceptionHandler) {
     }
 
     IDT.call_once(create_idt).load();
+
+    // Publish the BSP's per-CPU syscall slot and point GS at it.
+    initialize_per_cpu_syscall(0, tss.0.get() as u64);
 
     // Store shared descriptors so APs can reuse them.
     SHARED_DESCRIPTORS.call_once(|| SharedDescriptors {
@@ -184,6 +256,11 @@ pub(super) fn initialize_ap(kernel_stack_top: u64) {
 
     shared_idt().load();
 
+    // Publish this AP's per-CPU syscall slot, point GS at it, and program this CPU's syscall MSRs.
+    initialize_per_cpu_syscall(index, tss_ptr as u64);
+    super::syscall::configure_cpu();
+
+    // Establish this CPU's current-thread kernel stack in both the per-CPU slot and its own TSS.
     super::syscall::set_kernel_stack_top(kernel_stack_top);
     super::user::set_kernel_stack_top(kernel_stack_top);
 }
@@ -226,10 +303,6 @@ pub(super) unsafe fn switch_stack_pt_and_call(
             options(noreturn),
         );
     }
-}
-
-pub(super) fn tss_pointer() -> *mut TaskStateSegment {
-    BSP_TSS.get().expect("architecture not initialized").0.get()
 }
 
 pub(super) fn user_selectors() -> (u64, u64) {

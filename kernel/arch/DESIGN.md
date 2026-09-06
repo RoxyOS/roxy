@@ -38,8 +38,8 @@ tables are installed:
 - `ap_kernel_stack_top` returns the top of the AP's dedicated kernel-`.bss` stack (mapped under
   both bootloader and kernel page tables).
 - `initialize_application_processor` builds a per-CPU GDT (with a per-CPU TSS entry over shared
-  code/data/user descriptors), loads the global IDT, and configures the TSS RSP0/syscall kernel
-  stack.
+  code/data/user descriptors), loads the global IDT, configures the TSS RSP0/syscall kernel
+  stack, and programs this CPU's syscall MSRs (`EFER.SCE`, `IA32_STAR`/`LSTAR`/`SFMASK`).
 - `switch_stack_pt_and_call` loads the kernel page tables, switches onto the per-CPU kernel
   stack, and enters an interrupt-enabled idle loop; it never returns.
 
@@ -71,9 +71,19 @@ Architecture methods that enter userspace require the active page table to map t
 addresses. Unsafe backend code must keep this obligation local and document it at the call site.
 
 Before dispatching a user thread, the scheduler supplies the top of that thread's owned kernel
-stack through the architecture boundary. The x86_64 backend updates both the software SYSCALL
-entry stack and TSS RSP0 while interrupts are disabled, so syscalls, interrupts, and exceptions
-from ring 3 all enter on the same thread-owned stack.
+stack through the architecture boundary. The x86_64 backend records it in the current CPU's
+per-CPU syscall slot and in that CPU's TSS RSP0 while interrupts are disabled, so syscalls,
+interrupts, and exceptions from ring 3 all enter on the same thread-owned stack.
+
+The syscall entry and its `RSP0` bookkeeping are per-CPU because any CPU can service a syscall
+concurrently. Each CPU owns a `PerCpuSyscall` slot (kernel stack top, the user-`RSP` handoff the
+naked entry builds its frame from, and this CPU's TSS address), and sets its `GS.base` to that
+slot during bring-up. The naked `entry` reaches the slot through `gs:` operands; the syscall MSRs
+are programmed on every active CPU for the same reason.
+
+`GS` is reserved for this kernel per-CPU area. `CR4.FSGSBASE` stays clear so userspace cannot run
+`wrgsbase`/`rdgsbase`, and supported userspaces never load a data selector into `GS`; were one to,
+loading a flat 64-bit data segment zeroes the base and would break the next syscall entry.
 
 ## Failure and limits
 

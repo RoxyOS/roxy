@@ -1,7 +1,7 @@
 use core::{
     arch::naked_asm,
     mem::{offset_of, size_of, transmute},
-    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use x86_64::{
@@ -16,8 +16,6 @@ use crate::{Architecture, CurrentArchitectureBackend, RawSyscall, SyscallExit, S
 
 use super::{float, init};
 
-static KERNEL_STACK_TOP: AtomicU64 = AtomicU64::new(0);
-static USER_STACK_POINTER: AtomicU64 = AtomicU64::new(0);
 static HANDLER: AtomicUsize = AtomicUsize::new(0);
 
 #[repr(C)]
@@ -84,6 +82,18 @@ pub(super) fn configure(handler: SyscallHandler) {
         "syscall initialized twice"
     );
 
+    // The BSP is the first CPU running kernel code; program its syscall MSRs. Every AP programs
+    // its own copies during AP bring-up in `init::initialize_ap`.
+    configure_cpu();
+}
+
+/// Programs this CPU's syscall MSRs (`EFER.SCE`, `IA32_STAR`/`LSTAR`/`SFMASK`).
+///
+/// These MSRs are per logical processor, so this runs once for every active CPU: the BSP via
+/// [`configure`] and each AP via `init::initialize_ap`. The values are identical on every CPU
+/// (the selectors come from the shared GDT layout and the handler is one permanent entry point),
+/// but each processor must write them to its own copies or `syscall`/`sysret` fault on it.
+pub(super) fn configure_cpu() {
     let (user_code, user_data, kernel_code, kernel_data) = init::syscall_selectors();
 
     // SAFETY: architecture initialization established long mode and a permanent entry point.
@@ -96,20 +106,20 @@ pub(super) fn configure(handler: SyscallHandler) {
 }
 
 pub(super) fn set_kernel_stack_top(kernel_stack_top: u64) {
-    KERNEL_STACK_TOP.store(kernel_stack_top, Ordering::Release);
+    init::current_cpu_syscall().kernel_stack_top = kernel_stack_top;
 }
 
 #[cfg(feature = "kernel-test")]
 pub(super) fn kernel_stack_top() -> u64 {
-    KERNEL_STACK_TOP.load(Ordering::Acquire)
+    init::current_cpu_syscall().kernel_stack_top
 }
 
 #[unsafe(naked)]
 unsafe extern "C" fn entry() -> ! {
     naked_asm!(
-        "mov [rip + {user_stack_pointer}], rsp",
-        "mov rsp, [rip + {kernel_stack_top}]",
-        "push qword ptr [rip + {user_stack_pointer}]",
+        "mov qword ptr gs:[{user_stack_pointer}], rsp",
+        "mov rsp, qword ptr gs:[{kernel_stack_top}]",
+        "push qword ptr gs:[{user_stack_pointer}]",
         "push r11",
         "push rcx",
         "push r9",
@@ -144,8 +154,8 @@ unsafe extern "C" fn entry() -> ! {
         "mov r11, [rsp + {user_flags}]",
         "mov rsp, [rsp + {saved_user_stack_pointer}]",
         "sysretq",
-        kernel_stack_top = sym KERNEL_STACK_TOP,
-        user_stack_pointer = sym USER_STACK_POINTER,
+        kernel_stack_top = const init::PER_CPU_KERNEL_STACK_TOP,
+        user_stack_pointer = const init::PER_CPU_USER_STACK_POINTER,
         dispatch = sym dispatch,
         rax = const offset_of!(EntryFrame, rax),
         r15 = const offset_of!(EntryFrame, r15),

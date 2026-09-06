@@ -28,17 +28,17 @@ pub(super) unsafe fn enter(
 pub(super) fn set_kernel_stack_top(kernel_stack_top: u64) {
     assert!(!x86_64::instructions::interrupts::are_enabled());
 
-    let tss = init::tss_pointer();
+    let tss = init::current_cpu_tss();
 
-    // SAFETY: interrupts are disabled on the single supported CPU, so TSS mutation is exclusive.
+    // SAFETY: interrupts are disabled on this CPU, so its per-CPU TSS is owned exclusively here.
     unsafe { (*tss).privilege_stack_table[0] = VirtAddr::new(kernel_stack_top) };
 }
 
 #[cfg(feature = "kernel-test")]
 pub(super) fn kernel_stack_top() -> u64 {
-    let tss = init::tss_pointer();
+    let tss = init::current_cpu_tss();
 
-    // SAFETY: tests read the permanent BSP TSS without concurrent mutation.
+    // SAFETY: tests read the current CPU's TSS without concurrent mutation.
     unsafe { (*tss).privilege_stack_table[0].as_u64() }
 }
 
