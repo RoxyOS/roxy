@@ -17,8 +17,9 @@ pub(crate) trait InterruptBackend: sealed::Sealed {
 
     fn error_flags() -> u8;
 
-    /// Sends a reschedule IPI (wake signal) to the given target CPU using this controller.
-    fn send_ipi(target: roxy_arch::CpuId);
+    /// Sends a fixed-delivery IPI with the given vector to the given target CPU using this
+    /// controller. The caller owns vector selection; this is the raw hardware primitive.
+    fn send_ipi(target: roxy_arch::CpuId, vector: u8);
 
     fn mask_irq(line: roxy_arch::IrqLine);
 

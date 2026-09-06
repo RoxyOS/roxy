@@ -29,10 +29,13 @@ external handlers with `register_irq_handler` before interrupts are enabled. Ini
 the controller's APIC error and spurious-statistics handlers in the same registry as time and
 scheduler consumers. Registration is append-only for the boot lifetime and preserves call order.
 
-A reschedule IPI uses its own local vector (`LocalInterruptKind::Reschedule`); `send_reschedule_ipi`
-targets a logical CPU by translating back through the arch CPU map. The target needs no registered
-handler: delivery alone wakes it out of the scheduler's `wait_for_interrupt`, after which the
-interrupt is EOI'd and the target re-enters its dispatch loop.
+A reschedule IPI uses its own local vector (`LocalInterruptKind::Reschedule`). The backend's
+`send_ipi` is a raw fixed-delivery primitive that takes an explicit vector and targets a logical
+CPU by translating back through the arch CPU map; `send_reschedule_ipi` owns the policy of which
+vector reschedule uses and supplies it to the primitive. A second IPI kind (e.g. TLB shootdown)
+needs only another vector from the arch crate, not a backend change. The target needs no
+registered handler: delivery alone wakes it out of the scheduler's `wait_for_interrupt`, after
+which the interrupt is EOI'd and the target re-enters its dispatch loop.
 
 ## Interrupt flow and invariants
 

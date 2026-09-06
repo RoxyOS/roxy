@@ -6,7 +6,9 @@ mod misc;
 mod registry;
 mod state;
 
-use roxy_arch::{Architecture, CpuId, CurrentArchitectureBackend, IrqLine, LocalInterruptKind};
+use roxy_arch::{
+    Architecture, CpuId, CurrentArchitectureBackend, Interrupt, IrqLine, LocalInterruptKind,
+};
 
 use arch::InterruptBackend;
 
@@ -98,7 +100,10 @@ pub fn register_irq_handler(line: IrqLine, handler: Handler) {
 /// Panics when interrupts are enabled or `target` is not a registered CPU.
 pub fn send_reschedule_ipi(target: CpuId) {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
-    arch::CurrentInterruptBackend::send_ipi(target);
+    let vector = CurrentArchitectureBackend::interrupt_vector(Interrupt::Local(
+        LocalInterruptKind::Reschedule,
+    ));
+    arch::CurrentInterruptBackend::send_ipi(target, vector);
 }
 
 /// Enables delivery for an external IRQ line after its handler is registered.
