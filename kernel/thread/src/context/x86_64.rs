@@ -1,6 +1,7 @@
 use core::{
     arch::naked_asm,
     mem::{offset_of, size_of},
+    sync::atomic::AtomicBool,
 };
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, FloatState, UserContext};
@@ -109,20 +110,16 @@ impl ContextBackend for X86_64Context {
         }
     }
 
-    unsafe fn switch(previous: *mut Self, next: *const Self) {
-        // SAFETY: the caller guarantees distinct, exclusively owned live contexts.
-        let (previous, next) = unsafe { (&mut *previous, &*next) };
-        previous.fs_base = CurrentArchitectureBackend::user_thread_pointer();
-        CurrentArchitectureBackend::set_user_thread_pointer(next.fs_base);
-        // SAFETY: Both aligned states belong exclusively to their contexts, and architecture
-        // initialization enabled FXSAVE before scheduler context switching became possible.
+    unsafe fn switch(previous: *mut Self, next: *const Self, reserved_ptr: *const AtomicBool) {
+        // SAFETY: Both contexts are reserved for this CPU until the assembly handoff. Field
+        // borrows end before that handoff; no Rust reference spans the suspension or later reap.
         unsafe {
-            previous.float_state.save();
-            next.float_state.restore();
+            (*previous).fs_base = CurrentArchitectureBackend::user_thread_pointer();
+            CurrentArchitectureBackend::set_user_thread_pointer((*next).fs_base);
+            (*previous).float_state.save();
+            (*next).float_state.restore();
+            switch_context(previous, next, reserved_ptr);
         }
-
-        // SAFETY: The caller guarantees valid exclusive contexts and live backing stacks.
-        unsafe { switch_context(previous, next) };
     }
 }
 
@@ -144,8 +141,17 @@ impl X86_64Context {
     }
 }
 
+// Internal SysV x86_64 calling convention: RDI/RSI point to contexts, RDX to an optional
+// AtomicBool. Its one-byte store is a release on x86_64 (ordered stores), paired with Acquire
+// in dispatch/reap. After changing RSP and clearing the flag, never access outgoing memory.
+const _: () = assert!(size_of::<AtomicBool>() == 1);
+
 #[unsafe(naked)]
-unsafe extern "C" fn switch_context(_previous: *mut X86_64Context, _next: *const X86_64Context) {
+unsafe extern "C" fn switch_context(
+    _previous: *mut X86_64Context,
+    _next: *const X86_64Context,
+    _reserved_ptr: *const AtomicBool,
+) {
     naked_asm!(
         "push rbx",
         "push rbp",
@@ -155,6 +161,10 @@ unsafe extern "C" fn switch_context(_previous: *mut X86_64Context, _next: *const
         "push r15",
         "mov [rdi], rsp",
         "mov rsp, [rsi]",
+        "test rdx, rdx",
+        "jz 2f",
+        "mov byte ptr [rdx], 0",
+        "2:",
         "pop r15",
         "pop r14",
         "pop r13",

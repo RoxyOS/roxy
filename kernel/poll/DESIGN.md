@@ -25,7 +25,9 @@ blocks under the scheduler lock against a caller-provided wake latch. This order
 SMP: registering every listener before the readiness decision means a source that becomes ready
 mid-registration is still observed (either by the re-check or through a notification on the
 now-registered listener), and the latch turns a notification delivered while the owner thread was
-still `Running` (which `wake_if_waiting` drops) into a non-blocking wake instead of a lost one.
+still `Running` (which `wake_if_waiting` drops) into a non-blocking wake instead of a lost one: an
+owed wake skips the block entirely (the thread keeps running and re-checks) rather than marking a
+still-running thread runnable.
 
 ## Concurrency and limits
 

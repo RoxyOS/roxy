@@ -139,9 +139,10 @@ metadata are not yet supported.
 ABI-neutral readiness through `roxy-fd`. For a nonzero timeout it rechecks in a loop: with
 interrupts disabled, it registers one `roxy-poll` listener with each source before re-checking
 readiness, adds a cancelable monotonic timer registration when finite, and blocks against the
-listener's wake latch when still unready. The register-first order plus the latch close the SMP
-lost-wakeup windows; a notification or deadline wake always causes a fresh readiness query before
-results are encoded. It reports TTY and regular-file readiness and returns `POLLNVAL` for invalid
+listener's wake latch when still unready. When the latch shows an owed wake the block is skipped
+and the thread keeps running to re-query readiness. The register-first order plus the latch close
+the SMP lost-wakeup windows; a notification or deadline wake always causes a fresh readiness query
+before results are encoded. It reports TTY and regular-file readiness and returns `POLLNVAL` for invalid
 descriptors. No-descriptor finite polls are sleeps; an infinite no-descriptor poll remains blocked.
 Signals and temporary signal-mask replacement remain unsupported.
 

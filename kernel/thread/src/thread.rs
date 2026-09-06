@@ -1,4 +1,8 @@
-use core::sync::atomic::{AtomicU64, Ordering};
+use alloc::boxed::Box;
+use core::{
+    cell::UnsafeCell,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use roxy_arch::UserContext;
 use roxy_memory::{UserAddress, VirtualAddress};
@@ -13,7 +17,8 @@ use crate::{SavedContext, stack::KernelStack};
 pub struct Thread {
     id: ThreadId,
     kernel_stack: KernelStack,
-    context: SavedContext,
+    // The scheduler may inspect thread identity while a peer saves this context outside its lock.
+    context: Box<UnsafeCell<SavedContext>>,
 }
 
 static NEXT_THREAD_ID: AtomicU64 = AtomicU64::new(1);
@@ -34,7 +39,7 @@ impl Thread {
         Ok(Self {
             id: ThreadId::new(),
             kernel_stack,
-            context,
+            context: Box::new(UnsafeCell::new(context)),
         })
     }
 
@@ -57,7 +62,7 @@ impl Thread {
         Ok(Self {
             id: ThreadId::new(),
             kernel_stack,
-            context,
+            context: Box::new(UnsafeCell::new(context)),
         })
     }
 
@@ -73,12 +78,12 @@ impl Thread {
         Ok(Self {
             id: ThreadId::new(),
             kernel_stack,
-            context,
+            context: Box::new(UnsafeCell::new(context)),
         })
     }
 
-    pub fn context(&mut self) -> &mut SavedContext {
-        &mut self.context
+    pub(crate) fn context_pointer(&self) -> *mut SavedContext {
+        self.context.get()
     }
 
     #[must_use]

@@ -1,5 +1,8 @@
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicBool, Ordering};
+use alloc::{boxed::Box, vec::Vec};
+use core::{
+    cell::UnsafeCell,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use roxy_arch::{Architecture, CpuId, CurrentArchitectureBackend, MAX_CPUS};
 use roxy_cpu::CpuLocal;
@@ -17,7 +20,7 @@ use crate::{SavedContext, Thread, ThreadId};
 /// slot in the `LOCAL` per-CPU storage below.
 pub(super) struct LocalScheduler {
     pub(super) current: Option<ThreadIndex>,
-    pub(super) control_context: Option<SavedContext>,
+    pub(super) control_context: Option<Box<UnsafeCell<SavedContext>>>,
 }
 
 impl LocalScheduler {
@@ -38,14 +41,18 @@ impl LocalScheduler {
 static LOCAL: CpuLocal<Lock<LocalScheduler>> = CpuLocal::new();
 
 pub(super) struct Scheduler {
-    pub(super) entries: Vec<SchedulerEntry>,
-    pub(super) pending_reap: Option<ThreadIndex>,
+    // Stable boxes keep context pointers valid while other CPUs enqueue threads.
+    // Vacant slots preserve ThreadIndex values after a thread is reaped.
+    pub(super) entries: Vec<Option<Box<SchedulerEntry>>>,
 }
 
 pub(super) struct SchedulerEntry {
     pub(super) thread: Thread,
     pub(super) kind: ThreadKind,
     pub(super) state: ThreadState,
+    /// Set while a CPU is running this thread or has reserved it for a pending switch away.
+    /// Other CPUs skip it in dispatch and defer its reap until this is cleared at stack handoff.
+    pub(super) reserved: Box<AtomicBool>,
 }
 
 #[derive(Clone, Copy)]
@@ -76,16 +83,22 @@ impl Scheduler {
     pub(super) const fn new() -> Self {
         Self {
             entries: Vec::new(),
-            pending_reap: None,
         }
     }
 
     pub(super) fn enqueue(&mut self, thread: Thread, kind: ThreadKind) {
-        self.entries.push(SchedulerEntry {
+        let entry = Some(Box::new(SchedulerEntry {
             thread,
             kind,
             state: ThreadState::Runnable,
-        });
+            reserved: Box::new(AtomicBool::new(false)),
+        }));
+
+        if let Some(slot) = self.entries.iter_mut().find(|slot| slot.is_none()) {
+            *slot = entry;
+        } else {
+            self.entries.push(entry);
+        }
     }
 
     pub(super) fn current_thread_id(&mut self) -> ThreadId {
@@ -94,19 +107,29 @@ impl Scheduler {
     }
 
     pub(super) fn try_current_thread_id(&self) -> Option<ThreadId> {
-        local()
-            .current
-            .map(|current| self.entries[current.0].thread.id())
+        local().current.map(|current| {
+            self.entries[current.0]
+                .as_ref()
+                .expect("current thread slot is vacant")
+                .thread
+                .id()
+        })
     }
 
     pub(super) fn entry(&mut self, index: ThreadIndex) -> &mut SchedulerEntry {
-        &mut self.entries[index.0]
+        self.entries[index.0]
+            .as_deref_mut()
+            .expect("thread slot is vacant")
     }
 
     pub(super) fn index_of(&self, thread_id: ThreadId) -> Option<ThreadIndex> {
         self.entries
             .iter()
-            .position(|entry| entry.thread.id() == thread_id)
+            .position(|entry| {
+                entry
+                    .as_ref()
+                    .is_some_and(|entry| entry.thread.id() == thread_id)
+            })
             .map(ThreadIndex)
     }
 }

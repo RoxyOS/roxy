@@ -25,8 +25,14 @@ lock is held. The switch is performed only after the lock guard is released:
 
 ```text
 select target → release scheduler lock → prepare target address space
-→ update kernel stack top → switch saved context
+→ update kernel stack top → save outgoing context → switch stacks → release outgoing CPU
 ```
+
+Each scheduler entry owns a stable `Box` and a per-entry `reserved: Box<AtomicBool>`. Entry storage and
+the `reserved` flag are never reallocated or moved for the lifetime of a `ThreadIndex`, so a pointer or
+index published under the scheduler lock stays valid while another CPU enqueues, and reaping leaves
+vacant slots rather than shifting indexes. `SavedContext` likewise lives in a stable, separately
+owned allocation rather than being moved with the scheduler `Vec`.
 
 ## Per-CPU scheduler state
 
@@ -52,11 +58,30 @@ owning subsystems rather than the scheduler.
 
 A keyed block may pass a caller-owned wake latch (`prepare_block_current_with_key_and_latch`). The
 caller's notifier sets the latch before asking the scheduler to wake, so a wake that reaches a still-
-running thread (which `wake_if_waiting` drops) is recorded instead of lost; if the latch is set when
-the thread is about to block, the thread stays `Runnable` and is re-dispatched, and the caller
-re-checks its readiness. Both the latch store and the consuming swap run through the scheduler lock,
-so the owed wake cannot be lost on SMP. The scheduler only holds the latch across the block
-preparation call, never after it.
+running thread (which `wake_if_waiting` drops) is recorded instead of lost; when the latch is set the
+thread does not block at all - no context switch is prepared, it keeps running, and the caller
+re-checks its readiness. The thread is never marked `Runnable` before its switch away: marking a
+still-running thread runnable and switching later would expose it to concurrent dispatch on SMP
+(the "Runnable while still running" window), so an owed wake simply skips the block. Both the latch
+store and the consuming swap run through the scheduler lock, so the owed wake cannot be lost on SMP.
+The scheduler only holds the latch across the block preparation call, never after it.
+
+## CPU ownership handoff
+
+A thread is reserved for its CPU the moment the scheduler marks it `Running` (`reserved = true`, done
+under the scheduler lock). Dispatch, `next_runnable`, and reap all skip or defer a thread while its
+`reserved` flag is set, so an early wake (`Blocked → Runnable`) or a preemption (`Running → Runnable`)
+cannot let another CPU dispatch a thread that is still executing on its own stack.
+
+The assembly `switch_context` handoff clears `reserved` with an ordered store only after it has saved
+the outgoing context into `[rdi]` and switched `rsp` to the incoming stack. Heap-based atomics and
+context allocations keep the flag and the saved state at stable absolute addresses, so the release
+store remains reachable after the stack swap. Reaping therefore never frees a kernel stack while
+that stack still holds the outgoing thread.
+
+The `running` thread is never reaped while `reserved` is set; reaping removes the entry only after
+the handoff cleared the flag, and it takes the boxed slot leaving a vacant `Option`, so another
+CPU's recorded `current` index always stabilizes to the same thread.
 
 ## User dispatch hook
 
@@ -84,6 +109,7 @@ deadline waiters, then applies ordinary scheduler preemption policy.
 ## Invariants and limits
 
 - Context switching never occurs while the scheduler lock is held.
+- A thread is never dispatched or reaped while its `reserved` flag is set.
 - A thread is reaped only after execution has moved off its kernel stack.
 - Blocking code must prepare the block while protecting its wait queue, release that queue's lock,
   then perform the switch.

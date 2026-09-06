@@ -1,6 +1,6 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use super::state::{Scheduler, local};
+use super::state::{Scheduler, ThreadState};
 use crate::ThreadId;
 
 static REAPED_HANDLER: AtomicUsize = AtomicUsize::new(0);
@@ -70,24 +70,16 @@ pub(super) fn notify_reaped(reaped: Option<ThreadId>) {
 impl Scheduler {
     /// Reaps a thread only after execution has moved away from its kernel stack.
     ///
-    /// `exit_current` cannot remove the active entry because `rsp` still points into its kernel
-    /// stack. It records the index in `pending_reap` and switches away. The next scheduler entry
-    /// removes it from a different stack, drops its address-space handle, and repairs `current` if
-    /// `Vec::remove` shifted the successor's index.
+    /// Reaps an exiting thread only after its context switch has released CPU ownership. Vacant
+    /// slots preserve every other CPU's `ThreadIndex` while the entry's stack and context are
+    /// dropped.
     pub(super) fn reap_pending(&mut self) -> Option<ThreadId> {
-        let pending_reap = self.pending_reap.take()?;
-        assert!(
-            local().current != Some(pending_reap),
-            "cannot reap active thread"
-        );
-        let reaped = self.entries.remove(pending_reap.0).thread.id();
+        let slot = self.entries.iter_mut().find(|slot| {
+            slot.as_ref().is_some_and(|entry| {
+                entry.state == ThreadState::Exiting && !entry.reserved.load(Ordering::Acquire)
+            })
+        })?;
 
-        if let Some(current) = &mut local().current
-            && current.0 > pending_reap.0
-        {
-            current.0 -= 1;
-        }
-
-        Some(reaped)
+        Some(slot.take().expect("reap candidate disappeared").thread.id())
     }
 }

@@ -13,8 +13,8 @@ static NEXT_WAIT_KEY: AtomicU64 = AtomicU64::new(1);
 /// `notified` records whether a source already signalled this listener since the last block,
 /// regardless of whether the scheduler accepted the wake. It turns the SMP lost-wakeup window
 /// (a notification arriving while the owner thread is still `Running`) into a non-blocking wake:
-/// [`scheduler::prepare_block_current_with_key_and_latch`] consumes it and leaves the thread
-/// runnable instead of sleeping.
+/// [`scheduler::prepare_block_current_with_key_and_latch`] consumes it and, when it is set, the
+/// thread keeps running and re-checks readiness instead of sleeping.
 pub struct PollListener {
     thread_id: ThreadId,
     wait_key: scheduler::WaitKey,

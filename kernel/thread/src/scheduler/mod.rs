@@ -81,7 +81,7 @@ pub fn register_user_dispatch_hook(hook: fn(ThreadId)) {
 }
 
 #[must_use = "a prepared block must be performed"]
-pub struct PendingBlock(switch::PendingContextSwitch);
+pub struct PendingBlock(Option<switch::PendingContextSwitch>);
 
 /// Uniquely identifies one keyed block registration.
 ///
@@ -106,7 +106,7 @@ impl WaitKey {
 pub fn prepare_block_current() -> PendingBlock {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
-    PendingBlock(SCHEDULER.lock().prepare_block(None))
+    PendingBlock(Some(SCHEDULER.lock().prepare_block(None)))
 }
 
 /// Marks the current thread blocked with a caller-owned wait key.
@@ -117,18 +117,16 @@ pub fn prepare_block_current() -> PendingBlock {
 pub fn prepare_block_current_with_key(wait_key: WaitKey) -> PendingBlock {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
-    PendingBlock(SCHEDULER.lock().prepare_block(Some(wait_key)))
+    PendingBlock(Some(SCHEDULER.lock().prepare_block(Some(wait_key))))
 }
 
-/// Marks the current thread blocked with a caller-owned wait key, sets `latch` to false, unless
-/// `latch` is true - then the thread stays [`Runnable`](crate::scheduler) and is re-dispatched
-/// instead of sleeping.
+/// Blocks the current thread with a caller-owned wait key, consuming a caller-owned wake latch.
 ///
-/// `latch` is a caller-owned flag the notifier sets before asking the scheduler to wake, so a
-/// wake that reaches this thread while it is still `Running` is recorded here rather than dropped
-/// by `wake_if_waiting`. Consuming it refunds that owed wake; the caller re-checks its readiness
-/// when it resumes, and both the store (in the notifier) and this swap run through the scheduler
-/// lock, so the owed wake cannot be lost on SMP.
+/// `latch` is set by the notifier before it asks the scheduler to wake, so a wake that reaches this
+/// thread while it is still `Running` is recorded here rather than dropped by `wake_if_waiting`.
+/// When the latch was set, the thread does not block at all: no context switch is prepared and
+/// `perform()` is a no-op, so the caller continues running and re-checks its readiness. Otherwise
+/// the thread blocks as `prepare_block_current_with_key` does.
 ///
 /// # Panics
 ///
@@ -143,9 +141,15 @@ pub fn prepare_block_current_with_key_and_latch(
 }
 
 impl PendingBlock {
-    /// Performs the prepared context switch and returns after the thread is woken.
+    /// Performs the prepared context switch when one was prepared, returning immediately otherwise.
+    ///
+    /// When the caller prepared the block through the wake-latch API and a wake was already owed,
+    /// no switch is prepared and this is a no-op: the thread keeps running and the caller re-checks
+    /// its readiness.
     pub fn perform(self) {
-        self.0.perform();
+        if let Some(switch) = self.0 {
+            switch.perform();
+        }
     }
 }
 
