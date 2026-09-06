@@ -16,13 +16,16 @@ changed calls `notify`, which asks the scheduler to wake the listener only when 
 the same wait key.
 
 ```text
-query readiness → register unready sources → prepare block(wait key)
+register listeners → re-check readiness → prepare block with wake latch
 → source notification or deadline wake → re-query readiness → drop registrations
 ```
 
-The caller performs query, registration, and block preparation with interrupts disabled. This
-prevents an interrupt-driven source from changing state between observing it as unready and
-recording its listener on the current BSP-only scheduler.
+The caller performs registration, re-check, and block preparation with interrupts disabled, and
+blocks under the scheduler lock against a caller-provided wake latch. This order is required for
+SMP: registering every listener before the readiness decision means a source that becomes ready
+mid-registration is still observed (either by the re-check or through a notification on the
+now-registered listener), and the latch turns a notification delivered while the owner thread was
+still `Running` (which `wake_if_waiting` drops) into a non-blocking wake instead of a lost one.
 
 ## Concurrency and limits
 
@@ -30,4 +33,8 @@ Wait queues are protected by their own locks. Notification can occur in interrup
 not allocate; registration may allocate in thread context. Wakeups are advisory: a caller always
 rechecks readiness after it resumes, so a notification may be spurious or match an event mask that
 does not satisfy that caller. The crate currently has no fairness policy, edge-triggered mode, or
-multi-CPU queue protocol.
+multi-CPU queue protocol beyond the scheduler's wake latch.
+
+The wake latch is owned by the `PollListener` and released with it, so no cross-CPU pending-wake
+state leaks out of the registration lifetime; the scheduler only consumes the latch it is handed at
+block time.

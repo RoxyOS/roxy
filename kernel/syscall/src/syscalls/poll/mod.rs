@@ -128,9 +128,15 @@ fn poll_values(values: &mut [PollFdAbi]) -> usize {
     ready
 }
 
-fn block_until_poll_change(values: &[PollFdAbi], deadline: Option<Duration>) {
+fn block_until_poll_change(values: &mut [PollFdAbi], deadline: Option<Duration>) {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
+    // Register the wake listener with every source BEFORE re-checking readiness, and block with a
+    // wake latch (see `prepare_block_current_with_key_and_latch`). Together these close the SMP
+    // lost-wakeup windows: a source that becomes ready during registration is caught either by the
+    // re-scan below or, when it changes after the re-scan, by a notification through the now-
+    // registered listener that is recorded in the latch instead of dropped for a not-yet-blocked
+    // thread.
     let listener = PollListener::current_thread();
     let registrations = register_poll_listeners(values, &listener);
 
@@ -138,7 +144,21 @@ fn block_until_poll_change(values: &[PollFdAbi], deadline: Option<Duration>) {
         roxy_timer_wait::register_wakeup_deadline(deadline, listener.wait_key());
     }
 
-    let block = roxy_thread::scheduler::prepare_block_current_with_key(listener.wait_key());
+    // Now that every listener is registered, re-scan readiness. A source that became ready during
+    // registration would never notify this listener (it was not registered yet), so return and let
+    // the outer loop report the ready set instead of sleeping forever.
+    if poll_values(values) > 0 {
+        if deadline.is_some() {
+            roxy_timer_wait::cancel_wakeup_deadline(listener.wait_key());
+        }
+        drop(registrations);
+        return;
+    }
+
+    let block = roxy_thread::scheduler::prepare_block_current_with_key_and_latch(
+        listener.wait_key(),
+        listener.notified(),
+    );
     block.perform();
 
     if deadline.is_some() {

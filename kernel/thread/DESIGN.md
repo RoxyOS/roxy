@@ -50,6 +50,14 @@ same key to make the thread runnable, so a stale notification from an earlier wa
 later wait by the same thread. Resource-specific queues and deadline registration belong to their
 owning subsystems rather than the scheduler.
 
+A keyed block may pass a caller-owned wake latch (`prepare_block_current_with_key_and_latch`). The
+caller's notifier sets the latch before asking the scheduler to wake, so a wake that reaches a still-
+running thread (which `wake_if_waiting` drops) is recorded instead of lost; if the latch is set when
+the thread is about to block, the thread stays `Runnable` and is re-dispatched, and the caller
+re-checks its readiness. Both the latch store and the consuming swap run through the scheduler lock,
+so the owed wake cannot be lost on SMP. The scheduler only holds the latch across the block
+preparation call, never after it.
+
 ## User dispatch hook
 
 The thread crate cannot depend on the process crate because process already depends on thread.

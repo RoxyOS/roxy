@@ -137,12 +137,13 @@ metadata are not yet supported.
 
 `poll` decodes the userspace `pollfd` array inside this subsystem and queries each descriptor's
 ABI-neutral readiness through `roxy-fd`. For a nonzero timeout it rechecks in a loop: with
-interrupts disabled, it queries all descriptors, registers one `roxy-poll` listener with each
-unready source, adds a cancelable monotonic timer registration when finite, and prepares a keyed
-block. A notification or deadline wake always causes a fresh readiness query before results are
-encoded. It reports TTY and regular-file readiness and returns `POLLNVAL` for invalid descriptors.
-No-descriptor finite polls are sleeps; an infinite no-descriptor poll remains blocked. Signals and
-temporary signal-mask replacement remain unsupported.
+interrupts disabled, it registers one `roxy-poll` listener with each source before re-checking
+readiness, adds a cancelable monotonic timer registration when finite, and blocks against the
+listener's wake latch when still unready. The register-first order plus the latch close the SMP
+lost-wakeup windows; a notification or deadline wake always causes a fresh readiness query before
+results are encoded. It reports TTY and regular-file readiness and returns `POLLNVAL` for invalid
+descriptors. No-descriptor finite polls are sleeps; an infinite no-descriptor poll remains blocked.
+Signals and temporary signal-mask replacement remain unsupported.
 
 `ppoll` shares `poll`'s descriptor readiness and timer-wait implementation, but decodes its
 relative timeout from the Roxy mlibc `timespec` ABI at nanosecond precision. A null timeout waits

@@ -1,4 +1,5 @@
 use core::ptr;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_memory::activate_kernel_page_table;
@@ -140,6 +141,36 @@ impl Scheduler {
             None => BlockState::Unkeyed,
         });
 
+        self.prepare_block_switch(current)
+    }
+
+    /// Marks the current thread blocked with a caller-owned wait key, sets `latch` to false, unless
+    /// `latch` is true - then the thread stays `Runnable` and is re-dispatched instead of sleeping.
+    ///
+    /// The caller (`roxy-poll`) sets `latch` before asking the scheduler to wake, so a notification
+    /// delivered while this thread is still `Running` is recorded here rather than dropped by
+    /// [`Scheduler::wake_if_waiting`]. Consuming it refunds that owed wake, closing the SMP window
+    /// in which a concurrent CPU runs the whole notify sequence between this thread's readiness
+    /// re-check and its block.
+    pub(super) fn prepare_block_with_latch(
+        &mut self,
+        wait_key: WaitKey,
+        latch: &AtomicBool,
+    ) -> PendingContextSwitch {
+        let current = local().current.expect("no current thread");
+
+        self.entry(current).state = ThreadState::Blocked(BlockState::Keyed(wait_key));
+
+        if latch.swap(false, Ordering::SeqCst) {
+            self.entry(current).state = ThreadState::Runnable;
+        }
+
+        self.prepare_block_switch(current)
+    }
+
+    /// Builds the outgoing switch from the caller-set block state of `current` to the next
+    /// runnable thread (or the scheduler control context when none remains).
+    fn prepare_block_switch(&mut self, current: ThreadIndex) -> PendingContextSwitch {
         let previous = ptr::from_mut(self.entry(current).thread.context());
         let next = self.next_runnable(ThreadIndex((current.0 + 1) % self.entries.len()));
 
@@ -281,12 +312,15 @@ fn prepare_dispatch(user_thread: Option<ThreadId>) {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
+    use core::num::NonZeroU64;
+    use core::sync::atomic::{AtomicBool, Ordering};
+
     use roxy_test::kernel_test;
 
     use super::ThreadKind;
     use super::local;
     use super::{BlockState, Scheduler, ThreadIndex, ThreadState};
-    use crate::Thread;
+    use crate::{Thread, scheduler::WaitKey};
 
     kernel_test!("roxy-thread::scheduler-block-wake", scheduler_block_wake, {
         let first = Thread::new(unused_thread).unwrap();
@@ -308,6 +342,38 @@ mod tests {
         assert_eq!(scheduler.entries[0].state, ThreadState::Runnable);
         assert!(!scheduler.wake_unconditionally(first_id));
     });
+
+    kernel_test!(
+        "roxy-thread::scheduler-block-with-latch",
+        scheduler_block_with_latch,
+        {
+            let first = Thread::new(unused_thread).unwrap();
+            let second = Thread::new(unused_thread).unwrap();
+            let mut scheduler = Scheduler::new();
+            scheduler.enqueue(first, ThreadKind::Kernel);
+            scheduler.enqueue(second, ThreadKind::Kernel);
+
+            // A set latch (a wake owed to a still-running thread) must keep it Runnable.
+            local().current = Some(ThreadIndex(0));
+            scheduler.entries[0].state = ThreadState::Running;
+            let latched = AtomicBool::new(true);
+            let key = WaitKey::new(NonZeroU64::new(7).unwrap());
+            let _pending = scheduler.prepare_block_with_latch(key, &latched);
+            assert_eq!(scheduler.entries[0].state, ThreadState::Runnable);
+            assert!(!latched.load(Ordering::SeqCst));
+
+            // A cleared latch blocks normally.
+            local().current = Some(ThreadIndex(0));
+            scheduler.entries[0].state = ThreadState::Running;
+            let clear = AtomicBool::new(false);
+            let other_key = WaitKey::new(NonZeroU64::new(8).unwrap());
+            let _pending2 = scheduler.prepare_block_with_latch(other_key, &clear);
+            assert_eq!(
+                scheduler.entries[0].state,
+                ThreadState::Blocked(BlockState::Keyed(other_key))
+            );
+        }
+    );
 
     fn unused_thread() -> ! {
         panic!("unused scheduler test thread started")

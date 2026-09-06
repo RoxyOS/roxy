@@ -4,6 +4,7 @@ mod state;
 mod switch;
 
 use core::num::NonZeroU64;
+use core::sync::atomic::AtomicBool;
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
 use roxy_utils::Lock;
@@ -117,6 +118,28 @@ pub fn prepare_block_current_with_key(wait_key: WaitKey) -> PendingBlock {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
     PendingBlock(SCHEDULER.lock().prepare_block(Some(wait_key)))
+}
+
+/// Marks the current thread blocked with a caller-owned wait key, sets `latch` to false, unless
+/// `latch` is true - then the thread stays [`Runnable`](crate::scheduler) and is re-dispatched
+/// instead of sleeping.
+///
+/// `latch` is a caller-owned flag the notifier sets before asking the scheduler to wake, so a
+/// wake that reaches this thread while it is still `Running` is recorded here rather than dropped
+/// by `wake_if_waiting`. Consuming it refunds that owed wake; the caller re-checks its readiness
+/// when it resumes, and both the store (in the notifier) and this swap run through the scheduler
+/// lock, so the owed wake cannot be lost on SMP.
+///
+/// # Panics
+///
+/// Panics when called outside a scheduled thread or with interrupts enabled.
+pub fn prepare_block_current_with_key_and_latch(
+    wait_key: WaitKey,
+    latch: &AtomicBool,
+) -> PendingBlock {
+    assert!(!CurrentArchitectureBackend::interrupts_enabled());
+
+    PendingBlock(SCHEDULER.lock().prepare_block_with_latch(wait_key, latch))
 }
 
 impl PendingBlock {
