@@ -2,9 +2,9 @@
 
 ## Purpose and scope
 
-`roxy-cpu` owns CPU identity, BSP-oriented CPU initialization, and the `CpuLocal<T>` storage
-primitive. It does not own interrupt routing, timer setup, interrupt statistics, thread scheduling,
-global time policy, or process state.
+`roxy-cpu` owns CPU identity, per-CPU initialization, and the `CpuLocal<T>` storage primitive. It
+does not own interrupt routing, timer setup, interrupt statistics, thread scheduling, global time
+policy, or process state.
 
 ## Ownership and boundaries
 
@@ -28,15 +28,13 @@ hardware identifier after `roxy-interrupt` has configured the local controller.
 - Slot count is bounded by the exported `MAX_CPUS` constant in `roxy-arch`; `current_cpu_id` must
   stay below that bound or the access panics.
 - Hardware identifiers are architecture values; public callers use the typed `CpuId` wrapper.
-- The storage layer is per-CPU capable. Making a non-bootstrap slot meaningful still requires the
-  architecture to report a real per-CPU identity; today `current_cpu_id` returns the bootstrap
-  processor, so only slot zero is exercised.
+- The storage layer is per-CPU. Every slot is keyed by the real identity the architecture reports
+  for the executing CPU; `current_cpu_id` resolves through the arch CPU map on both the bootstrap
+  and application processors.
 
 ## Limits
 
-`CpuLocal` storage supports one value per CPU, and non-bootstrap CPUs now register through the
-architecture CPU map (during `Architecture::initialize_application_processor`), so slots beyond
-the BSP are populated and `current_cpu_id` resolves real per-CPU identity. The kernel is still
-BSP-oriented operationally: APs park with interrupts disabled and no scheduler runs on them, so
-lock, timer, and scheduler assumptions remain single-CPU until a real AP idle loop, per-CPU
-local-APIC/timer, and thread migration are added (see `roxy-smp`).
+`CpuLocal` storage supports one value per CPU. Non-bootstrap CPUs register through the
+architecture CPU map during `Architecture::initialize_application_processor`, so slots beyond the
+BSP are populated and `current_cpu_id` resolves a real per-CPU identity on every active CPU. Each
+slot initializes exactly once with interrupts disabled (guarded by `spin::Once`, see the invariants above).

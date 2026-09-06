@@ -78,5 +78,5 @@ locks.
 
 Read readiness means buffered data or peer closure. Write readiness means an open peer with
 buffer capacity. A bound socket reports readable while its backlog holds pending connections.
-Peer closure also reports hangup. The implementation assumes the current BSP-oriented kernel
-execution model and does not expose a nonblocking mode.
+Peer closure also reports hangup. The implementation blocks through the kernel scheduler and does
+not expose a nonblocking mode.

@@ -2,7 +2,7 @@ use core::fmt;
 
 /// Upper bound on the number of CPUs the kernel can address. `CpuId` values index per-CPU storage
 /// such as `CpuLocal`, so this bounds those arrays. It is a kernel policy constant, not a hardware
-/// limit: it must be large enough for the intended platform (current target uses one vCPU) without
+/// limit: it must be large enough for the intended platform (current QEMU target uses 16 vCPUs) without
 /// wasting per-slot static storage.
 pub const MAX_CPUS: usize = 64;
 

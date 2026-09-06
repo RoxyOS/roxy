@@ -117,8 +117,9 @@ a bounded queue.
 
 ## Limits
 
-The current implementation assumes the repository's single-BSP execution model.  Non-US
-keyboard layouts, complete extended-key behaviour, LED synchronization, hot-plugging, canonical
-mode, echo, termios, and signals remain outside this subsystem.  PS/2 mouse support targets
-standard 3-button mice and IntelliMouse (wheel) mice; IntelliMouse Explorer (5-button, ID 4)
-and other vendor extensions are not yet implemented.
+The controller and its IRQ1/IRQ12 handlers run on the single CPU that the IOAPIC routes these
+legacy lines to (the BSP), so the driver keeps one owner and no per-CPU or lock-free controller
+state. Non-US keyboard layouts, complete extended-key behaviour, LED synchronization,
+hot-plugging, canonical mode, echo, termios, and signals remain outside this subsystem. PS/2
+mouse support targets standard 3-button mice and IntelliMouse (wheel) mice; IntelliMouse Explorer
+(5-button, ID 4) and other vendor extensions are not yet implemented.

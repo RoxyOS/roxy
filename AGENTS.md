@@ -12,8 +12,8 @@ port, Bash, and a deliberately limited BusyBox configuration. The kernel ABI and
 one cross-repository contract: syscall or ABI work may require coordinated changes to both sides.
 
 The current platform is intentionally narrow. The supported architecture backend is x86_64, the
-kernel and scheduler are BSP-oriented, the QEMU configuration uses one virtual CPU, and the build
-tooling assumes an x86_64 Linux host. Kernel Rust targets `x86_64-unknown-none`; userspace Clang
+kernel and scheduler bring up multiple application processors (SMP), the QEMU configuration uses
+16 virtual CPUs, and the build tooling assumes an x86_64 Linux host. Kernel Rust targets `x86_64-unknown-none`; userspace Clang
 targets `x86_64-unknown-roxy`.
 
 The current userspace exposes only the Roxy ABI, but the kernel architecture must remain capable

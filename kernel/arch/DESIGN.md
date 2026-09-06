@@ -88,9 +88,9 @@ loading a flat 64-bit data segment zeroes the base and would break the next sysc
 ## Failure and limits
 
 Invalid CPU state, unsupported exception forms, non-canonical user pointers, and repeated
-initialization are kernel faults rather than recoverable userspace errors. The backend currently
-assumes the BSP-oriented CPU model exposed by the rest of the kernel and provides no portability
-promise beyond the implemented target.
+initialization are kernel faults rather than recoverable userspace errors. The backend targets the
+SMP CPU model used by the rest of the kernel and provides no portability promise beyond the
+implemented target.
 
 An unrecoverable failure stops the whole machine, not just the faulting core. The first core to
 fail (the panic handler or the unrecoverable-exception path) asks `roxy-interrupt` to broadcast a

@@ -39,6 +39,6 @@ throughout the subsystem.
 
 ## Limits
 
-The current backend and CPU-local assumptions are x86_64/BSP-oriented. Memory statistics are
-diagnostic and must not become allocation policy. NUMA, demand paging, swapping, and a general
-multi-CPU allocator are outside this subsystem's current contract.
+The current backend is x86_64, and page-table and allocation code is not restricted to one CPU.
+Memory statistics are diagnostic and must not become allocation policy. NUMA, demand paging,
+swapping, and a per-CPU allocator remain outside this subsystem's current contract.
