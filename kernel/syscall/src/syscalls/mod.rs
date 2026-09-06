@@ -14,6 +14,7 @@ mod fork;
 mod fs;
 mod futex_wait;
 mod futex_wake;
+mod get_tid;
 mod getcwd;
 mod getegid;
 mod geteuid;
@@ -40,6 +41,8 @@ mod socket;
 mod socketpair;
 mod stat;
 mod tcb_set;
+mod thread_create;
+mod thread_exit;
 mod timer;
 mod ttyname;
 mod umask;
@@ -51,7 +54,7 @@ mod writev;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 78] = [
+pub(super) const SYSCALLS: [Syscall; 81] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -130,4 +133,7 @@ pub(super) const SYSCALLS: [Syscall; 78] = [
     timer::GETTIME_SYSCALL,
     timer::GETOVERRUN_SYSCALL,
     timer::DELETE_SYSCALL,
+    thread_create::SYSCALL,
+    thread_exit::SYSCALL,
+    get_tid::SYSCALL,
 ];

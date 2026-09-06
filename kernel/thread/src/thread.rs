@@ -101,6 +101,11 @@ impl ThreadId {
     fn new() -> Self {
         Self(NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed))
     }
+
+    #[must_use]
+    pub const fn as_u64(self) -> u64 {
+        self.0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

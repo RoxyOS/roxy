@@ -79,6 +79,9 @@ pub(crate) enum SyscallNumber {
     TimerGettime = 75,
     TimerGetoverrun = 76,
     TimerDelete = 77,
+    ThreadCreate = 78,
+    ThreadExit = 79,
+    GetTid = 80,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -159,6 +162,14 @@ impl TryFrom<u64> for SyscallNumber {
             70 => Ok(Self::SetSid),
             71 => Ok(Self::Writev),
             72 => Ok(Self::Ttyname),
+            73 => Ok(Self::TimerCreate),
+            74 => Ok(Self::TimerSettime),
+            75 => Ok(Self::TimerGettime),
+            76 => Ok(Self::TimerGetoverrun),
+            77 => Ok(Self::TimerDelete),
+            78 => Ok(Self::ThreadCreate),
+            79 => Ok(Self::ThreadExit),
+            80 => Ok(Self::GetTid),
             _ => Err(()),
         }
     }
