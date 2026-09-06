@@ -20,13 +20,12 @@ pub fn initialize() {
 ///
 /// # Panics
 ///
-/// Panics when interrupts are enabled or the deadline has already elapsed.
+/// Panics when interrupts are enabled.
+///
+/// A deadline that has already elapsed is not an error: it is registered as-is and only adds up
+/// to one timer tick (4 ms) of latency before [`register_wakeup_deadline`]'s wakeup fires.
 pub fn block_current(deadline: Duration) -> PendingBlock {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
-    assert!(
-        deadline > roxy_time::monotonic_time(),
-        "deadline already elapsed"
-    );
 
     let wait_key = TIMER_WAITERS.lock().next_key();
     register_wakeup_deadline(deadline, wait_key);
@@ -41,13 +40,13 @@ pub fn block_current(deadline: Duration) -> PendingBlock {
 ///
 /// # Panics
 ///
-/// Panics when interrupts are enabled or the deadline has already elapsed.
+/// Panics when interrupts are enabled.
+///
+/// A deadline that has already elapsed is registered anyway: the next timer tick removes it via
+/// [`TIMER_WAITERS`] and wakes the current thread immediately, so the caller never blocks past the
+/// deadline even when the clock crossed it after the deadline snapshot was taken.
 pub fn register_wakeup_deadline(deadline: Duration, wait_key: WaitKey) {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
-    assert!(
-        deadline > roxy_time::monotonic_time(),
-        "deadline already elapsed"
-    );
 
     let thread_id = roxy_thread::scheduler::current_thread_id();
     TIMER_WAITERS.lock().register(thread_id, deadline, wait_key);

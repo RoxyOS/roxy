@@ -37,3 +37,9 @@ expiry notifications from an earlier block.
 switches contexts; callers that combine a deadline with another source must register every source,
 then prepare and perform one scheduler block with their shared wait key, and explicitly cancel the
 deadline after an early wakeup.
+
+A deadline that has already elapsed is not rejected: it is still registered, and the next timer tick
+removes it and wakes the caller. This tolerates the check-then-register window that arises because
+each CPU's periodic timer advances the same global monotonic clock, so the clock can cross a deadline
+between a caller's elapsed check and registration. The cost is at most one tick of extra latency for
+an already-expired deadline, never a panic.
