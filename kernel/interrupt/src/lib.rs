@@ -6,7 +6,7 @@ mod misc;
 mod registry;
 mod state;
 
-use roxy_arch::{Architecture, CurrentArchitectureBackend, IrqLine, LocalInterruptKind};
+use roxy_arch::{Architecture, CpuId, CurrentArchitectureBackend, IrqLine, LocalInterruptKind};
 
 use arch::InterruptBackend;
 
@@ -85,6 +85,20 @@ pub fn register_local_handler(kind: LocalInterruptKind, handler: Handler) {
 pub fn register_irq_handler(line: IrqLine, handler: Handler) {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
     registry::register_irq(line, handler);
+}
+
+/// Sends a reschedule IPI to wake an idle application processor.
+///
+/// The target does not need a registered handler for the reschedule vector: delivery alone wakes
+/// it out of `wait_for_interrupt`, after which the interrupt is EOI'd and the target re-enters its
+/// dispatch loop.
+///
+/// # Panics
+///
+/// Panics when interrupts are enabled or `target` is not a registered CPU.
+pub fn send_reschedule_ipi(target: CpuId) {
+    assert!(!CurrentArchitectureBackend::interrupts_enabled());
+    arch::CurrentInterruptBackend::send_ipi(target);
 }
 
 /// Enables delivery for an external IRQ line after its handler is registered.

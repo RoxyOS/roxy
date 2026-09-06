@@ -58,6 +58,19 @@ impl InterruptBackend for X86_64Interrupt {
         })
     }
 
+    fn send_ipi(target: roxy_arch::CpuId) {
+        let apic_id = CurrentArchitectureBackend::hardware_apic_id(target);
+        let vector = CurrentArchitectureBackend::interrupt_vector(Interrupt::Local(
+            LocalInterruptKind::Reschedule,
+        ));
+        with_local_apic(|local_apic| {
+            // SAFETY: This is a plain fixed-delivery IPI to a registered CPU's physical x2APIC id.
+            unsafe {
+                local_apic.send_ipi(vector, apic_id);
+            }
+        });
+    }
+
     fn mask_irq(line: IrqLine) {
         ioapic::mask(line);
     }

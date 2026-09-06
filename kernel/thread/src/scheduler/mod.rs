@@ -13,7 +13,7 @@ pub use reap::{
     ThreadExitHandler, ThreadReapedHandler, register_exit_handler, register_reaped_handler,
 };
 
-use self::state::{Scheduler, ThreadKind};
+use self::state::{Scheduler, ThreadKind, wake_idle_aps};
 use crate::{Thread, ThreadCreateError, ThreadId};
 
 static SCHEDULER: Lock<Scheduler> = Lock::new(Scheduler::new());
@@ -132,7 +132,11 @@ impl PendingBlock {
 #[must_use]
 pub fn wake_unconditionally(thread_id: ThreadId) -> bool {
     CurrentArchitectureBackend::without_interrupts(|| {
-        SCHEDULER.lock().wake_unconditionally(thread_id)
+        let woken = SCHEDULER.lock().wake_unconditionally(thread_id);
+        if woken {
+            wake_idle_aps();
+        }
+        woken
     })
 }
 
@@ -140,12 +144,17 @@ pub fn wake_unconditionally(thread_id: ThreadId) -> bool {
 #[must_use]
 pub fn wake_if_waiting(thread_id: ThreadId, wait_key: WaitKey) -> bool {
     CurrentArchitectureBackend::without_interrupts(|| {
-        SCHEDULER.lock().wake_if_waiting(thread_id, wait_key)
+        let woken = SCHEDULER.lock().wake_if_waiting(thread_id, wait_key);
+        if woken {
+            wake_idle_aps();
+        }
+        woken
     })
 }
 
 fn enqueue(thread: Thread, kind: ThreadKind) {
     CurrentArchitectureBackend::without_interrupts(|| {
         SCHEDULER.lock().enqueue(thread, kind);
+        wake_idle_aps();
     });
 }

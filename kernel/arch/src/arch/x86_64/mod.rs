@@ -44,6 +44,10 @@ impl Architecture for X86_64 {
         cpu_map::current_id()
     }
 
+    fn hardware_apic_id(cpu: CpuId) -> u32 {
+        cpu_map::apic_id_for(cpu)
+    }
+
     fn current_stack_pointer() -> u64 {
         let rsp: u64;
         // SAFETY: Reading RSP is always safe and has no side effects.

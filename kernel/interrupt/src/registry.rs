@@ -12,6 +12,7 @@ struct Registry {
     timer: HandlerList,
     error: HandlerList,
     spurious: HandlerList,
+    reschedule: HandlerList,
     irq: [HandlerList; IrqLine::ISA_COUNT as usize],
 }
 
@@ -21,6 +22,7 @@ impl Registry {
             timer: HandlerList::new(),
             error: HandlerList::new(),
             spurious: HandlerList::new(),
+            reschedule: HandlerList::new(),
             irq: [const { HandlerList::new() }; IrqLine::ISA_COUNT as usize],
         }
     }
@@ -30,6 +32,7 @@ impl Registry {
             LocalInterruptKind::Timer => &self.timer,
             LocalInterruptKind::Error => &self.error,
             LocalInterruptKind::Spurious => &self.spurious,
+            LocalInterruptKind::Reschedule => &self.reschedule,
         }
     }
 

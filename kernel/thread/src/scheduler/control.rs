@@ -6,6 +6,7 @@ use roxy_utils::preemption;
 use super::{
     SCHEDULER,
     reap::{notify_exit, notify_reaped},
+    state,
 };
 
 /// True once the bootstrap processor has finished boot and wants application processors to take
@@ -40,8 +41,10 @@ pub fn start() -> ! {
             notify_exit(prepared.exiting);
 
             if let Some(pending_switch) = prepared.pending_switch {
+                state::mark_idle(false);
                 pending_switch.perform();
             } else {
+                state::mark_idle(true);
                 CurrentArchitectureBackend::wait_for_interrupt();
             }
         }

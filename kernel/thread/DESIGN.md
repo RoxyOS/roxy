@@ -86,10 +86,13 @@ The bootstrap processor runs the whole boot: it is always cleared to dispatch, a
 initial process itself. Application processors each run their own scheduler control loop with a
 per-CPU timer but are held behind an `APS_READY` gate until `kernel-main` has spawned the initial
 process, so they never steal the boot thread. After readiness they dispatch runnable threads from
-the shared queue. The run queue round-robins by a flat index; a thread is marked `Running` on
-dispatch so two CPUs cannot grab the same thread, but there is no mechanism yet to hand a runnable
-thread to a free AP or IPI-wake one. It has no priorities, CPU affinity, or process-level
-multi-threading policy.
+the shared queue.
+
+Idle application processors are tracked in a shared `IDLE` array and woken by a reschedule IPI
+whenever a thread becomes runnable (`enqueue`/`wake`), so a free AP picks up work immediately
+rather than waiting for its next timer tick. A thread is marked `Running` on dispatch so two CPUs
+cannot grab the same thread. The run queue still round-robins by a flat index and there is no load
+balancing, CPU affinity, or process-level multi-threading policy.
 
 The scheduler receives opaque wait keys from higher-level wait sources. It does not own timer
 deadlines or relative-duration policy. Timed waits currently have no signal interruption or

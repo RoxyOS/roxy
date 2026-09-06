@@ -58,6 +58,7 @@ tables, letting the AP switch stacks before switching CR3.
 - Application processors are held behind an `APS_READY` gate until the BSP has spawned the initial
   process, so they cannot steal the boot thread or run userspace before devices and the process
   table are ready. Each AP then dispatches runnable threads and runs its userspace on its own
-  kernel stack; an IPI to wake idle APs on enqueue/wake is still to be added (Phase B3b).
+  kernel stack. A shared `IDLE` array plus a reschedule IPI wakes a free AP immediately when a
+  thread becomes runnable, instead of waiting for the next timer tick.
 - In test (`kernel-test`) builds `initialize` is not called (the call is gated out in `kernel-main`),
   so APs are never released and cannot interfere with the serial-based test harness.

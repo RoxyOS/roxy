@@ -11,6 +11,7 @@ pub(super) const TIMER_VECTOR: u8 = 0xf0;
 pub(super) const ERROR_VECTOR: u8 = 0xfe;
 pub(super) const SPURIOUS_VECTOR: u8 = 0xff;
 pub(super) const IRQ_VECTOR_BASE: u8 = 0x20;
+pub(super) const RESCHEDULE_VECTOR: u8 = 0xef;
 
 static HANDLER: AtomicUsize = AtomicUsize::new(0);
 
@@ -20,6 +21,7 @@ pub(super) const fn vector(interrupt: Interrupt) -> u8 {
             LocalInterruptKind::Timer => TIMER_VECTOR,
             LocalInterruptKind::Error => ERROR_VECTOR,
             LocalInterruptKind::Spurious => SPURIOUS_VECTOR,
+            LocalInterruptKind::Reschedule => RESCHEDULE_VECTOR,
         },
         Interrupt::Irq(line) => IRQ_VECTOR_BASE + line.number(),
     }
@@ -52,6 +54,10 @@ pub(super) extern "x86-interrupt" fn error(_frame: InterruptStackFrame) {
 
 pub(super) extern "x86-interrupt" fn spurious(_frame: InterruptStackFrame) {
     dispatch(Interrupt::Local(LocalInterruptKind::Spurious));
+}
+
+pub(super) extern "x86-interrupt" fn reschedule(_frame: InterruptStackFrame) {
+    dispatch(Interrupt::Local(LocalInterruptKind::Reschedule));
 }
 
 macro_rules! irq_stub {

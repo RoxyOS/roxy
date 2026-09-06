@@ -70,6 +70,22 @@ pub(super) fn current_id() -> CpuId {
         )
 }
 
+/// Returns the hardware APIC id of the given logical slot, for addressing an IPI.
+///
+/// # Panics
+///
+/// Panics when the slot has not been registered.
+pub(super) fn apic_id_for(slot: CpuId) -> u32 {
+    let map = MAP.lock();
+    map.entries[..map.count]
+        .iter()
+        .find(|entry| entry.slot == slot)
+        .map_or_else(
+            || panic!("CPU slot {slot} is not registered"),
+            |entry| entry.apic_id,
+        )
+}
+
 /// Reads the current CPU's hardware APIC id via CPUID leaf 1 (`EBX[31:24]`, Initial APIC ID).
 ///
 /// CPUID is used instead of the x2APIC ID MSR so this works before x2APIC mode is enabled.

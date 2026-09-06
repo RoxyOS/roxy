@@ -292,6 +292,7 @@ fn create_idt() -> InterruptDescriptorTable {
         idt[interrupt::TIMER_VECTOR].set_handler_fn(interrupt::timer);
         idt[interrupt::ERROR_VECTOR].set_handler_fn(interrupt::error);
         idt[interrupt::SPURIOUS_VECTOR].set_handler_fn(interrupt::spurious);
+        idt[interrupt::RESCHEDULE_VECTOR].set_handler_fn(interrupt::reschedule);
         idt[interrupt::IRQ_VECTOR_BASE].set_handler_fn(interrupt::irq0);
         idt[interrupt::IRQ_VECTOR_BASE + 1].set_handler_fn(interrupt::irq1);
         idt[interrupt::IRQ_VECTOR_BASE + 2].set_handler_fn(interrupt::irq2);

@@ -36,6 +36,8 @@ pub enum LocalInterruptKind {
     Timer,
     Error,
     Spurious,
+    /// Reschedule IPI: a wake signal sent to an idle application processor.
+    Reschedule,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -165,6 +167,9 @@ pub trait Architecture: sealed::Sealed {
     fn interrupt_vector(interrupt: Interrupt) -> u8;
 
     fn current_cpu_id() -> CpuId;
+
+    /// Returns the hardware APIC id of the given logical CPU slot, for targeting an IPI.
+    fn hardware_apic_id(cpu: CpuId) -> u32;
 
     /// Returns the current stack pointer value.
     fn current_stack_pointer() -> u64;

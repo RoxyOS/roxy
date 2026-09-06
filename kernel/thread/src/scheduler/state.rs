@@ -1,5 +1,7 @@
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, Ordering};
 
+use roxy_arch::{Architecture, CpuId, CurrentArchitectureBackend, MAX_CPUS};
 use roxy_cpu::CpuLocal;
 use roxy_utils::Lock;
 
@@ -124,4 +126,42 @@ pub(super) fn local() -> roxy_utils::LockGuard<'static, LocalScheduler> {
 /// `scheduler::initialize`; each AP will do it in `ap_main_2` once SMP is enabled.
 pub(super) fn initialize_local() {
     LOCAL.initialize_current(Lock::new(LocalScheduler::new()));
+}
+
+/// Whether each CPU is idle, i.e. currently blocked in `wait_for_interrupt` with no thread to run.
+///
+/// Each CPU updates only its own slot. The array is shared so a CPU doing an `enqueue`/`wake` can
+/// find idle application processors to reschedule via an IPI; `mark_idle`/`wake_idle_aps` keep it
+/// consistent. This is cross-CPU readable despite `LocalScheduler.current` being CPU-local.
+static IDLE: [AtomicBool; MAX_CPUS] = [const { AtomicBool::new(false) }; MAX_CPUS];
+
+fn cpu_index() -> usize {
+    let index = CurrentArchitectureBackend::current_cpu_id().get() as usize;
+    assert!(
+        index < MAX_CPUS,
+        "CPU id {index} exceeds MAX_CPUS ({MAX_CPUS})"
+    );
+    index
+}
+
+/// Marks the current CPU as idle (about to block in `wait_for_interrupt`) or busy (running a
+/// thread).
+pub(super) fn mark_idle(idle: bool) {
+    IDLE[cpu_index()].store(idle, Ordering::Release);
+}
+
+/// Wakes every idle application processor so it re-enters its dispatch loop after a thread became
+/// runnable.
+///
+/// Must be called with interrupts disabled. The current CPU is skipped (it is the one performing
+/// the enqueue/wake and is not idle itself).
+pub(super) fn wake_idle_aps() {
+    let current = CurrentArchitectureBackend::current_cpu_id();
+    for (index, idle) in IDLE.iter().enumerate() {
+        let cpu = CpuId::new(u32::try_from(index).expect("MAX_CPUS fits in u32"));
+        if cpu == current || !idle.load(Ordering::Acquire) {
+            continue;
+        }
+        roxy_interrupt::send_reschedule_ipi(cpu);
+    }
 }

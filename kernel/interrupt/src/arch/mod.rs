@@ -17,6 +17,9 @@ pub(crate) trait InterruptBackend: sealed::Sealed {
 
     fn error_flags() -> u8;
 
+    /// Sends a reschedule IPI (wake signal) to the given target CPU using this controller.
+    fn send_ipi(target: roxy_arch::CpuId);
+
     fn mask_irq(line: roxy_arch::IrqLine);
 
     fn unmask_irq(line: roxy_arch::IrqLine);
