@@ -1,4 +1,5 @@
 mod action;
+mod arch;
 mod build_kernel;
 mod check;
 mod cli;
@@ -17,11 +18,11 @@ fn main() -> Result<()> {
 
     if let Some(arg) = cli.arg {
         match arg {
-            Arg::Check => check::run(),
-            Arg::Image => action::image(),
-            Arg::Rootfs => action::rootfs(),
-            Arg::Run => action::run(),
-            Arg::Test => action::test(),
+            Arg::Check => check::run(cli.arch),
+            Arg::Image => action::image(cli.arch),
+            Arg::Rootfs => action::rootfs(cli.arch),
+            Arg::Run => action::run(cli.arch),
+            Arg::Test => action::test(cli.arch),
         }?;
     }
 

@@ -2,26 +2,28 @@ use std::path::PathBuf;
 
 use anyhow::{Result, ensure};
 
-pub(crate) fn build_kernel() -> Result<PathBuf> {
-    println!("==> Building kernel");
-    crate::cmd!(
-        "cargo build --package kernel-main --features kernel --target x86_64-unknown-none --release"
-    )?;
+use crate::arch::Arch;
 
-    kernel_path()
+pub(crate) fn build_kernel(arch: Arch) -> Result<PathBuf> {
+    println!("==> Building kernel ({})", arch.triple());
+    let triple = arch.triple();
+    crate::cmd!("cargo build --package kernel-main --features kernel --target {triple} --release")?;
+
+    kernel_path(arch)
 }
 
-pub(crate) fn build_test_kernel() -> Result<PathBuf> {
-    println!("==> Building test kernel");
+pub(crate) fn build_test_kernel(arch: Arch) -> Result<PathBuf> {
+    println!("==> Building test kernel ({})", arch.triple());
+    let triple = arch.triple();
     crate::cmd!(
-        "cargo build --package kernel-main --features kernel,kernel-test --target x86_64-unknown-none --release"
+        "cargo build --package kernel-main --features kernel,kernel-test --target {triple} --release"
     )?;
 
-    kernel_path()
+    kernel_path(arch)
 }
 
-fn kernel_path() -> Result<PathBuf> {
-    let kernel = workspace_root().join("target/x86_64-unknown-none/release/kernel-main");
+fn kernel_path(arch: Arch) -> Result<PathBuf> {
+    let kernel = workspace_root().join(format!("target/{}/release/kernel-main", arch.triple()));
     ensure!(
         kernel.is_file(),
         "kernel ELF was not produced at {}",

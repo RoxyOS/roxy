@@ -8,13 +8,15 @@ use std::{
 use anyhow::{Context, Result, ensure};
 use xshell::Shell;
 
+use crate::arch::Arch;
+
 const IMAGE_SIZE: u64 = 512 * 1024 * 1024;
 const EXT4_MAGIC_OFFSET: u64 = 1024 + 0x38;
 const EXT4_MAGIC: [u8; 2] = [0x53, 0xef];
 
-pub(crate) fn get_or_build() -> Result<PathBuf> {
+pub(crate) fn get_or_build(arch: Arch) -> Result<PathBuf> {
     let workspace = crate::build_kernel::workspace_root();
-    let output = output_path(&workspace);
+    let output = output_path(&workspace, arch);
 
     if output.is_file() && has_ext4_superblock(&output)? {
         println!("==> Reusing root filesystem: {}", output.display());
@@ -26,14 +28,14 @@ pub(crate) fn get_or_build() -> Result<PathBuf> {
         println!("==> Cached root filesystem is invalid; rebuilding");
     }
 
-    build()
+    build(arch)
 }
 
-pub(crate) fn build() -> Result<PathBuf> {
-    println!("==> Building root filesystem");
+pub(crate) fn build(arch: Arch) -> Result<PathBuf> {
+    println!("==> Building root filesystem ({})", arch.name());
 
     let workspace = crate::build_kernel::workspace_root();
-    let output = output_path(&workspace);
+    let output = output_path(&workspace, arch);
     let staging = workspace.join("target/roxy/rootfs");
 
     fs::create_dir_all(output.parent().unwrap())
@@ -47,8 +49,8 @@ pub(crate) fn build() -> Result<PathBuf> {
     Ok(output)
 }
 
-fn output_path(workspace: &Path) -> PathBuf {
-    workspace.join("target/roxy/rootfs.img")
+fn output_path(workspace: &Path, arch: Arch) -> PathBuf {
+    workspace.join(format!("target/roxy/rootfs-{}.img", arch.name()))
 }
 
 fn has_ext4_superblock(path: &Path) -> Result<bool> {

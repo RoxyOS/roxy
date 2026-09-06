@@ -1,6 +1,10 @@
 use anyhow::Result;
 
-pub(crate) fn run() -> Result<()> {
+use crate::arch::Arch;
+
+pub(crate) fn run(arch: Arch) -> Result<()> {
+    let triple = arch.triple();
+
     println!("==> Checking formatting");
     crate::cmd!("cargo fmt --all --check")?;
 
@@ -11,19 +15,17 @@ pub(crate) fn run() -> Result<()> {
     crate::cmd!("cargo clippy --workspace --all-targets -- -D warnings")?;
 
     println!("==> Checking release kernel");
+    crate::cmd!("cargo check --package kernel-main --features kernel --target {triple} --release")?;
     crate::cmd!(
-        "cargo check --package kernel-main --features kernel --target x86_64-unknown-none --release"
-    )?;
-    crate::cmd!(
-        "cargo clippy --package kernel-main --features kernel --target x86_64-unknown-none --release -- -D warnings"
+        "cargo clippy --package kernel-main --features kernel --target {triple} --release -- -D warnings"
     )?;
 
     println!("==> Checking release test kernel");
     crate::cmd!(
-        "cargo check --package kernel-main --features kernel,kernel-test --target x86_64-unknown-none --release"
+        "cargo check --package kernel-main --features kernel,kernel-test --target {triple} --release"
     )?;
     crate::cmd!(
-        "cargo clippy --package kernel-main --features kernel,kernel-test --target x86_64-unknown-none --release -- -D warnings"
+        "cargo clippy --package kernel-main --features kernel,kernel-test --target {triple} --release -- -D warnings"
     )?;
 
     println!("==> Checking diff whitespace");

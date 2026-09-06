@@ -6,6 +6,8 @@ use std::{
 
 use anyhow::{Context, Result};
 
+use crate::arch::Arch;
+
 use super::Mode;
 
 pub(super) fn build(
@@ -14,10 +16,15 @@ pub(super) fn build(
     rootfs: &Path,
     limine: &Path,
     mode: Mode,
+    arch: Arch,
 ) -> Result<PathBuf> {
-    let (staging_name, output_name) = match mode {
-        Mode::Production => ("iso-root", "roxy.iso"),
-        Mode::Test => ("test-iso-root", "roxy-test.iso"),
+    let staging_name = match mode {
+        Mode::Production => "iso-root",
+        Mode::Test => "test-iso-root",
+    };
+    let output_name = match mode {
+        Mode::Production => format!("roxy-{}.iso", arch.name()),
+        Mode::Test => format!("roxy-test-{}.iso", arch.name()),
     };
     let staging = root.join(staging_name);
     let output = root.join(output_name);

@@ -2,20 +2,22 @@ use std::{env, path::Path, path::PathBuf, process::Command};
 
 use anyhow::{Result, bail, ensure};
 
-pub(super) fn run(image: &Path) -> Result<()> {
+use crate::arch::Arch;
+
+pub(super) fn run(image: &Path, arch: Arch) -> Result<()> {
     println!("==> Starting virtual machine");
 
-    let mut command = command(image)?;
+    let mut command = command(image, arch)?;
     command.arg("-no-shutdown");
     ensure!(command.status()?.success(), "QEMU failed");
 
     Ok(())
 }
 
-pub(super) fn test(image: &Path) -> Result<()> {
+pub(super) fn test(image: &Path, arch: Arch) -> Result<()> {
     println!("==> Running kernel tests");
 
-    let mut command = command(image)?;
+    let mut command = command(image, arch)?;
     command.args([
         "-device",
         "isa-debug-exit,iobase=0xf4,iosize=0x04",
@@ -30,10 +32,10 @@ pub(super) fn test(image: &Path) -> Result<()> {
     }
 }
 
-fn command(image: &Path) -> Result<Command> {
-    let firmware = firmware()?;
-    let mut command = Command::new("qemu-system-x86_64");
-    command.args(["-M", "q35"]);
+fn command(image: &Path, arch: Arch) -> Result<Command> {
+    let firmware = firmware(arch)?;
+    let mut command = Command::new(arch.qemu_runner());
+    command.args(["-M", arch.qemu_machine()]);
 
     if cfg!(target_os = "linux") && Path::new("/dev/kvm").exists() {
         command.args(["-enable-kvm", "-cpu", "host"]);
@@ -60,14 +62,21 @@ fn command(image: &Path) -> Result<Command> {
     Ok(command)
 }
 
-fn firmware() -> Result<PathBuf> {
-    let firmware = env::var_os("OVMF_CODE").map(PathBuf::from);
-    let firmware = firmware.filter(|path| path.is_file());
+fn firmware(arch: Arch) -> Result<PathBuf> {
+    match arch {
+        Arch::X86_64 => {
+            let firmware = env::var_os("OVMF_CODE").map(PathBuf::from);
+            let firmware = firmware.filter(|path| path.is_file());
 
-    ensure!(
-        firmware.is_some(),
-        "OVMF_CODE must point to an OVMF code image"
-    );
+            ensure!(
+                firmware.is_some(),
+                "OVMF_CODE must point to an OVMF code image"
+            );
 
-    Ok(firmware.unwrap())
+            Ok(firmware.unwrap())
+        }
+        Arch::Aarch64 => {
+            bail!("aarch64 boot is not yet wired: the runner has no firmware/EFI path for aarch64")
+        }
+    }
 }

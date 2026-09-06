@@ -6,36 +6,38 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
+use crate::arch::Arch;
+
 #[derive(Clone, Copy)]
 pub(super) enum Mode {
     Production,
     Test,
 }
 
-pub(crate) fn build_iso(kernel: &Path, rootfs: &Path) -> Result<()> {
+pub(crate) fn build_iso(kernel: &Path, rootfs: &Path, arch: Arch) -> Result<()> {
     println!("==> Building boot image");
 
-    create_iso(kernel, rootfs, Mode::Production)?;
+    create_iso(kernel, rootfs, Mode::Production, arch)?;
 
     Ok(())
 }
 
-pub(crate) fn run(kernel: &Path, rootfs: &Path) -> Result<()> {
-    let image = create_iso(kernel, rootfs, Mode::Production)?;
+pub(crate) fn run(kernel: &Path, rootfs: &Path, arch: Arch) -> Result<()> {
+    let image = create_iso(kernel, rootfs, Mode::Production, arch)?;
 
-    qemu::run(&image)
+    qemu::run(&image, arch)
 }
 
-pub(crate) fn test(kernel: &Path, rootfs: &Path) -> Result<()> {
-    let image = create_iso(kernel, rootfs, Mode::Test)?;
+pub(crate) fn test(kernel: &Path, rootfs: &Path, arch: Arch) -> Result<()> {
+    let image = create_iso(kernel, rootfs, Mode::Test, arch)?;
 
-    qemu::test(&image)
+    qemu::test(&image, arch)
 }
 
-fn create_iso(kernel: &Path, rootfs: &Path, mode: Mode) -> Result<PathBuf> {
+fn create_iso(kernel: &Path, rootfs: &Path, mode: Mode, arch: Arch) -> Result<PathBuf> {
     let root = output_root();
     let limine = limine::prepare(&root)?;
-    iso::build(&root, kernel, rootfs, &limine, mode)
+    iso::build(&root, kernel, rootfs, &limine, mode, arch)
 }
 
 fn output_root() -> PathBuf {
