@@ -55,6 +55,8 @@ pub(super) enum ThreadKind {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ThreadState {
     Runnable,
+    /// Currently running on one CPU; not available for dispatch by other CPUs.
+    Running,
     Blocked(BlockState),
     Exiting,
 }

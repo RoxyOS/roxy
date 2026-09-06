@@ -66,6 +66,7 @@ impl Scheduler {
                 exiting: None,
             };
         };
+        self.entry(next).state = ThreadState::Running;
         let mut local = local();
         local.current = Some(next);
         let control = local
@@ -96,8 +97,13 @@ impl Scheduler {
             };
         };
 
+        // Return the preempted thread to the runnable pool so other CPUs may dispatch it.
+        self.entry(current).state = ThreadState::Runnable;
+
         let Some(next) = self.next_runnable(ThreadIndex((current.0 + 1) % self.entries.len()))
         else {
+            // No runnable thread remains; keep the current thread running.
+            self.entry(current).state = ThreadState::Running;
             return ScheduleResult {
                 pending_switch: None,
                 reaped,
@@ -106,6 +112,8 @@ impl Scheduler {
         };
 
         if next == current {
+            // Only the current thread is runnable; keep it running.
+            self.entry(current).state = ThreadState::Running;
             return ScheduleResult {
                 pending_switch: None,
                 reaped,
@@ -113,6 +121,7 @@ impl Scheduler {
             };
         }
 
+        self.entry(next).state = ThreadState::Running;
         let previous = ptr::from_mut(self.entry(current).thread.context());
         local().current = Some(next);
 
@@ -137,9 +146,8 @@ impl Scheduler {
         let mut local = local();
         local.current = next;
 
-        match next {
-            Some(next) => self.prepare_switch_from(previous, next),
-            None => PendingContextSwitch {
+        let Some(next) = next else {
+            return PendingContextSwitch {
                 previous,
                 next: ptr::from_ref(
                     local
@@ -148,8 +156,11 @@ impl Scheduler {
                 ),
                 next_user_thread: None,
                 next_kernel_stack_top: None,
-            },
-        }
+            };
+        };
+
+        self.entry(next).state = ThreadState::Running;
+        self.prepare_switch_from(previous, next)
     }
 
     pub(super) fn wake_unconditionally(&mut self, thread_id: ThreadId) -> bool {
@@ -194,6 +205,9 @@ impl Scheduler {
         self.pending_reap = Some(current);
 
         let previous = ptr::from_mut(self.entry(current).thread.context());
+        if let Some(next) = next {
+            self.entry(next).state = ThreadState::Running;
+        }
         let pending_switch = match next {
             Some(next) => self.prepare_switch_from(previous, next),
             None => PendingContextSwitch {
@@ -282,6 +296,7 @@ mod tests {
         scheduler.enqueue(first, ThreadKind::Kernel);
         scheduler.enqueue(second, ThreadKind::Kernel);
         local().current = Some(ThreadIndex(0));
+        scheduler.entries[0].state = ThreadState::Running;
 
         let _pending = scheduler.prepare_block(None);
         assert_eq!(
