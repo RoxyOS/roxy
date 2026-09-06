@@ -55,6 +55,15 @@ package()   { meson_install / autotools_install … }
 
 For meson projects use the helpers from `build-systems/meson.sh`; for autotools use `build-systems/autotools.sh`, etc.
 
+### Static per-package files
+
+Static files that belong to a package (configs, scripts, drivers) live **beside the recipe, not
+inlined in a heredoc**: `distro/recipes/<name>/<file>`. Reference them from recipe functions as
+`"${base_dir}/recipes/<name>/<file>"` — `base_dir` is the `distro/` tree, which is mounted into
+the build container. Do **not** use `recipe_dir` for this: it is the host-side path and is not
+accessible inside the container (existing recipes never use it). Examples: `xorg-server/xorg.conf`,
+`xinit/xinitrc`, `xf86-input-evdev/evdev-input.conf`, `libc-test/config.mak`.
+
 After writing the recipe, do `jinx build <name>` to test the recipe.
 
 ## Related

@@ -44,7 +44,7 @@ No function is required — a recipe can exist purely to provide sources via `fr
 | Variable | Meaning |
 |---|---|
 | `name` | Package name (dir basename). |
-| `recipe_dir` | Absolute path of recipe dir. |
+| `recipe_dir` | Host-side absolute path of recipe dir; **not accessible from inside the build container** — reference static package files via `${base_dir}/recipes/<name>/<file>` instead (see `add-package.md`). |
 | `source_dir` | Unpacked source tree path. |
 | `prefix` | `/usr` (normal) or `/usr/local` (host). |
 | `sysroot` | Populated sysroot in container (`/sysroot`). |
