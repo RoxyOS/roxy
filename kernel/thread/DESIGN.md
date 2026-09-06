@@ -82,11 +82,14 @@ deadline waiters, then applies ordinary scheduler preemption policy.
 - The scheduler validates wait keys but does not own resource-specific wait queues or deadlines.
 - The dispatch hook is registered once during boot before any user thread runs.
 
-The scheduler is currently single-CPU in execution: only the bootstrap processor runs the control
-loop and starts idle. The data plane is already per-CPU shaped (a `LocalScheduler` slot per CPU),
-but the run queue still round-robins by a flat index without dispatching ownership, so a thread
-could be selected by two CPUs at once. SMP dispatch, per-CPU idle and timer preemption, and IPI
-wakeups are deferred. It has no priorities, CPU affinity, or process-level multi-threading policy.
+The bootstrap processor runs the whole boot: it is always cleared to dispatch, and it runs the
+initial process itself. Application processors each run their own scheduler control loop with a
+per-CPU timer but are held behind an `APS_READY` gate until `kernel-main` has spawned the initial
+process, so they never steal the boot thread. After readiness they dispatch runnable threads from
+the shared queue. The run queue round-robins by a flat index; a thread is marked `Running` on
+dispatch so two CPUs cannot grab the same thread, but there is no mechanism yet to hand a runnable
+thread to a free AP or IPI-wake one. It has no priorities, CPU affinity, or process-level
+multi-threading policy.
 
 The scheduler receives opaque wait keys from higher-level wait sources. It does not own timer
 deadlines or relative-duration policy. Timed waits currently have no signal interruption or

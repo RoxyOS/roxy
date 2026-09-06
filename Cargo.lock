@@ -912,6 +912,8 @@ dependencies = [
  "roxy-interrupt",
  "roxy-memory",
  "roxy-serial",
+ "roxy-thread",
+ "roxy-time",
 ]
 
 [[package]]

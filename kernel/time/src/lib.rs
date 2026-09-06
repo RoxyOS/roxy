@@ -27,6 +27,19 @@ pub fn initialize_periodic_timer() {
     timer::initialize();
 }
 
+/// Initialises an application processor's periodic timer without re-calibrating.
+///
+/// The bootstrap processor must have called [`initialize_periodic_timer`] first so that the
+/// calibrated LAPIC timer count is available. This function does not touch the shared PIT.
+///
+/// # Panics
+///
+/// Panics when the BSP has not calibrated yet, interrupts are enabled, or the per-CPU slot is
+/// already initialised.
+pub fn initialize_ap_timer() {
+    timer::initialize_ap();
+}
+
 /// Starts periodic timer interrupts for the current CPU.
 ///
 /// # Panics

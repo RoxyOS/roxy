@@ -12,6 +12,8 @@ roxy-arch.workspace = true
 roxy-interrupt.workspace = true
 roxy-memory.workspace = true
 roxy-serial.workspace = true
+roxy-thread.workspace = true
+roxy-time.workspace = true
 
 [lints]
 workspace = true

@@ -58,11 +58,12 @@ pub extern "C" fn _start() -> ! {
         hhdm_offset: boot_info.hhdm_offset,
     });
     roxy_cpu::current_cpu().initialize(interrupt_init_result.hardware_id());
-    roxy_smp::initialize();
     roxy_time::initialize_periodic_timer();
     roxy_timer_wait::initialize();
     roxy_posix_timer::initialize();
     roxy_thread::initialize();
+    #[cfg(not(feature = "kernel-test"))]
+    roxy_smp::initialize();
     roxy_ps2::initialize();
     roxy_ps2::register_psaux(&device_registry);
     let (keyboard_event, keyboard_listener) = roxy_evdev_keyboard::create();
@@ -135,6 +136,7 @@ fn kernel_main() -> ! {
         roxy_process::process_session_id(init).expect("init process must be a session leader");
     roxy_tty::bind_controlling_terminal(init_session, init_pgid);
 
+    roxy_thread::scheduler::allow_ap_dispatch();
     roxy_thread::scheduler::start()
 }
 

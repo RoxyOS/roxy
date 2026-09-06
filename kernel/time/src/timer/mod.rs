@@ -17,12 +17,19 @@ const TICK_NANOS: u64 = 1_000_000_000 / TIMER_HZ;
 trait TimerBackend: sealed::Sealed {
     fn initialize();
 
+    fn initialize_ap();
+
     fn start();
 }
 
 pub(super) fn initialize() {
     CurrentTimerBackend::initialize();
     roxy_interrupt::register_local_handler(LocalInterruptKind::Timer, on_tick);
+}
+
+pub(super) fn initialize_ap() {
+    CurrentTimerBackend::initialize_ap();
+    // No handler registration — the BSP already registered the global tick handler.
 }
 
 pub(super) fn start() {

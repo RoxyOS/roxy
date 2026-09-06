@@ -36,16 +36,15 @@ pub unsafe extern "C" fn ap_main_1(_info: &limine::mp::MpInfo) -> ! {
 
 /// Runs on the AP's own kernel stack under the kernel page tables.
 ///
-/// Everything after the stack/page-table switch is ordinary kernel code: it can use the heap and
-/// device mappings, so this is also where the AP would enter a per-CPU scheduler idle loop in a
-/// later phase.
+/// Everything after the stack/page-table switch is ordinary kernel code: it initialises the
+/// per-CPU local APIC, scheduler slot, and timer, then enters the scheduler control loop.
 extern "C" fn ap_main_2() -> ! {
     let cpu_id = CurrentArchitectureBackend::current_cpu_id();
     s_println!("AP main on cpu {cpu_id}: hello world");
 
     roxy_interrupt::initialize_ap();
-
-    loop {
-        CurrentArchitectureBackend::wait_for_interrupt();
-    }
+    roxy_thread::scheduler::initialize_local();
+    roxy_time::initialize_ap_timer();
+    roxy_time::start_periodic_timer();
+    roxy_thread::scheduler::start();
 }

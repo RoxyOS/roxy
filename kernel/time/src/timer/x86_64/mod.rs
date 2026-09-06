@@ -1,5 +1,6 @@
 mod pit;
 
+use spin::Once;
 use x2apic::lapic::{LocalApic, LocalApicBuilder, TimerDivide, TimerMode};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, Interrupt, LocalInterruptKind};
@@ -9,6 +10,9 @@ use roxy_utils::Lock;
 use super::{TIMER_HZ, TimerBackend, sealed};
 
 static APIC_TIMER: CpuLocal<Lock<X2ApicTimer>> = CpuLocal::new();
+
+/// Calibrated LAPIC timer initial count, shared with APs so they skip the PIT-based calibration.
+static CALIBRATED_COUNT: Once<u32> = Once::new();
 
 pub(super) struct X86_64Timer;
 
@@ -27,6 +31,25 @@ impl TimerBackend for X86_64Timer {
 
         let mut local_apic = build_local_apic();
         let initial_count = calibrate_timer(&mut local_apic);
+        CALIBRATED_COUNT.call_once(|| initial_count);
+        // SAFETY: The timer remains masked while its periodic configuration is installed.
+        unsafe {
+            local_apic.set_timer_mode(TimerMode::Periodic);
+            local_apic.set_timer_divide(TimerDivide::Div16);
+            local_apic.set_timer_initial(initial_count);
+            local_apic.disable_timer();
+        }
+
+        APIC_TIMER.initialize_current(Lock::new(X2ApicTimer { local_apic }));
+    }
+
+    fn initialize_ap() {
+        assert!(!CurrentArchitectureBackend::interrupts_enabled());
+
+        let initial_count = *CALIBRATED_COUNT
+            .get()
+            .expect("BSP must calibrate the timer first");
+        let mut local_apic = build_local_apic();
         // SAFETY: The timer remains masked while its periodic configuration is installed.
         unsafe {
             local_apic.set_timer_mode(TimerMode::Periodic);

@@ -24,7 +24,15 @@ registers a timer interrupt handler that advances monotonic time by one fixed ti
 
 ## Concurrency and limits
 
-The monotonic nanosecond counter is atomic and may be read without a lock. Backend initialization
-and timer start require interrupts to be disabled. The current model assumes one authoritative BSP
-periodic timer and does not correct drift, accept later wall-clock updates, track time zones, or
-provide per-CPU clocks. Sleep and timeout queues belong to higher-level subsystems.
+The monotonic nanosecond counter is atomic and may be read without a lock. Each CPU runs its own
+periodic LAPIC timer and advances the same global monotonic counter, which therefore records wall
+elapsed time without per-CPU clocks. Backend initialization and timer start require interrupts to
+be disabled.
+
+Only the bootstrap processor calibrates the timer against PIT channel 2; it stores the resulting
+LAPIC initial count in a shared slot that every application processor then reuses. This keeps the
+single shared PIT from being driven concurrently. The timer handler itself is global and registered
+exactly once, so per-CPU timers all invoke the same tick advance.
+
+The current model does not correct drift, accept later wall-clock updates, or track time zones.
+Sleep and timeout queues belong to higher-level subsystems.

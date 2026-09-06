@@ -8,7 +8,7 @@ use core::num::NonZeroU64;
 use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
 use roxy_utils::Lock;
 
-pub use control::{exit_current, start};
+pub use control::{allow_ap_dispatch, exit_current, start};
 pub use reap::{
     ThreadExitHandler, ThreadReapedHandler, register_exit_handler, register_reaped_handler,
 };
@@ -23,6 +23,14 @@ static SCHEDULER: Lock<Scheduler> = Lock::new(Scheduler::new());
 pub fn initialize() {
     state::initialize_local();
     roxy_interrupt::register_local_handler(LocalInterruptKind::Timer, control::on_timer_interrupt);
+}
+
+/// Initialises the current CPU's scheduler slot without registering the timer handler.
+///
+/// Each AP calls this once before entering the scheduler control loop. The timer handler is
+/// already registered by the bootstrap processor.
+pub fn initialize_local() {
+    state::initialize_local();
 }
 
 /// Creates and enqueues a permanently runnable kernel thread.
