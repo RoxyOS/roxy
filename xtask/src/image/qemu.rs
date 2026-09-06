@@ -49,7 +49,7 @@ fn command(image: &Path) -> Result<Command> {
         "-m",
         "4G",
         "-smp",
-        "3",
+        "16",
         "-serial",
         "stdio",
         "-monitor",
