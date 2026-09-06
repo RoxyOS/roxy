@@ -10,9 +10,16 @@ use roxy_signal::Signal;
 /// raised in kernel mode, and vectors that cannot be recovered by terminating a single process,
 /// still panic the kernel with the original diagnostic.
 pub(crate) fn handler(context: &ExceptionContext) -> ! {
-    match (is_user_mode(context), fault_signal(context.vector)) {
-        (true, Some(signal)) => terminate_for_fault(signal),
-        _ => report_and_halt(context),
+    match context.vector {
+        // A stop-NMI broadcast by a peer CPU during a system panic/halt. We must stop immediately
+        // without touching the console (don't contend the serial lock with the panicking core) or
+        // going through the panic path (which would re-broadcast and cascade NMI storms). Only the
+        // initiating core confirms the shutdown; peers just halt.
+        ExceptionVector::NonMaskable => CurrentArchitectureBackend::halt_forever(),
+        _ => match (is_user_mode(context), fault_signal(context.vector)) {
+            (true, Some(signal)) => terminate_for_fault(signal),
+            _ => report_and_halt(context),
+        },
     }
 }
 
@@ -30,7 +37,9 @@ fn fault_signal(vector: ExceptionVector) -> Option<Signal> {
         }
         ExceptionVector::DivideError => Some(Signal::FloatingPointException),
         ExceptionVector::InvalidOpcode => Some(Signal::IllegalInstruction),
-        ExceptionVector::DoubleFault => None,
+        // NonMaskable is handled before `fault_signal` is consulted (a stop-NMI always halts);
+        // the `None` keeps this match exhaustive.
+        ExceptionVector::DoubleFault | ExceptionVector::NonMaskable => None,
     }
 }
 
@@ -64,7 +73,7 @@ fn report_and_halt(context: &ExceptionContext) -> ! {
         context.fault_address,
         context.cpu_id
     );
-    CurrentArchitectureBackend::halt_forever()
+    crate::halt_all_cpus()
 }
 
 #[cfg(feature = "kernel-test")]

@@ -6,11 +6,19 @@ mod misc;
 mod registry;
 mod state;
 
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use roxy_arch::{
     Architecture, CpuId, CurrentArchitectureBackend, Interrupt, IrqLine, LocalInterruptKind,
 };
 
 use arch::InterruptBackend;
+
+/// Whether the local APIC (and thus peers) are up at all. Cleared until the BSP's interrupt
+/// subsystem is initialized, so `send_nmi_all` is a no-op during a very early-boot panic when
+/// there are no peers running and touching the uninitialized controller would recurse into the
+/// panic handler.
+static LOCAL_APIC_READY: AtomicBool = AtomicBool::new(false);
 
 pub use state::{InterruptStatistics, current_statistics};
 
@@ -50,6 +58,7 @@ pub fn initialize(platform: InterruptPlatformInfo) -> InterruptInitResult {
 
     CurrentArchitectureBackend::register_interrupt_dispatcher(dispatch::handle);
     let hardware_id = arch::CurrentInterruptBackend::initialize(platform);
+    LOCAL_APIC_READY.store(true, Ordering::Release);
     state::INTERRUPT_STATE.initialize_current(state::InterruptState::new());
     registry::register_local(LocalInterruptKind::Error, misc::record_apic_error);
     registry::register_local(LocalInterruptKind::Spurious, misc::record_spurious);
@@ -63,6 +72,7 @@ pub fn initialize_ap() -> u32 {
     assert!(!CurrentArchitectureBackend::interrupts_enabled());
 
     let hardware_id = arch::CurrentInterruptBackend::initialize_ap();
+    LOCAL_APIC_READY.store(true, Ordering::Release);
     state::INTERRUPT_STATE.initialize_current(state::InterruptState::new());
     hardware_id
 }
@@ -104,6 +114,21 @@ pub fn send_reschedule_ipi(target: CpuId) {
         LocalInterruptKind::Reschedule,
     ));
     arch::CurrentInterruptBackend::send_ipi(target, vector);
+}
+
+/// Broadcasts a stop-request NMI to every other CPU and disables interrupts on this one.
+///
+/// Used to stop the whole machine after an unrecoverable kernel failure; each peer receives the
+/// NMI through its registered `ExceptionHandler` as `ExceptionVector::NonMaskable` and halts,
+/// while the caller should finish with `Architecture::halt_forever` on this CPU. NMI delivery
+/// reaches a peer even when it is running with interrupts disabled (inside a critical section).
+pub fn send_nmi_all() {
+    // Only broadcast once the local APIC is up and peers may be running; a panic during very
+    // early boot (before interrupt init) has no APs to stop, and poking the uninitialised
+    // controller would recurse into the panic handler. The caller still halts this CPU.
+    if LOCAL_APIC_READY.load(Ordering::Acquire) {
+        arch::CurrentInterruptBackend::send_nmi();
+    }
 }
 
 /// Enables delivery for an external IRQ line after its handler is registered.

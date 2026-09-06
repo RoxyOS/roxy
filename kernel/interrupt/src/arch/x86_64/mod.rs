@@ -1,6 +1,6 @@
 mod ioapic;
 
-use x2apic::lapic::{LocalApic, LocalApicBuilder};
+use x2apic::lapic::{IpiAllShorthand, LocalApic, LocalApicBuilder};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend, Interrupt, IrqLine, LocalInterruptKind};
 use roxy_cpu::CpuLocal;
@@ -64,6 +64,18 @@ impl InterruptBackend for X86_64Interrupt {
             // SAFETY: This is a plain fixed-delivery IPI to a registered CPU's physical x2APIC id.
             unsafe {
                 local_apic.send_ipi(vector, apic_id);
+            }
+        });
+    }
+
+    fn send_nmi() {
+        // Disabling interrupts is always safe; they stay disabled because the caller halts.
+        ::x86_64::instructions::interrupts::disable();
+        with_local_apic(|local_apic| {
+            // SAFETY: NMI is edge-triggered and delivered regardless of the target's IF; the
+            // all-except-self destination shorthand reaches every live peer in a single ICR write.
+            unsafe {
+                local_apic.send_nmi_all(IpiAllShorthand::AllExcludingSelf);
             }
         });
     }

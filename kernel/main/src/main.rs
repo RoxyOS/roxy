@@ -140,6 +140,14 @@ fn kernel_main() -> ! {
     roxy_thread::scheduler::start()
 }
 
+pub(crate) fn halt_all_cpus() -> ! {
+    // Ask every other CPU to stop (NMI delivery reaches peers even inside critical sections),
+    // then halt this one. Used by the panic handler and the unrecoverable-exception path so one
+    // fatal failure brings down the whole machine rather than leaving other cores running.
+    roxy_interrupt::send_nmi_all();
+    CurrentArchitectureBackend::halt_forever()
+}
+
 #[panic_handler]
 fn panic(info: &PanicInfo<'_>) -> ! {
     e_println!("Kernel Panic: {info}");
@@ -148,7 +156,7 @@ fn panic(info: &PanicInfo<'_>) -> ! {
     test::exit_failure();
 
     #[cfg(not(feature = "kernel-test"))]
-    CurrentArchitectureBackend::halt_forever()
+    halt_all_cpus()
 }
 
 #[alloc_error_handler]

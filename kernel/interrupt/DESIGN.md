@@ -37,6 +37,15 @@ needs only another vector from the arch crate, not a backend change. The target 
 registered handler: delivery alone wakes it out of the scheduler's `wait_for_interrupt`, after
 which the interrupt is EOI'd and the target re-enters its dispatch loop.
 
+A stop for the whole machine is a different delivery mode, so it is a separate backend method
+rather than another vector. `send_nmi` broadcasts an NMI to every other CPU with the
+all-except-self destination shorthand; it only delivers the NMI, it does not itself halt anyone —
+peers halt because their registered handler stops on `ExceptionVector::NonMaskable`, and the
+initiating core halts itself. NMI is delivered through the target's vector-2 IDT entry
+regardless of its `IF`, so a peer interrupts-disabled inside a critical section is still stopped;
+it must NOT reach such a peer as a normal exception re-entering the panic path. The receiving
+side is the kernel panic/exception policy (`ExceptionVector::NonMaskable`), never this subsystem.
+
 ## Interrupt flow and invariants
 
 ```text

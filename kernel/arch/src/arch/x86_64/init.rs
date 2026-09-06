@@ -287,6 +287,8 @@ fn create_idt() -> InterruptDescriptorTable {
         idt.general_protection_fault
             .set_handler_fn(exception::general_protection_fault);
         idt.page_fault.set_handler_fn(exception::page_fault);
+        idt.non_maskable_interrupt
+            .set_handler_fn(exception::non_maskable_interrupt);
         idt[interrupt::TIMER_VECTOR].set_handler_fn(interrupt::timer);
         idt[interrupt::ERROR_VECTOR].set_handler_fn(interrupt::error);
         idt[interrupt::SPURIOUS_VECTOR].set_handler_fn(interrupt::spurious);

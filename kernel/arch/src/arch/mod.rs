@@ -29,6 +29,10 @@ pub enum ExceptionVector {
     DoubleFault,
     GeneralProtectionFault,
     PageFault,
+    /// Hardware `#NMI` (architecturally fixed to vector 2). The kernel's only NMI use is the
+    /// stop-request broadcast sent by `roxy_interrupt::send_nmi_all` to halt peer CPUs after
+    /// an unrecoverable failure on this one; the registered `ExceptionHandler` decides what to do.
+    NonMaskable,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

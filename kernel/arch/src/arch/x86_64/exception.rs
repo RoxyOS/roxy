@@ -76,6 +76,10 @@ pub(super) extern "x86-interrupt" fn page_fault(
     )
 }
 
+pub(super) extern "x86-interrupt" fn non_maskable_interrupt(frame: InterruptStackFrame) {
+    dispatch(ExceptionVector::NonMaskable, &frame, None, None)
+}
+
 pub(super) extern "x86-interrupt" fn double_fault(frame: InterruptStackFrame, code: u64) -> ! {
     dispatch(ExceptionVector::DoubleFault, &frame, Some(code), None)
 }

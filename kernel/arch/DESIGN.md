@@ -92,6 +92,14 @@ initialization are kernel faults rather than recoverable userspace errors. The b
 assumes the BSP-oriented CPU model exposed by the rest of the kernel and provides no portability
 promise beyond the implemented target.
 
+An unrecoverable failure stops the whole machine, not just the faulting core. The first core to
+fail (the panic handler or the unrecoverable-exception path) asks `roxy-interrupt` to broadcast a
+stop NMI to every other CPU and then halts; each peer receives that NMI through the `NonMaskable`
+exception vector (architecturally fixed to IDT slot 2) and halts without re-entering the panic
+path or taking seqlocks, so a peer that was interrupted inside a critical section is not torn.
+NMI delivery ignores the target `IF`, which is what guarantees even a peer running with interrupts
+disabled is stopped.
+
 ## Design decisions
 - The trait exposes semantic operations such as `resume_user` and `set_kernel_stack_top` rather than
   register-level helpers. This keeps syscall and process code independent of x86 register names and

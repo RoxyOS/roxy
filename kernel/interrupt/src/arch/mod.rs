@@ -21,6 +21,14 @@ pub(crate) trait InterruptBackend: sealed::Sealed {
     /// controller. The caller owns vector selection; this is the raw hardware primitive.
     fn send_ipi(target: roxy_arch::CpuId, vector: u8);
 
+    /// Broadcasts a stop-request NMI to every other CPU (all-except-self). This only delivers the
+    /// NMI; whether and how a peer halts is owned by the caller/handler policy (the registered
+    /// `ExceptionHandler` stops on `ExceptionVector::NonMaskable`, and the initiating core halts
+    /// itself). NMI delivery reaches a peer even when it runs with interrupts disabled, so this
+    /// is the primitive the whole-machine shutdown uses. Interrupts are disabled on this CPU
+    /// before delivery and stay disabled.
+    fn send_nmi();
+
     fn mask_irq(line: roxy_arch::IrqLine);
 
     fn unmask_irq(line: roxy_arch::IrqLine);
