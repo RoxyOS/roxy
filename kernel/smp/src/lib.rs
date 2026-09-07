@@ -1,28 +1,17 @@
-//! SMP subsystem: starts the bootloader-parked application processors and owns the kernel-side
+//! SMP subsystem: starts the platform-parked application processors and owns the kernel-side
 //! AP entry.
 
 #![no_std]
 
 mod ap;
+mod arch;
 
-use limine::mp::MP_FLAG_X2APIC;
-use limine::request::MpRequest;
-
-pub use ap::ap_main_1;
-
-/// Limine Multi-Processor request that parks application processors at boot and lets us release
-/// them later.
-#[used]
-#[unsafe(link_section = ".limine_requests")]
-static MP: MpRequest = MpRequest::new(MP_FLAG_X2APIC);
-
-/// Starts every application processor reported by the bootloader, handing each over to
-/// [`ap_main_1`].
+/// Starts every application processor reported by the current architecture's platform, handing
+/// each over to that backend's AP entry stub.
 ///
 /// # Panics
 ///
-/// Panics when the bootloader returns no MP response (the request must be present) or when a CPU
-/// cannot be registered.
+/// Panics when a CPU cannot be registered.
 ///
 /// # Safety
 ///
@@ -31,19 +20,5 @@ static MP: MpRequest = MpRequest::new(MP_FLAG_X2APIC);
 /// already claims slot 0). This is satisfied when called after the bootstrap processor's own
 /// `roxy-cpu` state is initialized.
 pub fn initialize() {
-    let Some(response) = MP.response() else {
-        return;
-    };
-
-    for &cpu in response.cpus() {
-        // The response includes the bootstrap processor; only non-bootstrap CPUs are started.
-        if cpu.lapic_id == response.bsp_lapic_id {
-            continue;
-        }
-
-        // `bootstrap` stores `extra_argument` (relaxed) then publishes `goto_addr` (release),
-        // matching the Limine MP hand-over contract. The AP reads its own RSP on entry to
-        // determine the kernel stack, so extra_argument is unused.
-        cpu.bootstrap(ap_main_1, 0);
-    }
+    arch::start_application_processors();
 }

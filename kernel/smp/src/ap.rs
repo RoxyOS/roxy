@@ -1,23 +1,21 @@
 //! Application-processor entry: the first kernel code each non-bootstrap CPU runs after the
-//! bootloader releases it.
+//! platform releases it.
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_serial::s_println;
 
-/// The bootloader hand-over entry point for an application processor.
+/// The common, architecture-neutral bring-up every released application processor runs before it
+/// can run ordinary kernel code: the first phase of AP boot, running on the backend's provided
+/// stack and page tables.
 ///
-/// Runs on the bootloader-provided stack under the bootloader page tables, where nothing that
-/// needs kernel heap or device mappings is available. It registers the AP's identity, sets up its
-/// per-CPU GDT/TSS/IDT, then switches onto the AP's own kernel stack under the kernel page tables
-/// and hands control to [`ap_main_2`].
+/// It registers the AP's identity, sets up its per-CPU descriptor tables / syscall state, then
+/// switches onto the AP's own kernel stack under the kernel page tables and hands control to
+/// [`ap_main_2`]. The step order lets an AP resolve its `CpuId` and pick its kernel stack before
+/// tables are installed and before any heap or device mapping is touched.
 ///
-/// # Safety
-///
-/// The caller must invoke this only through the bootloader's per-CPU hand-over contract: on a
-/// fresh AP, with interrupts disabled, on a bootloader-provided stack, and via a call that never
-/// returns to the caller.
-#[allow(clippy::missing_safety_doc)]
-pub unsafe extern "C" fn ap_main_1(_info: &limine::mp::MpInfo) -> ! {
+/// Each architecture backend's hand-over entry stub in `crate::arch` forwards here, so backends
+/// differ only in the hand-over signature and how they get released, never in this bring-up order.
+pub(crate) fn ap_main_1() -> ! {
     CurrentArchitectureBackend::register_application_processor();
     let cpu_id = CurrentArchitectureBackend::current_cpu_id();
     let kernel_stack_top = CurrentArchitectureBackend::ap_kernel_stack_top(cpu_id);

@@ -6,14 +6,17 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-limine.workspace = true
-
 roxy-arch.workspace = true
 roxy-interrupt.workspace = true
 roxy-memory.workspace = true
 roxy-serial.workspace = true
 roxy-thread.workspace = true
 roxy-time.workspace = true
+
+# The Limine MP hand-over is x86_64-only; another architecture brings its secondary CPUs up
+# through its own platform (e.g. PSCI), which lands in `src/arch/<target>.rs`.
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+limine.workspace = true
 
 [lints]
 workspace = true

@@ -2,24 +2,27 @@
 
 ## Purpose and scope
 
-`roxy-smp` owns the boot-time policy for bringing up multi-processing: it declares the bootloader's
-MP request that parks application processors, releases those APs during boot, and owns the kernel
-side of the AP entry. It does not own CPU identity, per-CPU descriptor tables, interrupt routing,
-or the scheduler.
+`roxy-smp` owns the boot-time policy for bringing up multi-processing: it owns the kernel side of
+AP entry and delegates secondary-CPU discovery and release to a per-architecture seam. It does not
+own CPU identity, per-CPU descriptor tables, interrupt routing, or the scheduler.
 
 ## Ownership and boundaries
 
-- The Limine `MpRequest` static lives here (not in `roxy-boot`, which only parses boot data). The
-  bootloader parks APs at boot and releases them when [`initialize`](crate::initialize) publishes
-  each AP's entry point.
-- [`initialize`](crate::initialize) runs on the BSP and calls `MpInfo::bootstrap` for every
-  non-bootstrap CPU. `bootstrap` stores the extra argument (relaxed) then publishes the entry
-  point (release), satisfying the bootloader's hand-over contract.
-- The AP-side entry [`ap_main_1`](crate::ap_main_1) is the first kernel code each AP runs, on the
-  bootloader-provided stack and page tables. It registers the CPU's identity, delegates GDT/TSS/IDT
-  setup to `roxy-arch` via `Architecture::initialize_application_processor`, then switches onto the
-  AP's own kernel stack under the kernel page tables into `ap_main_2`, which initialises the local
-  APIC, scheduler slot, and per-CPU timer, then enters the scheduler control loop.
+- Secondary-CPU discovery and release live behind `src/arch/`, the same cfg-selected seam as
+  `roxy-interrupt` and `roxy-memory`. The x86_64 backend owns the Limine `MpRequest` static (which
+  parks APs at boot and is released by `arch::start_application_processors`) and the hand-over
+  entry stub `ap_init`. Another architecture would own its platform mechanism (e.g. PSCI)
+  here instead.
+- [`initialize`](crate::initialize) is the common BSP-side entry; it delegates directly to
+  `arch::start_application_processors`. On x86_64 that calls `MpInfo::bootstrap` for every
+  non-bootstrap CPU.
+- The AP-side bring-up is split into a shared, architecture-neutral sequence and thin per-backend
+  stubs. `ap::ap_main_1` runs the common order: register the CPU's identity, pick the per-CPU
+  kernel stack, delegate GDT/TSS/IDT (or the aarch64 analogue) setup to `roxy-arch` via
+  `Architecture::initialize_application_processor`, then switch onto the AP's own kernel stack
+  under the kernel page tables into `ap_main_2`. Each backend's entry stub only forwards here (the
+  x86_64 stub is `ap_init(info) -> ap_main_1()`); `ap_main_2` initialises the local interrupt
+  controller, scheduler slot, and per-CPU timer, then enters the scheduler control loop.
 - Per-CPU GDT/TSS/IDT and CPU identity registration are owned by `roxy-arch`. The AP's hello-world
   diagnostic uses the blocking serial path so its output serialises with the BSP's instead of
   racing the UART's TX polling.
@@ -32,13 +35,15 @@ or the scheduler.
    `roxy_smp::initialize()`. `kernel-main` also gates the AP-dispatch readiness signal early: the
    scheduler lets APs take runnable threads only after the initial process has been spawned, so
    they never steal the still-booting thread during the fragile startup window.
-3. `initialize` releases each parked AP with [`ap_main_1`](crate::ap_main_1) as the entry.
-4. Each AP runs `ap_main_1` on the bootloader-provided stack and page tables: registers CPU
-   identity, selects its per-CPU kernel stack, sets up a per-CPU GDT/TSS and loads the shared IDT,
-   then switches onto its own kernel stack under the kernel page tables into `ap_main_2`. There it
-   prints `hello world`, enables its local APIC, initialises its `LocalScheduler` slot and periodic
-   timer, and enters the scheduler control loop (`roxy-thread`), idling until the BSP raises the
-   AP-dispatch readiness signal.
+3. `initialize` delegates to `arch::start_application_processors`, which releases each parked AP
+   with the backend's entry stub (on x86_64, `ap_init`) as the entry.
+4. Each released AP runs the backend's entry stub, which forwards to `ap_main_1` on the
+   bootloader-provided stack and page tables: registers CPU identity, selects its per-CPU kernel
+   stack, sets up a per-CPU GDT/TSS and loads the shared IDT, then switches onto its own kernel
+   stack under the kernel page tables into `ap_main_2`. There it prints `hello world`, enables its
+   local interrupt controller, initialises its `LocalScheduler` slot and periodic timer, and enters
+   the scheduler control loop (`roxy-thread`), idling until the BSP raises the AP-dispatch readiness
+   signal.
 5. The BSP continues normal boot (rest of init, userspace) while APs idle in `wait-for-interrupt`
    behind the readiness signal, then run their own scheduler control loops once `kernel-main`
    raises it after spawning the initial process.
