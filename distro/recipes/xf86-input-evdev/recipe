@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=2.8.4
-revision=1
+revision=2
 
 tarball_url="https://www.x.org/releases/individual/driver/xf86-input-evdev-${version}.tar.bz2"
 tarball_sha256="85fade9f5e9cf70f02c877165e95b3df4cdb9e08282416122ca80218e254100c"
@@ -31,11 +31,8 @@ build() {
 }
 
 package() {
+	# The Roxy evdev keyboard/mouse inputs (CoreKeyboard/CorePointer, wired by
+	# the base metapackage's xorg.conf ServerLayout) are provided through that
+	# configuration, not here.
 	autotools_install
-
-	# Define the evdev keyboard and mouse input devices, wired to Roxy's evdev
-	# nodes.  The xorg-server 10-fbdev.conf ServerLayout references Keyboard0 as
-	# CoreKeyboard and Mouse0 as CorePointer.
-	install -D -m 0644 "${base_dir}/recipes/xf86-input-evdev/evdev-input.conf" \
-		"${dest_dir}/usr/share/X11/xorg.conf.d/20-evdev-input.conf"
 }

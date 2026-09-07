@@ -12,6 +12,13 @@ toolchain description. It does not build the kernel or create the final root fil
 `Jinxfile` pins the supported Jinx version and Debian snapshot. Each recipe declares its source,
 integrity or commit pin, build/image dependencies, cross-compilation mode, and package phases. The
 `base` metapackage defines the minimal userspace installed into the rootfs staging tree.
+`base` is also the single place that bundles Roxy's own userland defaults: the default session
+startup script (`/root/.xinitrc`) and the X server configuration (`/etc/X11/xorg.conf`). Program
+recipes are kept clean — they build an upstream program and install only that program's output —
+while distribution-wide defaults live under `recipes/base/`, kept flat and named by what they are,
+with each `install` in `package()` pinning its target path. This keeps an upstream recipe reusable
+and decoupled from Roxy's particular deployment, and gives the `base` package a concrete ownership
+boundary.
 
 Shared autotools and Meson scripts own common cross-build mechanics. They invoke the Roxy Clang
 driver directly; the driver owns target defaults, sysroot search paths, linker selection, CRT files,
