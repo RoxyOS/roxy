@@ -6,7 +6,7 @@ use crate::arch::Arch;
 #[command(name = "xtask", about = "Roxy OS development tasks")]
 pub(crate) struct Cli {
     /// Target kernel architecture.
-    #[arg(long, value_enum, default_value = "x86_64")]
+    #[arg(long, value_enum, global = true, default_value = "x86_64")]
     pub(crate) arch: Arch,
 
     #[command(subcommand)]
