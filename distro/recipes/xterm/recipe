@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=411
-revision=1
+revision=2
 
 # xterm is maintained outside x.org by Thomas Dickey and released as xterm-<NNN>.tgz.
 tarball_url="https://invisible-mirror.net/archives/xterm/xterm-${version}.tgz"
@@ -33,6 +33,17 @@ configure() {
 		--without-xinerama \
 		--disable-setuid \
 		--disable-setgid
+
+	# Roxy is a Unix98-PTY host: the kernel provides /dev/ptmx (master open) plus
+	# TIOCGPTN/TIOCSPTLCK, and mlibc supplies grantpt/ptsname/unlockpt/posix_openpt.
+	# xterm's CF_FUNC_GRANTPT feature probes are AC_RUN_IFELSE, which cross-compilation
+	# marks "maybe" and skips, so HAVE_GRANTPT_PTY_ISATTY (the gate that sends get_pty()
+	# down the posix_openpt()/Unix98 path) is left undefined. Force it here; the macro is
+	# correct for this host and is what lets xterm allocate a pty instead of scanning
+	# /dev/ptyXX /dev/ttyXX. configure() runs with cwd in the package build dir, which is where
+	# the generated config header lands (do_configure cd's there before calling configure).
+	sed -i 's|/\* #undef HAVE_GRANTPT_PTY_ISATTY \*/|#define HAVE_GRANTPT_PTY_ISATTY 1|' \
+		xtermcfg.h
 }
 
 build() {
