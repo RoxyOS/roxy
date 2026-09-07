@@ -10,8 +10,8 @@ operations. It does not own scheduler context switching, ELF parsing policy, or 
 
 Each process owns exactly one optional `AddrSpaceHandle`, one set of user threads, and one `FdTable`;
 the first thread created is the main thread, which anchors `main_thread_id`. All threads of a process
-share the same address space, descriptor table, working directory, umask, signal queue, and signal
-dispositions, while each thread carries its own kernel stack and saved context. The process table
+share the same address space, descriptor table, working directory, umask, and signal dispositions,
+while each thread carries its own kernel stack, saved context, and signal mask. The process table
 maps thread ids to process ids so the thread scheduler can request address-space activation without
 depending on this crate.
 
@@ -37,25 +37,28 @@ published.
 A process is created with one main thread, and `create_thread` adds a runnable user thread that
 shares the process's address space, descriptor table, and signal state. Each thread owns a kernel
 stack and saved context (via `roxy-thread`); the caller supplies the already-mapped user stack, so
-the kernel does not allocate thread stacks. No syscall currently reaches `create_thread`, so real
-user threads exist only through the in-kernel test harness; the `thread_owners` map is the single
-registry recording which threads belong to each process.
+the kernel does not allocate thread stacks. The thread-create/exit/gettid syscalls back the mlibc
+pthread implementation, so real user threads exist; the `thread_owners` map is the single registry
+recording which threads belong to each process.
 
 Thread reaping keys process finalization on the last remaining thread: `finish_thread_reap` removes
 the reaped thread from `thread_owners`, and only when no thread of the process remains does it
 transition the process to `Exited`, release its address space, and wake waiters. A non-last thread
-reaping therefore leaves the process running. Because every real user thread ends today through the
-process-exit path (`exit_current` sets `Exiting` first), production processes remain single-threaded;
-the multi-thread reap and signal-target paths are exercised by table-level kernel tests.
+reaping therefore leaves the process running. Thread-targeted delivery (`tgkill`, `sigtimedwait`,
+`SIGEV_THREAD_ID`) queues a signal in the specific thread's per-thread state, which is how a
+`SIGEV_THREAD` helper thread waits on the timer's signal.
 
 Process-directed signals are delivered by waking the target process's main thread when it is still
 scheduled, and fall back to any other live thread of the process otherwise, so a signal is not lost
-once the main thread has reaped. Selection does not yet consult per-thread masks (see Limits).
+once the main thread has reaped. Thread-directed delivery (`tgkill`, `SIGEV_THREAD_ID`) queues the
+signal in the specific thread's per-thread pending queue and wakes it. Process-directed selection
+does not yet prefer a thread that does not block the signal (see Limits).
 
 ## Signals
 
 Each running process owns a queue of pending process-directed signals — `Vec<PendingSignal>`, where each entry pairs the `Signal` with the sender's pid and an ABI-neutral `SignalSource` (mapped to the Linux `si_code` only when the `siginfo_t` is serialized) so a later `siginfo_t` can be produced — a `SignalSet`
-signal mask, a `HashMap<Signal, SignalAction>` of configured dispositions, and a LIFO stack of
+signal mask keyed per thread (each thread has its own mask; the main thread's is the process mask),
+a per-thread targeted-pending map for `tgkill`/`SIGEV_THREAD_ID` signals, a `HashMap<Signal, SignalAction>` of configured dispositions, and a LIFO stack of
 outstanding signal-frame addresses. These are empty when a process is constructed. Absence from
 the action map means `Default`; installing `Ignore` removes already-pending instances of that
 signal. Sending an ignored signal succeeds without queuing or waking the target. Otherwise
@@ -163,12 +166,16 @@ at the syscall boundary; process reports whether a matching child is pending or 
 
 ## Limits and non-goals
 
-The current model supports multiple user threads sharing a process, but signal masks remain at the
-process level rather than per thread, so delivery cannot yet prefer a thread that does not block a
-signal. A process-level exit (`exit_current`) does not force-stop sibling threads before reaping, so
-a process whose main thread exits while secondary threads remain can only be finalized when its last
-thread reaps; there is no join or explicit thread-end syscall yet. `execve` remains safe only from a
-single-threaded process because it replaces the whole address space. There is no `FD_CLOEXEC` state,
+The current model supports multiple user threads sharing a process, with per-thread signal masks and
+a per-thread targeted-pending queue, plus `tgkill` and `sigtimedwait` for thread-directed delivery
+(enabling the libc's `SIGEV_THREAD`). `TODO(missing-capability: per-thread signal masks)` in
+`table.rs`: process-directed delivery (`signal_target_thread`) still prefers the main thread and
+otherwise any live thread rather than a thread that does not block the signal, so a process-wide
+signal can queue against a thread whose mask blocks it instead of re-routing. A process-level exit
+(`exit_current`) does not force-stop sibling threads before reaping, so a process whose main thread
+exits while secondary threads remain can only be finalized when its last thread reaps (`TODO(missing-
+capability: thread-teardown)` in `lifecycle.rs`). `execve` remains safe only from a single-threaded
+process because it replaces the whole address space. There is no `FD_CLOEXEC` state,
 so descriptors survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang
 interpretation, multi-threaded exec cleanup, credentials, asynchronous interrupt-return delivery,
 and PID 1 reparenting are not. POSIX real-time signals are supported; standard-signal

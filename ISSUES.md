@@ -54,14 +54,24 @@ clippy, and both kernel builds).
 ## POSIX timer semantics are only partially implemented
 
 `roxy-posix-timer` implements `timer_create`/`timer_settime`/`timer_gettime`/`timer_getoverrun`/
-`timer_delete` for `SIGEV_NONE` and `SIGEV_SIGNAL`. Two POSIX behaviors are knowingly approximated
-or absent, each marked with a `TODO(<missing-capability>)` at its code site:
+`timer_delete` for `SIGEV_NONE`, `SIGEV_SIGNAL`, and (via the libc) `SIGEV_THREAD`:
+
+- The kernel timer ABI supports `SIGEV_NONE`/`SIGEV_SIGNAL` (process-directed) and
+  `SIGEV_THREAD_ID` (`TimerNotify::SignalToThread`), which targets the timer signal at a specific
+  thread's per-thread pending queue. `roxy-process` gained per-thread signal masks, a per-thread
+  pending queue, `tgkill` delivery, and `sigtimedwait` to back thread-targeted timers.
+- `SIGEV_THREAD` itself is implemented in the roxy mlibc (`sysdeps/roxy/time.cpp`) exactly as
+  glibc does: `timer_create` spawns a helper pthread with the requested attributes; the helper
+  blocks an internal realtime signal, publishes its kernel tid, and loops on `sigtimedwait`
+  invoking `sigev_notify_function` on each expiration, backed by a kernel timer armed with
+  `SIGEV_THREAD_ID` at that thread.
+
+One POSIX behavior is knowingly approximated, marked with a `TODO(<missing-capability>)` at its
+code site:
 
 - `TODO(pending-aware-overrun)`: overrun counts expirations coalesced into a single delivered
   notification when the 250 Hz tick catches a timer up, rather than expirations missed while the
   previous expiration signal is still undelivered. Roxy has no pending-signal introspection.
-- `SIGEV_THREAD` and `SIGEV_THREAD_ID` are rejected with `EINVAL` in the roxy mlibc sysdeps
-  (`timer_create`) because the process model has no per-thread signal delivery (`tgkill`).
 
 The syscall surface and ABI records for these are in `kernel/syscall/src/syscalls/timer/`, and the
 overrun approximation is documented in `kernel/posix-timer/DESIGN.md`.
@@ -77,17 +87,19 @@ this is a deliberate no-swap, reserve-`GS` design. The supported userspaces (mli
 touch `GS`, but hard hardening (conditional `swapgs` on ring-3 interrupt/exception entries, per
 the Linux `SWAPGS_MASK` model) is future work. Documented in `kernel/arch/DESIGN.md`.
 
-## Process threads are preparational: masks, teardown, and exec are single-thread
+## Process threads: masks and targeted delivery are per-thread; teardown and exec single-thread
 
-The process model can attach and reap multiple user threads sharing one address space, descriptor
-table, and signal queue (`create_thread`, `thread_owners`, last-thread reap), but several pieces of
-real threading are still missing and are marked with `TODO(<missing-capability>)` at their code
-sites in `kernel/process/`:
+The process model attaches and reaps multiple user threads sharing one address space and
+`descriptor table`, and now backs a real pthread implementation via the thread-create/exit/gettid
+syscalls. Signal state is per-thread: each thread has its own mask and targeted-pending queue
+(`pthread_sigmask` uses the `ThreadSigmask`/`SIGPROCMASK` thread-scope sysdep), and `tgkill` and
+`sigtimedwait` are implemented (the latter enables `SIGEV_THREAD`'s helper thread). Remaining gaps,
+marked with `TODO(<missing-capability>)` at their code sites in `kernel/process/`:
 
-- `TODO(missing-capability: per-thread signal masks)` in `kernel/process/src/table.rs`: signal
-  masks remain at the process level, so process-directed signal delivery (`signal_target_thread`)
-  prefers the main thread and otherwise any live thread instead of picking a thread that does not
-  block the signal; there is no `tgkill`.
+- `TODO(missing-capability: per-thread signal masks)` in `kernel/process/src/table.rs`:
+  process-directed delivery (`signal_target_thread`) still prefers the main thread and otherwise any
+  live thread rather than picking a thread that does not block the signal, so a process-wide signal
+  can queue against a thread whose mask blocks it instead of re-routing.
 - `TODO(missing-capability: thread-teardown)` in `kernel/process/src/lifecycle.rs`: a process-level
   exit (`exit_current`) sets `Exiting` but does not stop sibling threads, so a process whose main
   thread exits while secondary threads remain is only finalized when its last thread reaches the
@@ -95,6 +107,4 @@ sites in `kernel/process/`:
 - `execve` from a multi-threaded process is unsupported because it replaces the whole address space
   without quiescing other threads.
 
-No syscall reaches `create_thread` yet, so real user threads exist only through the in-kernel test
-harness; the thread direction is groundwork for a future pthread-backed `clone`/thread-create
-syscall. `kernel/process/DESIGN.md` documents the intended model.
+`kernel/process/DESIGN.md` documents the intended model.

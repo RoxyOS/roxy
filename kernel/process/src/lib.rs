@@ -34,9 +34,11 @@ pub use memory::{
 pub use setpgid::{CreateSessionError, SetPgidError, create_session, set_pgid};
 use signal::PendingSignal;
 pub use signal::{
-    SignalAction, SignalError, block_signals, currently_blocked_signals, deliver_pending_signal,
-    has_pending_signal, pop_signal_frame, replace_masked_signals, replace_signal_action,
-    send_signal, send_signal_to_pgid, send_timer_signal, signal_action_of, unblock_signals,
+    SigWait, SignalAction, SignalError, block_signals, currently_blocked_signals,
+    deliver_pending_signal, has_pending_signal, has_unmasked_pending_signal, pop_signal_frame,
+    replace_masked_signals, replace_signal_action, send_signal, send_signal_to_pgid,
+    send_thread_signal, send_thread_timer_signal, send_timer_signal, signal_action_of,
+    take_matching_pending_signal, thread_belongs_to_current_process, unblock_signals,
 };
 pub use table::{
     current_parent_process_id, current_process_group_id, current_process_id,
@@ -45,7 +47,7 @@ pub use table::{
 };
 pub use wait::{WaitError, WaitOptions, WaitResult, WaitTarget, wait_current};
 
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 
 use hashbrown::HashMap;
 use roxy_fd::{DupError, Fd, FdTable, OpenFile};
@@ -70,6 +72,14 @@ struct Process {
     fds: FdTable,
     pending_signals: Vec<PendingSignal>,
     masked_signals: SignalSet,
+    /// Per-thread signal masks for secondary threads, keyed by thread id. The main thread's
+    /// mask lives in `masked_signals`; a thread's effective mask is `masked_signals` for the
+    /// main thread and its own entry here otherwise.
+    thread_masks: BTreeMap<ThreadId, SignalSet>,
+    /// Signals targeted at a specific thread (`tgkill` / `SIGEV_THREAD_ID` timer delivery),
+    /// keyed by thread id. They are consumed by `sigtimedwait` or, once unmasked, at a
+    /// userspace-return boundary like ordinary pending signals.
+    thread_pending: BTreeMap<ThreadId, Vec<PendingSignal>>,
     signal_frames: Vec<u64>,
     signal_actions: HashMap<Signal, SignalAction>,
     state: ProcessState,

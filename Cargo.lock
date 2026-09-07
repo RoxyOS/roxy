@@ -821,6 +821,7 @@ dependencies = [
  "roxy-process",
  "roxy-signal",
  "roxy-test",
+ "roxy-thread",
  "roxy-time",
  "roxy-utils",
 ]

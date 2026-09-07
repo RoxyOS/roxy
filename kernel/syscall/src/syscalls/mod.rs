@@ -36,11 +36,13 @@ mod seek;
 mod setpgid;
 mod setsid;
 pub(crate) mod signal;
+mod sigtimedwait;
 mod sleep;
 mod socket;
 mod socketpair;
 mod stat;
 mod tcb_set;
+mod tgkill;
 mod thread_create;
 mod thread_exit;
 mod timer;
@@ -54,7 +56,7 @@ mod writev;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 81] = [
+pub(super) const SYSCALLS: [Syscall; 83] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -136,4 +138,6 @@ pub(super) const SYSCALLS: [Syscall; 81] = [
     thread_create::SYSCALL,
     thread_exit::SYSCALL,
     get_tid::SYSCALL,
+    sigtimedwait::SYSCALL,
+    tgkill::SYSCALL,
 ];

@@ -82,6 +82,8 @@ pub(crate) enum SyscallNumber {
     ThreadCreate = 78,
     ThreadExit = 79,
     GetTid = 80,
+    SigtimedWait = 81,
+    Tgkill = 82,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -170,6 +172,8 @@ impl TryFrom<u64> for SyscallNumber {
             78 => Ok(Self::ThreadCreate),
             79 => Ok(Self::ThreadExit),
             80 => Ok(Self::GetTid),
+            81 => Ok(Self::SigtimedWait),
+            82 => Ok(Self::Tgkill),
             _ => Err(()),
         }
     }

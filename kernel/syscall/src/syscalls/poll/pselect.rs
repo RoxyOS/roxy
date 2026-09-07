@@ -39,7 +39,7 @@ fn handle(
     let result = pselect(count.0, read, write, exception, timeout);
 
     if let Some(old_mask) = old_mask {
-        roxy_process::replace_masked_signals(old_mask);
+        let _ = roxy_process::replace_masked_signals(old_mask);
     }
 
     result

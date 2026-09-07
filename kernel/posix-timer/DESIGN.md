@@ -22,7 +22,9 @@ Each timer is created for the calling process (its owner) and stores:
 - the selected `TimerClock` (both clocks share Roxy's monotonic base, so it only affects
   `timer_settime` absolute-deadline interpretation and is stored so that conversion can run
   against a later `timer_settime` call);
-- the notification configuration: `SIGEV_NONE` or a `Signal` to raise with a `sigval` payload;
+- the notification configuration: `SIGEV_NONE`, a `Signal` to raise with a `sigval` payload
+  (`Signal`), or a `Signal` targeted at a specific thread (`SignalToThread`), which backs the
+  kernel-side `SIGEV_THREAD_ID` mode that the libc uses to implement `SIGEV_THREAD`;
 - an arming `state` represented by the `TimerState` enum: `Disarmed`, or `Armed` carrying a
   monotonic absolute `next_deadline`, a `Duration` period (`interval`), and a cumulative `overrun`
   count. Deadline, period, and overrun exist only in the `Armed` variant, so a disarmed timer
@@ -43,6 +45,7 @@ timer tick (after roxy-time advances the monotonic clock)
    → for each active timer with next_deadline <= now:
        advance next_deadline; count coalesced expirations as overrun
        deliver SIGEV_SIGNAL via roxy-process::send_timer_signal
+       deliver SIGEV_THREAD_ID via roxy-process::send_thread_timer_signal
        (SIGEV_NONE only re-arms)
 ```
 

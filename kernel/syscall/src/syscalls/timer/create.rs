@@ -20,6 +20,17 @@ fn handle(clock: ClockId, sevp: Nullable<SigEvent>, res: Out<TimerResult>) -> Sy
     let (notify, value) = match event {
         TimerEvent::None => (TimerNotify::None, 0),
         TimerEvent::Signal { signal, value } => (TimerNotify::Signal(signal), value),
+        TimerEvent::SignalToThread {
+            signal,
+            value,
+            thread_id,
+        } => {
+            // A timer may only be targeted at a thread of the creating process.
+            if !roxy_process::thread_belongs_to_current_process(thread_id) {
+                return Err(crate::errno::Errno::NoSuchProcess);
+            }
+            (TimerNotify::SignalToThread { signal, thread_id }, value)
+        }
     };
 
     let id = roxy_posix_timer::create(clock.timer_clock(), notify, value)

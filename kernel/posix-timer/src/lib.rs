@@ -13,6 +13,7 @@ use core::time::Duration;
 use roxy_arch::{Architecture, CurrentArchitectureBackend, LocalInterruptKind};
 use roxy_process::{ProcessId, current_process_id};
 use roxy_signal::Signal;
+use roxy_thread::ThreadId;
 use roxy_utils::Lock;
 
 /// Upper bound on the overrun count coalesced into a single delivered expiration per catch-up, so
@@ -41,6 +42,8 @@ pub enum TimerNotify {
     None,
     /// Queue `Signal` to the owning process with the timer's `sigval` payload.
     Signal(Signal),
+    /// Queue `Signal` to a specific thread of the owning process (`SIGEV_THREAD_ID`)
+    SignalToThread { signal: Signal, thread_id: ThreadId },
 }
 
 /// An opaque, per-process handle to a POSIX timer. Zero is never a valid id.
@@ -227,8 +230,14 @@ impl PosixTimers {
 
             // `send_timer_signal` reports a missing (exited) owner; the timer is dropped lazily on
             // the next user-facing operation through the owner scoping check.
-            if let TimerNotify::Signal(signal) = notify {
-                let _ = roxy_process::send_timer_signal(owner, signal, value);
+            match notify {
+                TimerNotify::Signal(signal) => {
+                    let _ = roxy_process::send_timer_signal(owner, signal, value);
+                }
+                TimerNotify::SignalToThread { signal, thread_id } => {
+                    let _ = roxy_process::send_thread_timer_signal(thread_id, signal, value);
+                }
+                TimerNotify::None => {}
             }
 
             index += 1;

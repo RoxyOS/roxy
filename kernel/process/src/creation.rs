@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::sync::atomic::{AtomicU64, Ordering};
 use roxy_memory::UserAddress;
 use roxy_signal::SignalSet;
@@ -64,6 +64,8 @@ impl Process {
             fds,
             pending_signals: Vec::new(),
             masked_signals: SignalSet::empty(),
+            thread_masks: BTreeMap::new(),
+            thread_pending: BTreeMap::new(),
             signal_frames: Vec::new(),
             signal_actions: HashMap::new(),
             state: ProcessState::Running,
@@ -95,6 +97,8 @@ impl Process {
             fds,
             pending_signals: Vec::new(),
             masked_signals: SignalSet::empty(),
+            thread_masks: BTreeMap::new(),
+            thread_pending: BTreeMap::new(),
             signal_frames: Vec::new(),
             signal_actions,
             state: ProcessState::Running,

@@ -107,6 +107,14 @@ impl ThreadId {
         Self(NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed))
     }
 
+    /// Reconstructs a `ThreadId` from the value [`ThreadId::as_u64`] previously returned (e.g. a
+    /// `gettid` syscall result shipped through a `SIGEV_THREAD_ID` notification), rejecting the
+    /// never-valid id zero.
+    #[must_use]
+    pub const fn from_u64(value: u64) -> Option<Self> {
+        if value == 0 { None } else { Some(Self(value)) }
+    }
+
     #[must_use]
     pub const fn as_u64(self) -> u64 {
         self.0

@@ -105,6 +105,14 @@ impl ProcessTable {
 
     fn finish_thread_reap(&mut self, thread_id: ThreadId) {
         let process_id = self.thread_owners.remove(&thread_id).unwrap();
+
+        // Free the reaped thread's per-thread signal state so a blocked `sigtimedwait` or a
+        // pending `SIGEV_THREAD_ID` signal cannot outlive its thread.
+        if let Some(process) = self.processes.get_mut(&process_id) {
+            process.thread_masks.remove(&thread_id);
+            process.thread_pending.remove(&thread_id);
+        }
+
         if self.process_has_threads(process_id) {
             // A non-final thread was reaped. The process keeps its address space, descriptor
             // table, and signal state; only this thread is gone, so the process continues.

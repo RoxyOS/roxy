@@ -28,7 +28,7 @@ fn handle(
     let result = poll(entries, count, timeout);
 
     if let Some(old_mask) = old_mask {
-        roxy_process::replace_masked_signals(old_mask);
+        let _ = roxy_process::replace_masked_signals(old_mask);
     }
 
     result

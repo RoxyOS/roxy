@@ -4,6 +4,7 @@ use core::time::Duration;
 use roxy_memory::UserAddress;
 use roxy_posix_timer::TimerClock;
 use roxy_signal::Signal;
+use roxy_thread::ThreadId;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -17,6 +18,10 @@ const TIMER_ABSTIME: u32 = 1;
 /// Linux-compatible `sigevent.sigev_notify` values, fixed by the Roxy personality.
 const SIGEV_SIGNAL: i32 = 0;
 const SIGEV_NONE: i32 = 1;
+/// `SIGEV_THREAD` is implemented entirely by the libc (which spawns a helper thread and
+/// translates it to `SIGEV_THREAD_ID`); the kernel never sees a raw one from a well-behaved
+/// libc.
+#[allow(dead_code)]
 const SIGEV_THREAD: i32 = 2;
 const SIGEV_THREAD_ID: i32 = 4;
 
@@ -107,7 +112,15 @@ impl SyscallArg for SigEvent {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum TimerEvent {
     None,
-    Signal { signal: Signal, value: u64 },
+    Signal {
+        signal: Signal,
+        value: u64,
+    },
+    SignalToThread {
+        signal: Signal,
+        value: u64,
+        thread_id: ThreadId,
+    },
 }
 
 /// Decodes a `timer_create` `sigevent` (or the null default) into a notification configuration.
@@ -115,7 +128,7 @@ pub(super) enum TimerEvent {
 /// # Errors
 ///
 /// Returns `Invalid` for an unchecked notification type or an invalid signal number. Unsupported
-/// thread-directed notification modes report through the centralized diagnostic.
+/// notification modes report through the centralized diagnostic.
 pub(super) fn decode_event(event: Option<SigEvent>) -> Result<TimerEvent, Errno> {
     // POSIX default: a null sevp is equivalent to `sigev_notify = SIGEV_SIGNAL` with `SIGALRM`.
     let (value, notify, signo) = match event {
@@ -129,12 +142,26 @@ pub(super) fn decode_event(event: Option<SigEvent>) -> Result<TimerEvent, Errno>
             let signal = decode_signal(signo)?;
             Ok(TimerEvent::Signal { signal, value })
         }
-        SIGEV_THREAD | SIGEV_THREAD_ID => Err(crate::unsupported::unsupported_argument(
+        SIGEV_THREAD_ID => {
+            // The libc implements `SIGEV_THREAD` by pointing the timer at a helper thread that
+            // `sigtimedwait`s this signal and runs the callback; the kernel only delivers it.
+            let event = event.expect("SIGEV_THREAD_ID requires a sigevent");
+            let signal = decode_signal(signo)?;
+            let thread_id = u32::try_from(event.sigev_notify_thread_id)
+                .ok()
+                .and_then(|tid| ThreadId::from_u64(u64::from(tid)))
+                .ok_or(Errno::Invalid)?;
+            Ok(TimerEvent::SignalToThread {
+                signal,
+                value,
+                thread_id,
+            })
+        }
+        _ => Err(crate::unsupported::unsupported_argument(
             "timer_create.sigev_notify",
             notify,
             Errno::Invalid,
         )),
-        _ => Err(Errno::Invalid),
     }
 }
 
