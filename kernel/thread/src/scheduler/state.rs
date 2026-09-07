@@ -50,6 +50,16 @@ pub(super) struct SchedulerEntry {
     pub(super) thread: Thread,
     pub(super) kind: ThreadKind,
     pub(super) state: ThreadState,
+    /// The CPU this thread last ran on, set when it blocks. `None` only while the thread is
+    /// freshly enqueued and has not yet run. Dispatch is restricted to this CPU once set, so a
+    /// woken thread always resumes on the CPU where it descheduled.
+    ///
+    /// This keeps the per-CPU preemption-depth model consistent: `roxy_utils::Lock` guards a
+    /// `PreemptionGuard` recording the creating CPU and asserts on drop that it is released on
+    /// that same CPU. A thread holds such a guard only within one running episode; without this
+    /// binding, the shared run queue let any CPU dispatch a woken thread, and it could drop a
+    /// guard on a different CPU than it was created (`preemption` Panics).
+    pub(super) home_cpu: Option<CpuId>,
     /// Set while a CPU is running this thread or has reserved it for a pending switch away.
     /// Other CPUs skip it in dispatch and defer its reap until this is cleared at stack handoff.
     pub(super) reserved: Box<AtomicBool>,
@@ -91,6 +101,7 @@ impl Scheduler {
             thread,
             kind,
             state: ThreadState::Runnable,
+            home_cpu: None,
             reserved: Box::new(AtomicBool::new(false)),
         }));
 

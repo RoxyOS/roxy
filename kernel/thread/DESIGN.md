@@ -83,6 +83,22 @@ The `running` thread is never reaped while `reserved` is set; reaping removes th
 the handoff cleared the flag, and it takes the boxed slot leaving a vacant `Option`, so another
 CPU's recorded `current` index always stabilizes to the same thread.
 
+## Home-CPU binding of blocked threads
+
+The preemption-depth model is per-CPU: `roxy_utils::Lock` guards a `PreemptionGuard` that records the
+CPU on which it was created and asserts on drop that it is released on the same CPU. A thread
+therefore must never drop a guard on a different CPU than where it took the lock. Because a guard is
+never held across a preemption (preemption is disabled while depth is non-zero), the only way a
+thread can be descheduled with a guard live is to block while holding a lock.
+
+To keep that invariant, a thread that blocks is pinned to the CPU where it descheduled: each entry
+now records `home_cpu`, set when the thread blocks, and dispatch (`next_runnable`) accepts a thread
+only from its `home_cpu`. A freshly enqueued thread (`home_cpu = None`) may still start on any CPU;
+once it blocks it is bound, so a woken thread always resumes where it last ran and any lock it
+holds is released on the same CPU. Without this binding the shared run queue would let any CPU
+dispatch a woken thread, and it could drop a `PreemptionGuard` on a different CPU than it was
+created, tripping the accounting assertion.
+
 ## User dispatch hook
 
 The thread crate cannot depend on the process crate because process already depends on thread.

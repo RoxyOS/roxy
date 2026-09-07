@@ -169,6 +169,9 @@ impl Scheduler {
     /// Builds the outgoing switch from the caller-set block state of `current` to the next
     /// runnable thread (or the scheduler control context when none remains).
     fn prepare_block_switch(&mut self, current: ThreadIndex) -> PendingContextSwitch {
+        // Pin the block origin: only this CPU may dispatch the thread again, because any
+        // Lock/PreemptionGuard it holds must be released on the same CPU (see `state.rs`).
+        self.entry(current).home_cpu = Some(CurrentArchitectureBackend::current_cpu_id());
         let previous = self.entry(current).thread.context_pointer();
         let reserved_ptr = ptr::from_ref(self.entry(current).reserved.as_ref());
         let next = self.next_runnable(ThreadIndex((current.0 + 1) % self.entries.len()));
@@ -287,10 +290,16 @@ impl Scheduler {
     }
 
     fn next_runnable(&self, start: ThreadIndex) -> Option<ThreadIndex> {
+        let cpu = CurrentArchitectureBackend::current_cpu_id();
         (0..self.entries.len()).find_map(|offset| {
             let index = (start.0 + offset) % self.entries.len();
             let entry = self.entries[index].as_ref()?;
-            (entry.state == ThreadState::Runnable && !entry.reserved.load(Ordering::Acquire))
+            // A thread blocked on another CPU is dispatched only by that CPU (see `state.rs
+            // home_cpu`); freshly enqueued threads (home_cpu `None`) may run anywhere.
+            let home_ok = entry.home_cpu.is_none_or(|home| home == cpu);
+            (entry.state == ThreadState::Runnable
+                && !entry.reserved.load(Ordering::Acquire)
+                && home_ok)
                 .then_some(ThreadIndex(index))
         })
     }
