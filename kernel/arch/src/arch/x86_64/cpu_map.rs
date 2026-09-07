@@ -1,4 +1,5 @@
 use spin::Mutex;
+use x86_64::instructions::interrupts;
 
 use crate::{CpuId, MAX_CPUS};
 
@@ -38,19 +39,21 @@ static MAP: Mutex<CpuMap> = Mutex::new(CpuMap {
 /// Panics when `apic_id` is already registered (a CPU must register exactly once) or when more
 /// than `MAX_CPUS` distinct CPUs register.
 pub(super) fn register(apic_id: u32) {
-    let mut map = MAP.lock();
-    for &entry in &map.entries[..map.count] {
-        assert!(
-            entry.apic_id != apic_id,
-            "CPU with apic id {apic_id} is already registered"
-        );
-    }
-    assert!(map.count < MAX_CPUS, "CPU map capacity exceeded (MAX_CPUS)");
-    let index = map.count;
-    // `index` is bounded by `MAX_CPUS`, so the narrow conversion always succeeds.
-    let slot = CpuId::new(u32::try_from(index).expect("MAX_CPUS fits in u32"));
-    map.entries[index] = Entry { apic_id, slot };
-    map.count += 1;
+    interrupts::without_interrupts(|| {
+        let mut map = MAP.lock();
+        for &entry in &map.entries[..map.count] {
+            assert!(
+                entry.apic_id != apic_id,
+                "CPU with apic id {apic_id} is already registered"
+            );
+        }
+        assert!(map.count < MAX_CPUS, "CPU map capacity exceeded (MAX_CPUS)");
+        let index = map.count;
+        // `index` is bounded by `MAX_CPUS`, so the narrow conversion always succeeds.
+        let slot = CpuId::new(u32::try_from(index).expect("MAX_CPUS fits in u32"));
+        map.entries[index] = Entry { apic_id, slot };
+        map.count += 1;
+    });
 }
 
 /// Returns the logical slot of the CPU currently executing.
@@ -60,14 +63,23 @@ pub(super) fn register(apic_id: u32) {
 /// Panics when the current CPU has not been registered by its bring-up path.
 pub(super) fn current_id() -> CpuId {
     let apic_id = read_current_apic_id();
-    let map = MAP.lock();
-    map.entries[..map.count]
-        .iter()
-        .find(|entry| entry.apic_id == apic_id)
-        .map_or_else(
-            || panic!("CPU with apic id {apic_id} is not registered"),
-            |entry| entry.slot,
-        )
+    // The map is taken both by normal kernel code (with interrupts enabled) and by the per-CPU
+    // periodic-timer interrupt handler, which reaches it through `preemption`/`CpuLocal` while
+    // resolving the current CPU. Taking the bare `Mutex` here with interrupts enabled would let
+    // that handler re-enter the same lock on this core if a tick landed inside the critical
+    // section (a same-CPU spinning deadlock and a random SMP boot hang). Disabling interrupts
+    // for the duration (and restoring the prior `IF`) keeps `MAP` never held with interrupts
+    // enabled, so no interrupt can re-enter it on this core.
+    interrupts::without_interrupts(|| {
+        let map = MAP.lock();
+        map.entries[..map.count]
+            .iter()
+            .find(|entry| entry.apic_id == apic_id)
+            .map_or_else(
+                || panic!("CPU with apic id {apic_id} is not registered"),
+                |entry| entry.slot,
+            )
+    })
 }
 
 /// Returns the hardware APIC id of the given logical slot, for addressing an IPI.
@@ -76,14 +88,19 @@ pub(super) fn current_id() -> CpuId {
 ///
 /// Panics when the slot has not been registered.
 pub(super) fn apic_id_for(slot: CpuId) -> u32 {
-    let map = MAP.lock();
-    map.entries[..map.count]
-        .iter()
-        .find(|entry| entry.slot == slot)
-        .map_or_else(
-            || panic!("CPU slot {slot} is not registered"),
-            |entry| entry.apic_id,
-        )
+    // Same interrupt-disabling invariant as `current_id`: the reschedule-IPI senders that read
+    // the map can run in any context, and the map must never be held with interrupts enabled so
+    // an interrupt on this core cannot re-enter it.
+    interrupts::without_interrupts(|| {
+        let map = MAP.lock();
+        map.entries[..map.count]
+            .iter()
+            .find(|entry| entry.slot == slot)
+            .map_or_else(
+                || panic!("CPU slot {slot} is not registered"),
+                |entry| entry.apic_id,
+            )
+    })
 }
 
 /// Reads the current CPU's hardware APIC id via CPUID leaf 1 (`EBX[31:24]`, Initial APIC ID).

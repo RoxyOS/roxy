@@ -107,6 +107,13 @@ disabled is stopped.
 - The CPU identity map uses a fixed `[(u32, CpuId); MAX_CPUS]` array with a linear scan on every
   `current_cpu_id` call. This avoids allocation and a hasher in the per-CPU hot path, keeps the
   `roxy-arch` crate free of an allocator dependency, and guarantees deterministic slot assignment.
+  Every critical section over the map runs with interrupts disabled (restoring the prior `IF`):
+  the map is touched both by ordinary kernel code (interrupts enabled) and by the per-CPU
+  periodic-timer interrupt handler, which resolves the current CPU through `preemption`/`CpuLocal`
+  on the way to scheduling. If the bare spin lock could be held with interrupts enabled, a tick
+  landing inside the scan would re-enter the lock on the same core and deadlock; disabling interrupts
+  for the duration keeps the map never held with interrupts enabled and closes that same-CPU
+  re-entrancy hazard.
   The key is the CPUID Initial APIC ID rather than the x2APIC MSR because the map must be readable
   before x2APIC mode is enabled. On the current single-vCPU platform the two are identical; on
   future SMP the post-enable x2APIC linear id may differ from the Initial APIC ID, and matching
