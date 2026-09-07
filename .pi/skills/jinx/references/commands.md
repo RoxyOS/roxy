@@ -1,5 +1,15 @@
 # Jinx Command reference
 
+> **Run jinx from the initialized build directory (`target/jinx/`).** Every `jinx` command below
+> must be invoked with the build directory as cwd: `cd target/jinx && jinx build <pkg>`. The build
+> directory is created by `cargo rootfs` / `jinx init <distro>` and normally already exists.
+> Running from the repo root instead fails with `jinx: Please run 'jinx init ...' first` — that
+> message is misleading; it is a cwd problem, not an initialization problem.
+>
+> Layout under `target/jinx/`: `builds/<pkg>/` holds out-of-tree build artifacts (configure's
+> Makefiles, object files), `pkgs/<pkg>-*.xbps` holds the produced binaries, and the prepared
+> source tree lives in `distro/sources/<pkg>/` (read-only inside the build container).
+
 ## Commands
 
 | Command | What it does |

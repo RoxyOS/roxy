@@ -55,6 +55,37 @@ package()   { meson_install / autotools_install … }
 
 For meson projects use the helpers from `build-systems/meson.sh`; for autotools use `build-systems/autotools.sh`, etc.
 
+## Out-of-tree vs in-tree builds
+
+Jinx normally builds **out-of-tree**: `configure()`, `build()`, and `package()` run from a separate
+build directory (`target/jinx/builds/<name>/`), keeping the source tree pristine. Most autotools/
+automake/meson packages support this (they use `@srcdir@`/`VPATH` correctly).
+
+Two things to know up front so you do not waste build round-trips:
+
+- **`source_dir` is a read-only mount inside the build container.** Never try to build in place in
+  the source tree (`cd "${source_dir}" && make` fails with `Read-only file system` on the first
+  `config.log`/object write).
+- Some packages ship a **hand-written Makefile that only supports in-tree builds**. Tell-tale
+  signs: `VPATH=.` (or `VPATH=.:os`) with no `@srcdir@`, or a hard-coded header prerequisite line
+  such as `$(OBJECTS): *.h ../config.h`. Out-of-tree, `make` reports `No rule to make target '*.h'`
+  (the `*.h` wildcard expands to nothing in the empty build dir).
+
+For such packages, copy the source into the writable build directory and build there — this is the
+`lua` recipe's pattern. The copy carries the `prepare()`-patched files (e.g. the Roxy `config.sub`)
+across automatically:
+
+```bash
+configure() {
+	cp -a "${source_dir}/." .
+	# … then configure / build/install normally in cwd (the build dir)
+}
+```
+
+Jinx tracks the produced XBPS, not build-dir state, so an in-tree build inside the build dir is
+safe. Check upstream's `Makefile`/`Makefile.in` before configuring so you pick the right mode from
+the start.
+
 ### Static per-package files
 
 Static files that belong to a package (configs, scripts, drivers) live **beside the recipe, not
