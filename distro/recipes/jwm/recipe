@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+version=2.4.6
+revision=1
+
+tarball_url="https://github.com/joewing/jwm/releases/download/v${version}/jwm-${version}.tar.xz"
+tarball_sha256="b5871ec28317594b3fa22b83ed5524cc911d498c455eaab3ae68def195dd802d"
+
+cross_compile=yes
+
+# JWM uses only Xlib at a minimum. libXext provides the shape extension and
+# libXmu rounded-window drawing; both are enabled by default here.
+deps="mlibc libx11 libxext libxmu xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+clean_workdirs=no
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+# JWM ships a hand-written src/Makefile (VPATH=.:os and `$(OBJECTS): *.h`) that
+# only works when make runs inside a complete source tree, so it must be built
+# in-tree rather than out-of-tree like the other autotools packages. source_dir
+# is a read-only container mount, so like the lua recipe we copy the source
+# into the writable build dir and build there (config.sub is already patched in
+# source_dir by prepare; the copy carries it across). Jinx tracks the produced
+# XBPS, not build-dir state, so this is safe.
+configure() {
+	cp -a "${source_dir}/." .
+
+	# Point configure's AC_PATH_X at the cross sysroot for X11 headers and
+	# libraries so it does not probe (and fail on) the build machine.
+	#
+	# Disable the optional backends that are not packaged: PNG/JPEG/XPM
+	# image loading, Cairo/RSVG rendering, Xft/Pango font support, and the
+	# XRender and Xinerama extensions. NLS is disabled so translation .po
+	# files are not built (no gettext tooling in the build container).
+	autotools_configure \
+		--x-includes="${sysroot}/usr/include" \
+		--x-libraries="${sysroot}/usr/lib" \
+		--disable-png \
+		--disable-jpeg \
+		--disable-cairo \
+		--disable-rsvg \
+		--disable-xpm \
+		--disable-xft \
+		--disable-pango \
+		--disable-xrender \
+		--disable-xinerama \
+		--disable-nls
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}
