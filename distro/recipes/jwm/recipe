@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=2.4.6
-revision=1
+revision=2
 
 tarball_url="https://github.com/joewing/jwm/releases/download/v${version}/jwm-${version}.tar.xz"
 tarball_sha256="b5871ec28317594b3fa22b83ed5524cc911d498c455eaab3ae68def195dd802d"
@@ -9,8 +9,10 @@ tarball_sha256="b5871ec28317594b3fa22b83ed5524cc911d498c455eaab3ae68def195dd802d
 cross_compile=yes
 
 # JWM uses only Xlib at a minimum. libXext provides the shape extension and
-# libXmu rounded-window drawing; both are enabled by default here.
-deps="mlibc libx11 libxext libxmu xorgproto"
+# libXmu rounded-window drawing; both are enabled by default here. libpng
+# supplies the PNG background-image loading backend (see configure below),
+# which drives root-window/backdrop wallpapers.
+deps="mlibc libx11 libxext libxmu libpng xorgproto"
 hostdeps="roxy-llvm"
 imagedeps="gcc libc6-dev make pkg-config"
 clean_workdirs=no
@@ -34,14 +36,15 @@ configure() {
 	# Point configure's AC_PATH_X at the cross sysroot for X11 headers and
 	# libraries so it does not probe (and fail on) the build machine.
 	#
-	# Disable the optional backends that are not packaged: PNG/JPEG/XPM
+	# Disable the optional backends that are not packaged: JPEG/XPM
 	# image loading, Cairo/RSVG rendering, Xft/Pango font support, and the
-	# XRender and Xinerama extensions. NLS is disabled so translation .po
-	# files are not built (no gettext tooling in the build container).
+	# XRender and Xinerama extensions. PNG image loading is enabled (linked
+	# against libpng) so JWM can draw a background/backdrop image. NLS is
+	# disabled so translation .po files are not built (no gettext tooling in
+	# the build container).
 	autotools_configure \
 		--x-includes="${sysroot}/usr/include" \
 		--x-libraries="${sysroot}/usr/lib" \
-		--disable-png \
 		--disable-jpeg \
 		--disable-cairo \
 		--disable-rsvg \
