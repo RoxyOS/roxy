@@ -48,6 +48,13 @@ programs and libraries Jinx builds — not the kernel's user-mode execution mode
   build system skips the package and the change does not reach the rootfs. Use
   `jinx revbump <pkg>` to bump dependents, but the package itself must be bumped manually or by
   `jinx rebuild <pkg>`.
+- **Autotools builds use the tarball's pre-generated `configure`, never autoreconf.** `autotools.sh`
+  runs the shipped `./configure` as-is and never regenerates it from `aclocal.m4`/`configure.in`. To
+  change configure behavior you must either patch the generated `configure` script, or act in the
+  recipe's `configure()` right after `autotools_configure` (e.g. `sed` a generated config header);
+  only an explicit `autoreconf` in `prepare()` regenerates it, and that is not the default. Builds
+  are also **out-of-tree**: `configure()`/`build()`/`package()` run from `target/jinx/builds/<name>/`
+  (cwd), so configure-generated headers land there and **not** in `${source_dir}`.
 
 ## Which guide to read
 

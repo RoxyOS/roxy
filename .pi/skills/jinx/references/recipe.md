@@ -32,8 +32,13 @@ Run in order: `early_prepare()` → (patches) → `prepare()` → `configure()` 
 
 - `early_prepare()` — on pristine source, before patches (e.g. fetching vendored submodules).
 - `prepare()` — after patches, from source dir (e.g. `meson subprojects download`, `autoreconf`).
-- `configure()` — from build dir; only when build dir doesn't exist (first build, after `rebuild`,
-  after version/revision bump). Do `./configure`, `meson setup`, `cmake -G Ninja …`.
+  Autotools recipes do **not** auto-run autoreconf: `autotools.sh` uses the tarball's pre-generated
+  `configure`. To regenerate you need an explicit `autoreconf` here (rare), or patch the generated
+  `configure` rather than its `aclocal.m4`/`configure.in` source.
+- `configure()` — from build dir (out-of-tree: `target/jinx/builds/<name>/`); only when build dir
+  doesn't exist (first build, after `rebuild`, after version/revision bump). Generated config headers
+  (e.g. `config.h`, `xtermcfg.h`) are written to this cwd, not `${source_dir}` — patch them by relative
+  path here if you must force a feature. Do `./configure`, `meson setup`, `cmake -G Ninja …`.
 - `build()` — every build: `make -j${parallelism}`, `meson compile`, `cmake --build …`.
 - `package()` — install into `${dest_dir}`; Jinx turns it into the XBPS file.
 
