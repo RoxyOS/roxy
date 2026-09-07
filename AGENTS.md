@@ -127,6 +127,7 @@ procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`
 
 ### Architecture and Dependencies
 
+- When building, patching, or planning userspace packages, assume mlibc provides every libc feature the package needs. Do not re-verify mlibc capabilities.
 - Do not copy kernel code from Seele. Seele may only be consulted as a behavioral reference or an
   architectural failure case.
 - Do not create placeholder crates, speculative abstractions, compatibility shims, silent stubs,
