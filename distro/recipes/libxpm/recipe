@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+version=3.5.19
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/lib/libXpm-${version}.tar.xz"
+tarball_sha256="ad3576d689221a39dc728f0e0dc02ca7bb6a0d724c9a77fd1bfa1e9af83be900"
+
+cross_compile=yes
+
+# libXpm is the XPM pixmap library.  It is required by Xaw7 (Athena), which in
+# turn is the toolkit xclock links against.  Core XPM needs only X11/Xproto;
+# gettext (optionally probed) degrades gracefully when absent.
+deps="mlibc libx11 xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	autotools_configure
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}
