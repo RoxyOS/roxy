@@ -8,6 +8,10 @@ use crate::core::TtyCore;
 const CS8: u32 = 0o60;
 /// `c_iflag` ICRNL: map input CR to NL.
 const ICRNL: u32 = 0x100;
+/// `c_oflag` OPOST: enable output post-processing.
+const OPOST: u32 = 0x1;
+/// `c_oflag` ONLCR: map output NL to CR+NL (effective under OPOST).
+const ONLCR: u32 = 0x4;
 const VINTR: usize = 0;
 const VERASE: usize = 2;
 const VMIN: usize = 6;
@@ -174,7 +178,8 @@ fn termios_from_settings(settings: LineDisciplineSettings) -> Termios {
 
     Termios {
         input_flags: if settings.icrnl { ICRNL } else { 0 },
-        output_flags: 0,
+        output_flags: (if settings.opost { OPOST } else { 0 })
+            | (if settings.onlcr { ONLCR } else { 0 }),
         control_flags: CS8,
         local_flags: local_flags_from_settings(settings),
         line_discipline: 0,
@@ -192,6 +197,8 @@ fn settings_from_termios(termios: Termios) -> LineDisciplineSettings {
         isig: termios.local_flags.contains(LocalFlags::ISIG),
         intr_character: termios.control_characters[VINTR],
         icrnl: termios.input_flags & ICRNL != 0,
+        opost: termios.output_flags & OPOST != 0,
+        onlcr: termios.output_flags & ONLCR != 0,
     }
 }
 
@@ -213,7 +220,12 @@ fn validate_termios(termios: &Termios) -> Result<(), IoctlError> {
         termios.input_flags & !ICRNL,
         0,
     )?;
-    validate_fixed("ioctl.tcsetattr.output-flags", termios.output_flags, 0)?;
+    // Only the output flags the line discipline implements (OPOST/ONLCR) are accepted.
+    validate_fixed(
+        "ioctl.tcsetattr.output-flags",
+        termios.output_flags & !(OPOST | ONLCR),
+        0,
+    )?;
     validate_fixed("ioctl.tcsetattr.control-flags", termios.control_flags, CS8)?;
 
     let supported_local = LocalFlags::ECHO | LocalFlags::ICANON | LocalFlags::ISIG;

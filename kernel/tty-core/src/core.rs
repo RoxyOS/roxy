@@ -202,7 +202,28 @@ impl TtyCore {
     ///
     /// Returns the output endpoint's `Io` error.
     pub fn write(&self, output: &[u8]) -> Result<usize, FileError> {
-        self.output.write(output).map_err(map_output_error)
+        let translated = self.translate_output(output);
+        self.output.write(&translated).map_err(map_output_error)
+    }
+
+    /// Applies output post-processing for the current settings: with `OPOST`+`ONLCR` set, output
+    /// newlines are mapped to CR+NL (the conventional cooked-terminal line ending).
+    fn translate_output(&self, input: &[u8]) -> alloc::vec::Vec<u8> {
+        let settings = self.line_discipline.lock().settings;
+        if !settings.opost || !settings.onlcr {
+            return input.to_vec();
+        }
+
+        input.iter().fold(
+            alloc::vec::Vec::with_capacity(input.len()),
+            |mut out, byte| {
+                if *byte == b'\n' {
+                    out.push(b'\r');
+                }
+                out.push(*byte);
+                out
+            },
+        )
     }
 
     /// Returns the session currently owning this terminal, if any.
