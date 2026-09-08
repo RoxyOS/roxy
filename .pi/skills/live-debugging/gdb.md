@@ -1,88 +1,34 @@
 # GDB Attach to the Running Roxy Kernel
 
-`cargo xagent-debug` starts QEMU with a GDB stub on `tcp:127.0.0.1:1234`. Attach GDB to debug the
-*live, running* kernel — inspect registers, set breakpoints, single-step, and read memory while
-the guest executes. This is complementary to the screenshot/keyboard/mouse channels above.
+`cargo xagent-debug` starts a GDB stub on `tcp:127.0.0.1:1234`. Connect GDB to debug the *live*
+kernel — registers, breakpoints, single-step, memory.
 
-## The debug symbols binary
+## Which ELF
 
-GDB needs an ELF with symbols to resolve `break`/`p &symbol`. Two options, matching the
-`--profile` you pass to `cargo xagent-debug`:
+Connect the ELF matching the `--profile` you launched — GDB must symbolize the exact running
+build:
 
-- **`--profile dev` → debug ELF (source lines)**: `cargo xagent-debug --profile dev` builds
-  `target/x86_64-unknown-none/debug/kernel-main` and embeds it in the ISO, so the running kernel
-  *is* the debug ELF. Point GDB straight at it for full source-level debugging:
-  ```sh
-  gdb -q target/x86_64-unknown-none/debug/kernel-main
-  (gdb) target remote 127.0.0.1:1234
-  ```
-  This ELF carries DWARF (`readelf -S` shows `debug_info`/`debug_line`) and unoptimized code, so
-  single-stepping and `p` on Rust variables work.
-- **`--profile release` → release ELF, symbol-only**: the optimized kernel ships a symbol table
-  but **no DWARF** (verified via `readelf`), so with it you get mangled function names and
-  addresses but not source lines. Point GDB at:
-  ```sh
-  gdb -q target/x86_64-unknown-none/release/kernel-main
-  (gdb) target remote 127.0.0.1:1234
-  ```
-  Function breakpoints/backtraces work on the mangled names; `$main`, `$entry` are legible.
+- `--profile dev` → `target/x86_64-unknown-none/debug/kernel-main` (DWARF, source lines work).
+- `--profile release` → `target/x86_64-unknown-none/release/kernel-main` (symbols only, mangled
+  names, no source lines).
 
-> Always connect GDB to the ELF whose profile you launched — the running kernel must be the same
-> build GDB symbolizes, or addresses/line tables won't line up.
-
-## Attaching and the initial state
-
-- Connecting via `target remote` **pauses** the VM immediately (QEMU's stub stops it on attach).
-- The VM was booting when `xagent-debug` started; if you attached late, early boot is behind you.
-  To catch boot itself, pause the VM right after starting `cargo xagent-debug` (QMP `stop`, see
-  `SKILL.md`) before attaching GDB.
-- GDB stub under `-display none` on the release image works (protocol exchange verified: register
-  reads return real AP/init values).
-
-## Working with SMP
-
-The machine is `-smp 16`, so there are 16 vCPUs. GDB's remote stub exposes them; switch with:
-
-```
-(gdb) info threads
-(gdb) thread <id>
+```sh
+gdb -q target/x86_64-unknown-none/debug/kernel-main
+(gdb) target remote 127.0.0.1:1234
 ```
 
-Most kernel debugging here needs the current CPU. When you single-step on a multi-CPU target,
-only the selected thread steps; others keep running, so prefer `thread apply all stop` then pick a
-CPU, or use `set scheduler-locking on` while stepping the thread you care about.
+## Attaching
 
-## Useful commands
+- `target remote` **pauses** the VM immediately.
+- The VM boots on its own; pause it right after start (QMP `stop`) to catch early boot.
 
-```
-info registers                    # current vCPU state
-bt                                # backtrace of the current thread
-x/8gx 0xffffffff80000000          # read memory (physical/higher-half kernel VA)
-p &some_kernel_global             # address of a kernel symbol
-break roxy::module::function      # symbol breakpoint (must have debug symbols to resolve)
-continue / stepi / nexti
-```
+## SMP
 
-Because much kernel state is in Rust `no_std` types, `x` (memory) and register inspection are
-more reliable than `p` on arbitrary types without a full debug-info side table.
+16 vCPUs. `info threads` / `thread <id>` to switch. Only the selected thread steps; prefer
+`thread apply all stop`, or `set scheduler-locking on` while stepping.
 
-## Verifying the debugger is live
+## Finishing
 
-- `info registers` returns non-zero values (entry/VMM state differs from a fully booted CPU).
-- `monitor info cpus` (via the HMP socket) shows all 16 vCPUs by thread id, which cross-checks
-  the GDB thread list.
-- The guest is genuinely paused: type `cont`, then a screenshot (`screenshot.md`) or `serial.log`
-  resumes changing.
-
-## Leaving the guest running
-
-Do **not** leave the VM paused when you are done — send `continue` before detaching, or the guest
-freezes forever. Disconnect with `detach` after continuing, then stop the VM via its pidfile
-(`kill "$(cat target/roxy/agent-debug/qemu.pid)"`).
-
-## Notes
-
-- Keep the GDB stub port free: a leftover `xagent-debug` holds `tcp:1234`, so kill stray QEMU
-  before relaunching.
-- If breakpoints don't hit and you attached mid-boot, the code already ran past them; re-pause,
-  set breakpoints, and continue, or restart and attach earlier.
+Do **not** leave the VM paused: send `continue` before `detach`, then stop via the pidfile.
+If breakpoints don't hit, the code already ran past them (attached mid-boot); re-pause, set
+breakpoints, continue — or restart and attach earlier.
