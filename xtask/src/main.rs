@@ -23,6 +23,7 @@ fn main() -> Result<()> {
             Arg::Rootfs => action::rootfs(cli.arch),
             Arg::Run => action::run(cli.arch),
             Arg::Test => action::test(cli.arch),
+            Arg::Debug { profile } => action::debug(cli.arch, profile),
         }?;
     }
 

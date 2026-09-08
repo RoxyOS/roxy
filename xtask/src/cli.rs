@@ -1,6 +1,14 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::arch::Arch;
+
+/// Kernel build profile used by debugging launches. `Dev` compiles unoptimized with DWARF for
+/// source-level GDB; `Release` is the optimized build the kernel normally ships.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub(crate) enum Profile {
+    Dev,
+    Release,
+}
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask", about = "Roxy OS development tasks")]
@@ -20,4 +28,9 @@ pub(crate) enum Arg {
     Rootfs,
     Run,
     Test,
+    Debug {
+        /// Kernel build profile: `dev` produces a DWARF-enabled kernel for source-level GDB.
+        #[arg(long, value_enum)]
+        profile: Profile,
+    },
 }

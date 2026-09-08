@@ -2,6 +2,7 @@ mod iso;
 mod limine;
 mod qemu;
 
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -32,6 +33,15 @@ pub(crate) fn test(kernel: &Path, rootfs: &Path, arch: Arch) -> Result<()> {
     let image = create_iso(kernel, rootfs, Mode::Test, arch)?;
 
     qemu::test(&image, arch)
+}
+
+pub(crate) fn debug(kernel: &Path, rootfs: &Path, arch: Arch) -> Result<()> {
+    let image = create_iso(kernel, rootfs, Mode::Production, arch)?;
+
+    let debug_dir = output_root().join("agent-debug");
+    fs::create_dir_all(&debug_dir)?;
+
+    qemu::debug(&image, arch, &debug_dir)
 }
 
 fn create_iso(kernel: &Path, rootfs: &Path, mode: Mode, arch: Arch) -> Result<PathBuf> {

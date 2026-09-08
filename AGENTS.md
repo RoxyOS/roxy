@@ -74,6 +74,10 @@ The standard commands are:
 - `cargo xtest`: build the test kernel and run the distributed kernel tests in headless QEMU.
 - `cargo xrun`: build the normal kernel and run Roxy OS in QEMU with graphical framebuffer output
   and serial attached to the invoking terminal.
+- `cargo xagent-debug --profile dev`: build the kernel with DWARF debug info (use `release` for
+  the optimized build) and launch Roxy OS in QEMU detached, exposing a serial log, QMP and
+  monitor sockets under `target/roxy/agent-debug/`, and a GDB stub on `tcp:127.0.0.1:1234` for
+  live debugging. See `.pi/skills/live-debugging/SKILL.md`.
 - `cargo xtask image`: create `target/roxy/roxy.iso` without launching QEMU.
 - `cargo rootfs`: rebuild the Jinx `base` package staging tree and
   `target/roxy/rootfs.img` from userspace inputs.
