@@ -13,6 +13,9 @@ use crate::{
     mapper::{CurrentKernelPageTableBackend, KernelPageTableBackend, MappingFlags},
 };
 
+#[cfg(debug_assertions)]
+const BOOTSTRAP_HEAP_SIZE: usize = 2 * 1024 * 1024;
+#[cfg(not(debug_assertions))]
 const BOOTSTRAP_HEAP_SIZE: usize = 256 * 1024;
 const HEAP_ORDER: usize = 32;
 const PERMANENT_HEAP_SIZE: usize = 64 * 1024 * 1024;

@@ -40,5 +40,8 @@ throughout the subsystem.
 ## Limits
 
 The current backend is x86_64, and page-table and allocation code is not restricted to one CPU.
-Memory statistics are diagnostic and must not become allocation policy. NUMA, demand paging,
-swapping, and a per-CPU allocator remain outside this subsystem's current contract.
+Memory statistics are diagnostic and must not become allocation policy. Frame and heap statistics
+are exposed as lock-free atomic snapshots so the OOM/alloc-error diagnostic path can read them
+without re-entering an allocator lock (a failed allocation may reach the handler while the
+allocator is still held; taking the lock again would deadlock). NUMA, demand paging, swapping,
+and a per-CPU allocator remain outside this subsystem's current contract.

@@ -22,6 +22,11 @@ const FREED_POISON: u8 = 0;
 static ALLOCATOR: Once<Lock<PhysicalFrameAllocator>> = Once::new();
 static HHDM_OFFSET: AtomicU64 = AtomicU64::new(0);
 static ALLOCATION_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
+// Atomically mirrored counters for lock-free diagnostics: `statistics()` must never re-lock the
+// allocator (a failed allocation can call it while the lock is held, deadlocking), so these are
+// updated alongside the locked fields and read without taking the lock.
+static ALLOCATED_FRAMES: AtomicUsize = AtomicUsize::new(0);
+static TOTAL_FRAMES: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone, Copy)]
 pub(super) struct FrameIndex(usize);
@@ -61,6 +66,7 @@ impl PhysicalFrameAllocator {
             allocator.add_region(*region);
         }
 
+        TOTAL_FRAMES.store(allocator.total, Ordering::Relaxed);
         allocator
     }
 
@@ -69,11 +75,13 @@ impl PhysicalFrameAllocator {
         let end = usize::try_from(region.end / PAGE_SIZE).unwrap();
         self.allocator.add_frame(start, end);
         self.total = self.total.checked_add(end - start).unwrap();
+        TOTAL_FRAMES.store(self.total, Ordering::Relaxed);
     }
 
     fn allocate(&mut self) -> Option<FrameIndex> {
         let frame = self.allocator.alloc(1)?;
         self.allocated = self.allocated.checked_add(1).unwrap();
+        ALLOCATED_FRAMES.store(self.allocated, Ordering::Relaxed);
 
         #[cfg(debug_assertions)]
         assert!(self.live.insert(frame), "frame allocated twice");
@@ -86,6 +94,7 @@ impl PhysicalFrameAllocator {
         assert!(self.live.remove(&frame.0), "invalid frame deallocation");
 
         self.allocated = self.allocated.checked_sub(1).unwrap();
+        ALLOCATED_FRAMES.store(self.allocated, Ordering::Relaxed);
         self.allocator.dealloc(frame.0, 1);
     }
 }
@@ -125,14 +134,12 @@ pub(crate) fn hhdm_offset() -> u64 {
 }
 
 pub(crate) fn statistics() -> (usize, usize, usize) {
-    let Some(allocator) = ALLOCATOR.get() else {
-        return (0, 0, ALLOCATION_ATTEMPTS.load(Ordering::Relaxed));
-    };
-
-    let allocator = allocator.lock();
+    // Lock-free: reads the atomic mirrors so it never re-enters the allocator lock. A failed
+    // allocation may reach here while the allocator lock is already held; taking it again would
+    // deadlock the kernel on the OOM diagnostic path.
     (
-        allocator.total,
-        allocator.allocated,
+        TOTAL_FRAMES.load(Ordering::Relaxed),
+        ALLOCATED_FRAMES.load(Ordering::Relaxed),
         ALLOCATION_ATTEMPTS.load(Ordering::Relaxed),
     )
 }
