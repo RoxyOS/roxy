@@ -15,6 +15,8 @@ pub enum IoctlRequest<'a> {
     SetWindowSize(WindowSize),
     GetForegroundPgid(&'a mut u32),
     SetForegroundPgid(u32),
+    /// Flushes queued terminal input/output (`TCFLSH`). `which` is `TCIFLUSH`/`TCOFLUSH`/`TCIOFLUSH`.
+    Tcflush(u32),
     /// Makes the calling session leader's session the terminal's controlling session
     /// (`TIOCSCTTY`). `force` allows stealing an already-controlled terminal.
     SetControllingTerminal {

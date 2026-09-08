@@ -27,6 +27,7 @@ pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> R
         terminal::TIOCGPGRP => terminal::get_foreground_pgid(file, raw_argument).map(|()| 0),
         terminal::TIOCSPGRP => terminal::set_foreground_pgid(file, raw_argument).map(|()| 0),
         terminal::TIOCSCTTY => terminal::set_controlling_terminal(file, raw_argument).map(|()| 0),
+        terminal::TCFLSH => terminal::tcflush(file, raw_argument).map(|()| 0),
         pty::TIOCGPTN => pty::get_pty_number(file, raw_argument).map(|()| 0),
         pty::TIOCSPTLCK => pty::set_pty_lock(file, raw_argument).map(|()| 0),
         framebuffer::FBIOGET_VSCREENINFO => {

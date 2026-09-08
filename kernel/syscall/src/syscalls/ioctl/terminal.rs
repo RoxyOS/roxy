@@ -17,6 +17,7 @@ pub(super) const TIOCSWINSZ: u64 = 0x5414;
 pub(super) const TIOCGPGRP: u64 = 0x540f;
 pub(super) const TIOCSPGRP: u64 = 0x5410;
 pub(super) const TIOCSCTTY: u64 = 0x540e;
+pub(super) const TCFLSH: u64 = 0x540b;
 
 pub(super) fn get_termios(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
     let address = UserAddress::parse(raw_argument, Errno::Fault)?;
@@ -82,6 +83,14 @@ pub(super) fn set_foreground_pgid(file: &OpenFile, raw_argument: u64) -> Result<
     unsafe { user_memory::read(address, &mut pgid) }?;
 
     file.ioctl(IoctlRequest::SetForegroundPgid(pgid))
+        .map_err(super::execute::map_ioctl_error)
+}
+
+pub(super) fn tcflush(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
+    // TCFLSH's argument is the queue selector passed by value (the `int` of tcflush(3)).
+    let which = u32::try_from(raw_argument).map_err(|_| Errno::Invalid)?;
+
+    file.ioctl(IoctlRequest::Tcflush(which))
         .map_err(super::execute::map_ioctl_error)
 }
 

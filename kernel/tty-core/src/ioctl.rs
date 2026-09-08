@@ -5,16 +5,55 @@ use roxy_tty_types::{ApplyWhen, LocalFlags, Termios};
 
 use crate::core::TtyCore;
 
+// termios flag bit values follow mlibc `sysdeps/roxy/include/abi-bits/termios.h`. Only bits with
+// real, implemented line-discipline semantics (or, below, bits that are genuinely inapplicable on a
+// pty and documented as `TODO`) are accepted; everything else is rejected via the centralized
+// unsupported diagnostic.
 const CS8: u32 = 0o60;
 /// `c_iflag` ICRNL: map input CR to NL.
-const ICRNL: u32 = 0x100;
+const ICRNL: u32 = 0o400;
+/// `c_iflag` INLCR: map input NL to CR.
+const INLCR: u32 = 0o100;
+/// `c_iflag` IGNCR: discard input CR.
+const IGNCR: u32 = 0o200;
 /// `c_oflag` OPOST: enable output post-processing.
-const OPOST: u32 = 0x1;
+const OPOST: u32 = 0o1;
 /// `c_oflag` ONLCR: map output NL to CR+NL (effective under OPOST).
-const ONLCR: u32 = 0x4;
+const ONLCR: u32 = 0o4;
 const VINTR: usize = 0;
 const VERASE: usize = 2;
 const VMIN: usize = 6;
+
+/// `c_cflag` bits that control the modem/line this terminal runs on. A pty has no modem, parity, or
+/// line speed, so these are accepted and treated as no-ops rather than rejected. CRTSCTS hardware
+/// flow control and CMSPAR (0o4000000000) are omitted because `tcflag_t` is u32 on this platform
+/// and those values overflow; they are not used by the pty anyway.
+const MODEM_CFLAG: u32 = CS8
+    | 0o100 /* CSTOPB */
+    | 0o200 /* CREAD */
+    | 0o400 /* PARENB */
+    | 0o1000 /* PARODD */
+    | 0o2000 /* HUPCL */
+    | 0o4000 /* CLOCAL */
+    | 0o10017 /* CBAUD */
+    | 0o10000 /* CBAUDEX */;
+
+/// `c_lflag` bits whose effect is cosmetic or currently unimplemented (echo charm, flow control,
+/// output-to-background gating). They are accepted so a cooked terminal (e.g. xterm) can configure
+/// itself, with `TODO` markers for the semantics not yet implemented.
+const ECHO_LFLAG: u32 = 0o10 /* ECHO */
+    | 0o20 /* ECHOE */
+    | 0o40 /* ECHOK */
+    | 0o100 /* ECHONL */
+    | 0o1000 /* ECHOCTL */
+    | 0o2000 /* ECHOPRT */
+    | 0o4000 /* ECHOKE */
+    | 0o10_000 /* FLUSHO */
+    | 0o40_000 /* PENDIN */
+    | 0o200_000 /* EXTPROC */
+    | 0o400 /* TOSTOP */
+    | 0o200 /* NOFLSH */
+    | 0o100_000; /* IEXTEN */
 
 impl TtyCore {
     /// Dispatches a terminal ioctl request.
@@ -51,6 +90,7 @@ impl TtyCore {
                     .map_err(|_| IoctlError::Invalid)?;
                 Ok(())
             }
+            IoctlRequest::Tcflush(which) => self.tcflush(which),
             IoctlRequest::SetForegroundPgid(pgid) => {
                 // The caller must have this terminal as its controlling terminal and belong to
                 // the terminal's session (Linux `tiocspgrp`). The target group must exist and
@@ -141,6 +181,24 @@ impl TtyCore {
 
         Ok(())
     }
+    /// Flushes queued terminal input/output (`TCFLSH`): `which` is `TCIFLUSH` (0, discard
+    /// unread input), `TCOFLUSH` (1, discard unwritten output — a no-op here, since output goes
+    /// through the endpoint without buffering), or `TCIOFLUSH` (2, both).
+    fn tcflush(&self, which: u32) -> Result<(), IoctlError> {
+        let flush_input = match which {
+            0 /* TCIFLUSH */ | 2 /* TCIOFLUSH */ => true,
+            1 /* TCOFLUSH */ => false,
+            _ => return Err(IoctlError::Invalid),
+        };
+
+        if flush_input {
+            self.buffered.lock().clear();
+            self.line_discipline.lock().clear_input();
+            self.input_source.discard_pending_input();
+        }
+
+        Ok(())
+    }
 
     /// Makes the calling process's session the controller of this terminal (`TIOCSCTTY`).
     ///
@@ -177,7 +235,9 @@ fn termios_from_settings(settings: LineDisciplineSettings) -> Termios {
     control_characters[VMIN] = 1;
 
     Termios {
-        input_flags: if settings.icrnl { ICRNL } else { 0 },
+        input_flags: (if settings.icrnl { ICRNL } else { 0 })
+            | (if settings.inlcr { INLCR } else { 0 })
+            | (if settings.igncr { IGNCR } else { 0 }),
         output_flags: (if settings.opost { OPOST } else { 0 })
             | (if settings.onlcr { ONLCR } else { 0 }),
         control_flags: CS8,
@@ -197,6 +257,8 @@ fn settings_from_termios(termios: Termios) -> LineDisciplineSettings {
         isig: termios.local_flags.contains(LocalFlags::ISIG),
         intr_character: termios.control_characters[VINTR],
         icrnl: termios.input_flags & ICRNL != 0,
+        inlcr: termios.input_flags & INLCR != 0,
+        igncr: termios.input_flags & IGNCR != 0,
         opost: termios.output_flags & OPOST != 0,
         onlcr: termios.output_flags & ONLCR != 0,
     }
@@ -212,25 +274,45 @@ fn local_flags_from_settings(settings: LineDisciplineSettings) -> LocalFlags {
 }
 
 /// Validate that all fields in `termios` are supported. Returns `Unsupported` if not.
+#[allow(clippy::similar_names)] // supported_iflag/oflag/cflag/lflag are distinct flag groups
 fn validate_termios(termios: &Termios) -> Result<(), IoctlError> {
-    // Only the input flags the line discipline implements (currently ICRNL) are accepted; any
-    // other c_iflag bit is still rejected through the centralized unsupported diagnostic.
+    // c_iflag: implemented CR/NL translation plus pty-inapplicable flow/break bits (TODO
+    // flow-control/parity semantics are not yet implemented; they are accepted to let a cooked
+    // terminal configure itself).
+    let supported_iflag = ICRNL | INLCR | IGNCR
+        | 0o1 /* IGNBRK */ | 0o2 /* BRKINT */ | 0o4 /* IGNPAR */ | 0o10 /* PARMRK */
+        | 0o20 /* INPCK */ | 0o40 /* ISTRIP */ | 0o1000 /* IUCLC */ | 0o2000 /* IXON */
+        | 0o4000 /* IXANY */ | 0o10000 /* IXOFF */ | 0o20000 /* IMAXBEL */ | 0o40000 /* IUTF8 */;
     validate_fixed(
         "ioctl.tcsetattr.input-flags",
-        termios.input_flags & !ICRNL,
+        termios.input_flags & !supported_iflag,
         0,
     )?;
-    // Only the output flags the line discipline implements (OPOST/ONLCR) are accepted.
+    // c_oflag: OPOST/ONLCR implemented; the remaining output post-processing bits (TODO) are
+    // accepted as no-ops so cooked terminals can configure their CR/NL/fluid line endings.
+    let supported_oflag = OPOST | ONLCR
+        | 0o2 /* OLCUC */ | 0o10 /* OCRNL */ | 0o20 /* ONOCR */ | 0o40 /* ONLRET */
+        | 0o100 /* OFILL */ | 0o200 /* OFDEL */;
     validate_fixed(
         "ioctl.tcsetattr.output-flags",
-        termios.output_flags & !(OPOST | ONLCR),
+        termios.output_flags & !supported_oflag,
         0,
     )?;
-    validate_fixed("ioctl.tcsetattr.control-flags", termios.control_flags, CS8)?;
-
-    let supported_local = LocalFlags::ECHO | LocalFlags::ICANON | LocalFlags::ISIG;
-    let unsupported_local = termios.local_flags.difference(supported_local);
-    validate_fixed("ioctl.tcsetattr.local-flags", unsupported_local.bits(), 0)?;
+    // c_cflag: a pty has no modem/parity/line speed, so those bits are accepted as no-ops.
+    validate_fixed(
+        "ioctl.tcsetattr.control-flags",
+        termios.control_flags & !MODEM_CFLAG,
+        0,
+    )?;
+    // c_lflag: ISIG/ICANON/ECHO implemented; the rest (echo charm, flow control, background-output
+    // gating) are accepted as no-ops with TODO markers.
+    let supported_lflag =
+        (LocalFlags::ISIG | LocalFlags::ICANON | LocalFlags::ECHO).bits() | ECHO_LFLAG;
+    validate_fixed(
+        "ioctl.tcsetattr.local-flags",
+        termios.local_flags.bits() & !supported_lflag,
+        0,
+    )?;
     validate_fixed(
         "ioctl.tcsetattr.line-discipline",
         u32::from(termios.line_discipline),

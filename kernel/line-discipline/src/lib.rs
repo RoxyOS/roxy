@@ -43,10 +43,16 @@ impl LineDiscipline {
             return ProcessResult::ignored();
         }
 
-        // ICRNL: map input CR to NL. Applied before the canonical/non-canonical split as POSIX
-        // input translation happens regardless of mode.
+        // POSIX input translation (c_iflag), applied before the canonical/non-canonical split:
+        // IGNCR discards CR, then ICRNL maps any remaining CR to NL, then INLCR maps NL to CR.
+        // These operate on individual input bytes (the master feeds one byte per event).
+        if self.settings.igncr && input == b"\r" {
+            return ProcessResult::ignored();
+        }
         let input: &[u8] = if self.settings.icrnl && input == b"\r" {
             b"\n"
+        } else if self.settings.inlcr && input == b"\n" {
+            b"\r"
         } else {
             input
         };
