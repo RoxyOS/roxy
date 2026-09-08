@@ -6,6 +6,8 @@ use roxy_tty_types::{ApplyWhen, LocalFlags, Termios};
 use crate::core::TtyCore;
 
 const CS8: u32 = 0o60;
+/// `c_iflag` ICRNL: map input CR to NL.
+const ICRNL: u32 = 0x100;
 const VINTR: usize = 0;
 const VERASE: usize = 2;
 const VMIN: usize = 6;
@@ -171,7 +173,7 @@ fn termios_from_settings(settings: LineDisciplineSettings) -> Termios {
     control_characters[VMIN] = 1;
 
     Termios {
-        input_flags: 0,
+        input_flags: if settings.icrnl { ICRNL } else { 0 },
         output_flags: 0,
         control_flags: CS8,
         local_flags: local_flags_from_settings(settings),
@@ -189,6 +191,7 @@ fn settings_from_termios(termios: Termios) -> LineDisciplineSettings {
         erase_character: termios.control_characters[VERASE],
         isig: termios.local_flags.contains(LocalFlags::ISIG),
         intr_character: termios.control_characters[VINTR],
+        icrnl: termios.input_flags & ICRNL != 0,
     }
 }
 
@@ -203,7 +206,13 @@ fn local_flags_from_settings(settings: LineDisciplineSettings) -> LocalFlags {
 
 /// Validate that all fields in `termios` are supported. Returns `Unsupported` if not.
 fn validate_termios(termios: &Termios) -> Result<(), IoctlError> {
-    validate_fixed("ioctl.tcsetattr.input-flags", termios.input_flags, 0)?;
+    // Only the input flags the line discipline implements (currently ICRNL) are accepted; any
+    // other c_iflag bit is still rejected through the centralized unsupported diagnostic.
+    validate_fixed(
+        "ioctl.tcsetattr.input-flags",
+        termios.input_flags & !ICRNL,
+        0,
+    )?;
     validate_fixed("ioctl.tcsetattr.output-flags", termios.output_flags, 0)?;
     validate_fixed("ioctl.tcsetattr.control-flags", termios.control_flags, CS8)?;
 

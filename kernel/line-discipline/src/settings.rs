@@ -1,5 +1,6 @@
 /// Input settings owned by a line discipline.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[allow(clippy::struct_excessive_bools)] // a bitmask-like settings bag reads best as plain fields
 pub struct LineDisciplineSettings {
     pub echo: bool,
     pub canonical: bool,
@@ -8,6 +9,8 @@ pub struct LineDisciplineSettings {
     pub isig: bool,
     /// The interrupt character (termios `VINTR`), conventionally Ctrl+C.
     pub intr_character: u8,
+    /// Whether input carriage returns are mapped to newlines (termios `ICRNL`).
+    pub icrnl: bool,
 }
 
 impl LineDisciplineSettings {
@@ -19,6 +22,7 @@ impl LineDisciplineSettings {
             erase_character: b'\x08',
             isig: true,
             intr_character: b'\x03',
+            icrnl: true,
         }
     }
 }

@@ -43,6 +43,14 @@ impl LineDiscipline {
             return ProcessResult::ignored();
         }
 
+        // ICRNL: map input CR to NL. Applied before the canonical/non-canonical split as POSIX
+        // input translation happens regardless of mode.
+        let input: &[u8] = if self.settings.icrnl && input == b"\r" {
+            b"\n"
+        } else {
+            input
+        };
+
         if !self.settings.canonical {
             return ProcessResult {
                 echo: self.settings.echo,
@@ -233,6 +241,35 @@ mod tests {
         let mut discipline = LineDiscipline::new();
 
         assert_eq!(discipline.process(b"\x08"), ProcessResult::ignored());
+    });
+
+    kernel_test!(
+        "roxy-line-discipline::icrnl",
+        maps_carriage_return_to_newline,
+        {
+            let mut discipline = LineDiscipline::new();
+
+            // Default cooked mode maps CR to NL; the CR commits the canonical line as a newline.
+            assert_eq!(
+                discipline.process(b"\r"),
+                ProcessResult {
+                    echo: true,
+                    buffer: Some(b"\n".to_vec()),
+                    signal: None,
+                }
+            );
+        }
+    );
+
+    kernel_test!("roxy-line-discipline::icrnl-disabled", passes_cr_through, {
+        let mut discipline = LineDiscipline::with_settings(LineDisciplineSettings {
+            icrnl: false,
+            ..LineDisciplineSettings::new()
+        });
+
+        // Without ICRNL the CR is ordinary input in canonical mode, not a line terminator.
+        assert!(discipline.process(b"\r").buffer.is_none());
+        assert_eq!(discipline.process(b"\n").buffer.unwrap(), b"\r\n");
     });
 
     kernel_test!("roxy-line-discipline::settings", obeys_settings, {
