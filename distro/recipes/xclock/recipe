@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+version=1.2.1
+revision=1
+
+tarball_url="https://www.x.org/releases/individual/app/xclock-${version}.tar.xz"
+tarball_sha256="e326cac20f7ad2af5412b9c4b70b1c3d392e08cd3cc6246e0a77b7c3935a4851"
+
+cross_compile=yes
+
+# xclock renders with the Xaw (Athena) toolkit widgets; Xmu/Xt/Xext/X11 supply
+# the drawing plumbing.
+deps="mlibc libx11 libxmu libxt libxext libxaw xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="gcc libc6-dev make pkg-config"
+
+source "${base_dir}/build-systems/autotools.sh"
+
+prepare() {
+	autotools_patch_roxy_target
+}
+
+configure() {
+	# Xft rendering (default ON) pulls in libXft and libXrender, which are not
+	# packaged; the plain Xaw/bitmap-fixed-font path does not need them.  The
+	# XKB bell (default try/ON) requires libxkbfile for XkbBell; disabling it
+	# keeps xclock's runtime dependency closure to the Xaw toolkit alone.
+	autotools_configure \
+		--without-xft \
+		--without-xkb
+}
+
+build() {
+	autotools_build
+}
+
+package() {
+	autotools_install
+}
