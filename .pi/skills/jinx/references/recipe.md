@@ -35,6 +35,14 @@ Run in order: `early_prepare()` → (patches) → `prepare()` → `configure()` 
   Autotools recipes do **not** auto-run autoreconf: `autotools.sh` uses the tarball's pre-generated
   `configure`. To regenerate you need an explicit `autoreconf` here (rare), or patch the generated
   `configure` rather than its `aclocal.m4`/`configure.in` source.
+- Cross-build leak to watch: `autotools_configure` exports `PKG_CONFIG_SYSROOT_DIR=/sysroot`
+  (plus `CC --sysroot=/sysroot`) so configure checks resolve the sysroot. But any *runtime* path
+  a package takes from pkg-config during configure (font root dir, datadir, locale, bindir) comes
+  back prefixed with `/sysroot`; if it bakes that into a `#define`/default path (Xorg
+  `COMPILEDDEFAULTFONTPATH`), the installed binary looks under `/sysroot/...` at runtime, which
+  does not exist. Override such paths with a hardcoded real-`/usr` value via a `--with-*` configure
+  option (see xorg-server: `--with-xkb-path=/usr/share/X11/xkb`,
+  `--with-default-font-path=/usr/share/fonts/X11/misc`).
 - `configure()` — from build dir (out-of-tree: `target/jinx/builds/<name>/`); only when build dir
   doesn't exist (first build, after `rebuild`, after version/revision bump). Generated config headers
   (e.g. `config.h`, `xtermcfg.h`) are written to this cwd, not `${source_dir}` — patch them by relative
