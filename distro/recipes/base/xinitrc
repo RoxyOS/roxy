@@ -1,5 +1,4 @@
 #!/bin/sh
 
-twm &
-xeyes &
-exec xeyes
+jwm &
+exec xterm
