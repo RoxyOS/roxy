@@ -55,6 +55,14 @@ programs and libraries Jinx builds — not the kernel's user-mode execution mode
   only an explicit `autoreconf` in `prepare()` regenerates it, and that is not the default. Builds
   are also **out-of-tree**: `configure()`/`build()`/`package()` run from `target/jinx/builds/<name>/`
   (cwd), so configure-generated headers land there and **not** in `${source_dir}`.
+- **pkg-config-derived runtime paths leak `/sysroot`.** `autotools_configure` exports
+  `PKG_CONFIG_SYSROOT_DIR=/sysroot`, so any **runtime** path a package takes from pkg-config during
+  configure (font root dir, datadir, locale, bindir) comes back prefixed with `/sysroot`; if the
+  package bakes it into a `#define`/default path (Xorg `COMPILEDDEFAULTFONTPATH`), the installed
+  binary looks under `/sysroot/...` at runtime, which does not exist. Override with a hardcoded
+  real-`/usr` value via a `--with-*` configure option (see xorg-server: `--with-xkb-path=/usr/share/X11/xkb`,
+  `--with-default-font-path=/usr/share/fonts/X11/misc`). Check by grepping the built binary/config.log
+  for a `/sysroot/usr/share/...` path after configure.
 
 ## Which guide to read
 
