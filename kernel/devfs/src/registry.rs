@@ -28,6 +28,16 @@ pub trait Device: Send + Sync {
         false
     }
 
+    /// Tries to bind this (terminal) device as the calling process's controlling terminal.
+    ///
+    /// Called by devfs right after a terminal device is opened. A session leader that has no
+    /// controlling terminal yet and opens an unowned terminal acquires it as its controlling
+    /// terminal (Linux `tty_open` semantics); returns `false` for non-terminals and when the
+    /// caller or terminal is not eligible.
+    fn acquire_controlling_terminal(&self) -> bool {
+        false
+    }
+
     /// Returns this terminal's openable pathname within the device filesystem (for example
     /// `/dev/tty0` or `/dev/pts/3`), when the device is a terminal.
     ///

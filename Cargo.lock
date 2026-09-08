@@ -402,6 +402,7 @@ dependencies = [
  "roxy-time",
  "roxy-timer-wait",
  "roxy-tty",
+ "roxy-tty-core",
  "roxy-vfs",
  "roxy-vm",
  "spin 0.12.2",
@@ -1035,6 +1036,7 @@ version = "0.1.0"
 dependencies = [
  "linkme",
  "roxy-arch",
+ "roxy-devfs",
  "roxy-fd",
  "roxy-line-discipline",
  "roxy-poll",

@@ -86,6 +86,7 @@ roxy-time.workspace = true
 roxy-posix-timer.workspace = true
 roxy-timer-wait.workspace = true
 roxy-tty.workspace = true
+roxy-tty-core.workspace = true
 roxy-vfs.workspace = true
 roxy-vm.workspace = true
 

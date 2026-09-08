@@ -49,6 +49,10 @@ pub extern "C" fn _start() -> ! {
         .register(b"ptmx", pty_registry.clone())
         .expect("pty master registered exactly once");
     device_registry.register_dynamic_resolver(pty_registry.clone());
+    // `/dev/tty` resolves to the calling process's controlling terminal (see tty-core).
+    device_registry.register_dynamic_resolver(alloc::sync::Arc::new(
+        roxy_tty_core::ControllingTerminalResolver,
+    ));
     let rsdp_address = boot_info
         .rsdp_address
         .checked_sub(boot_info.hhdm_offset)

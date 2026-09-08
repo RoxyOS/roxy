@@ -64,6 +64,17 @@ each core owned by the exited session, releases the terminal and sends `SIGHUP` 
 group. This replaces the previous single-console exit handler and lets console and pty terminals
 share one dispatch path.
 
+A session leader that opens an unowned terminal acquires it as its controlling terminal without an
+explicit `TIOCSCTTY` (Linux `tty_open` semantics): `TtyCore::try_acquire_controlling_terminal`
+runs from devfs at terminal open, binds the caller's session and foreground group only when the
+caller is a session leader, the session does not yet control a terminal, and this core is unowned
+(a core can be bound at most once, via the same owner lock `bind_session`/`TIOCSCTTY` share).
+`TtyCore` also serves the reverse lookup: `controlling_terminal_of(session)` scans the same live
+weak set used by the exit handler to find a session's controlling terminal. The `/dev/tty` node is
+a devfs dynamic resolver (`ControllingTerminalResolver`) in tty-core that maps the fixed `tty` path
+to a `ControlTerminal` device wrapping the calling session's resolved core, or nothing (open fails)
+when the process has no controlling terminal.
+
 ## Concurrency and extension contract
 
 `TtyCore` and its extension traits are `Send + Sync`. The interrupt-time fast path runs with

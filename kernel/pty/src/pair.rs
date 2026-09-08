@@ -228,6 +228,12 @@ impl roxy_devfs::Device for PtySlave {
         Some(alloc::format!("/dev/pts/{}", self.pair.number).into_bytes())
     }
 
+    fn acquire_controlling_terminal(&self) -> bool {
+        // A session leader opening this unowned slave acquires it as its controlling terminal
+        // (Linux `tty_open`). The slave's line discipline is what the child interacts with.
+        self.pair.slave_core.try_acquire_controlling_terminal()
+    }
+
     fn read(&self, output: &mut [u8]) -> Result<usize, FileError> {
         self.pair.slave_core.read(output)
     }

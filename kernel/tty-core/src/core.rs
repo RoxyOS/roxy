@@ -228,6 +228,37 @@ impl TtyCore {
         *self.foreground_pgid.lock() = Some(pgid);
     }
 
+    /// Tries to bind this terminal as the calling process's controlling terminal.
+    ///
+    /// Mirrors [`Self::set_controlling_terminal`] but is invoked implicitly when a session leader
+    /// opens this terminal (Linux `tty_open` semantics): a session leader that does not yet have a
+    /// controlling terminal and opens an unowned terminal acquires it. Returns `true` when this
+    /// terminal became the caller's controlling terminal.
+    #[must_use]
+    pub fn try_acquire_controlling_terminal(&self) -> bool {
+        if !roxy_process::is_current_session_leader() {
+            return false;
+        }
+        let Some(caller_session) = roxy_process::current_process_session_id() else {
+            return false;
+        };
+
+        // A session has at most one controlling terminal; refuse if it already controls another.
+        if controlling_terminal_of(caller_session).is_some() {
+            return false;
+        }
+
+        let mut owner = self.owner_session_id.lock();
+        if owner.is_some() {
+            return false;
+        }
+        let caller_pgid = roxy_process::current_process_group_id();
+        *owner = Some(caller_session);
+        *self.foreground_pgid.lock() = Some(caller_pgid);
+
+        true
+    }
+
     /// Releases the terminal when its controlling session's leader exits.
     ///
     /// If `session` owns this terminal, clears the ownership and returns the process group that
@@ -372,6 +403,22 @@ static LIVE_TERMINALS: spin::Once<Lock<alloc::vec::Vec<alloc::sync::Weak<TtyCore
 
 fn live_terminals() -> &'static Lock<alloc::vec::Vec<alloc::sync::Weak<TtyCore>>> {
     LIVE_TERMINALS.call_once(|| Lock::new(alloc::vec::Vec::new()))
+}
+
+/// Returns the live terminal core currently owned by `session`, if any.
+///
+/// This is the reverse of a core's `owner_session_id`: it finds a session's controlling terminal by
+/// scanning the shared live set, the same way the session-leader-exit handler relocates and releases
+/// terminals. Served to the `/dev/tty` node so opening it resolves to the current controlling
+/// terminal.
+#[must_use]
+pub fn controlling_terminal_of(session: SessionId) -> Option<Arc<TtyCore>> {
+    let live = live_terminals().lock();
+
+    live.iter().find_map(|weak| {
+        let core = weak.upgrade()?;
+        (core.owning_session() == Some(session)).then_some(core)
+    })
 }
 
 static EXIT_HANDLER_INSTALLED: spin::Once<()> = spin::Once::new();
