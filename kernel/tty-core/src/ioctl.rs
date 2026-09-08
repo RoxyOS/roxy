@@ -150,11 +150,16 @@ impl TtyCore {
     fn termios(&self) -> Termios {
         let settings = self.line_discipline.lock().settings;
 
-        termios_from_settings(settings)
+        let mut termios = termios_from_settings(settings);
+        // Return the full stored control-character set so tcgetattr reflects what tcsetattr saved.
+        termios.control_characters = *self.control_characters.lock();
+        termios
     }
 
     fn set_termios(&self, when: ApplyWhen, termios: Termios) -> Result<(), IoctlError> {
         validate_termios(&termios)?;
+        // Persist the control characters for round-trip; only VINTR/VERASE drive the discipline.
+        *self.control_characters.lock() = termios.control_characters;
 
         let _read_guard = self.read_lock.lock();
 
@@ -321,27 +326,20 @@ fn validate_termios(termios: &Termios) -> Result<(), IoctlError> {
     validate_fixed("ioctl.tcsetattr.input-speed", termios.input_speed, 0)?;
     validate_fixed("ioctl.tcsetattr.output-speed", termios.output_speed, 0)?;
 
-    let mut expected = [0; 32];
-    expected[VINTR] = 0o3;
-    expected[VERASE] = termios.control_characters[VERASE];
-    expected[VMIN] = 1;
-
-    if let Some((index, value)) = termios
-        .control_characters
-        .iter()
-        .copied()
-        .enumerate()
-        .find(|(index, value)| *value != expected[*index])
-    {
-        let argument = u64::try_from(index).unwrap() << 8 | u64::from(value);
-
-        return Err(IoctlError::Unsupported {
-            operation: "ioctl.tcsetattr.control-character",
-            argument,
-        });
-    }
-
+    // The control characters are single bytes (cc_t) and are round-tripped wholesale; only VINTR
+    // (SIGINT) and VERASE drive the discipline.
+    // TODO(control-chars): SIGQUIT/SIGTSTP (VQUIT/VSUSP), VEOF, VKILL, VSTART/VSTOP, etc. are
+    // stored but not yet wired to the line discipline.
     Ok(())
+}
+
+/// The default termios control-character set: VINTR is Ctrl+C (3), VERASE backspace (8), VMIN 1.
+pub(crate) fn default_control_characters() -> [u8; 32] {
+    let mut cc = [0; 32];
+    cc[VINTR] = 0o3;
+    cc[VERASE] = 0o10;
+    cc[VMIN] = 1;
+    cc
 }
 
 fn validate_fixed(operation: &'static str, actual: u32, expected: u32) -> Result<(), IoctlError> {
