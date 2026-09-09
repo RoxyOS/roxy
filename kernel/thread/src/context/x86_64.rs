@@ -97,7 +97,7 @@ impl ContextBackend for X86_64Context {
             },
         );
         saved_context.fs_base = fs_base;
-        // SAFETY: Architecture initialization configures FXSAVE before any thread is created.
+        // SAFETY: Architecture initialization configures XSAVE (x87/SSE/AVX) before any thread is created.
         saved_context.float_state = unsafe { FloatState::capture_current() };
         saved_context
     }
