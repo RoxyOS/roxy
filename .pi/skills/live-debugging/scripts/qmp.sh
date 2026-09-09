@@ -5,4 +5,19 @@
 set -eu
 export QMP_SOCK="${QMP_SOCK:-target/roxy/agent-debug/qmp.sock}"
 request="${1:?usage: <skill-dir>/scripts/qmp.sh '<QMP JSON request>'}"
-printf '{"execute":"qmp_capabilities"}\n%s\n' "$request" | socat - UNIX-CONNECT:"$QMP_SOCK"
+
+# QEMU's `server,nowait` re-creates the listening socket after each disconnect.
+# socat is fast enough to hit the brief window before the new listener is ready,
+# so retry a few times with a short back-off.
+attempt=1
+while true; do
+    if printf '{"execute":"qmp_capabilities"}\n%s\n' "$request" | socat - UNIX-CONNECT:"$QMP_SOCK" 2>/dev/null; then
+        exit 0
+    fi
+    if [ "$attempt" -ge 5 ]; then
+        echo "qmp.sh: failed to connect to $QMP_SOCK after $attempt attempts" >&2
+        exit 1
+    fi
+    attempt=$((attempt + 1))
+    sleep 0.05
+done
