@@ -87,6 +87,7 @@
               pkgs.OVMF.fd
               pkgs.pkg-config
               pkgs.qemu
+              pkgs.socat
               pkgs.xorriso
             ]
             ++ (with pkgs.llvmPackages; [
