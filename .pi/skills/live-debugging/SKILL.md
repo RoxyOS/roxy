@@ -1,6 +1,6 @@
 ---
 name: live-debugging
-description: Use when you need to debug a live qemu vm session.
+description: Use when you need to debug a live qemu vm session, attaching gdb, sending key inputs, mouse inputs, and screendumping.
 ---
 
 # Live QEMU Debugging in Roxy OS
