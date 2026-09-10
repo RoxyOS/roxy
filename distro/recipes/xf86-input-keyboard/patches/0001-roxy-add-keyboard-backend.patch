@@ -1,0 +1,363 @@
+diff --git xf86-input-keyboard-clean/configure xf86-input-keyboard-workdir/configure
+index 76f1212..553ab63 100755
+--- xf86-input-keyboard-clean/configure
++++ xf86-input-keyboard-workdir/configure
+@@ -19844,6 +19844,10 @@ case $host_os in
+     as_fn_error $? "This is not the keyboard driver you are looking for. Use evdev or libinput." "$LINENO" 5
+     ;;
+ 
++  roxy*)
++    # Roxy has its own keyboard device; see src/roxy_kbd.c.
++    ;;
++
+   freebsd* | kfreebsd-gnu* | netbsd* | openbsd* | dragonfly*)
+     IS_BSD="yes"
+     ;;
+diff --git xf86-input-keyboard-clean/src/Makefile.in xf86-input-keyboard-workdir/src/Makefile.in
+index 6daf679..dea865a 100644
+--- xf86-input-keyboard-clean/src/Makefile.in
++++ xf86-input-keyboard-workdir/src/Makefile.in
+@@ -162,8 +162,8 @@ am__objects_3 = sun_kbd.lo sun_kbdMap.lo
+ @SOLARIS_TRUE@am__objects_4 = $(am__objects_3)
+ am__objects_5 = hurd_kbd.lo at_scancode.lo
+ @HURD_TRUE@am__objects_6 = $(am__objects_5)
+-am_kbd_drv_la_OBJECTS = kbd.lo $(am__objects_2) $(am__objects_4) \
+-	$(am__objects_6)
++am_kbd_drv_la_OBJECTS = kbd.lo roxy_kbd.lo $(am__objects_2) \
++	$(am__objects_4) $(am__objects_6)
+ kbd_drv_la_OBJECTS = $(am_kbd_drv_la_OBJECTS)
+ AM_V_lt = $(am__v_lt_@AM_V@)
+ am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
+@@ -189,7 +189,7 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
+ am__maybe_remake_depfiles = depfiles
+ am__depfiles_remade = ./$(DEPDIR)/at_scancode.Plo \
+ 	./$(DEPDIR)/bsd_KbdMap.Plo ./$(DEPDIR)/bsd_kbd.Plo \
+-	./$(DEPDIR)/hurd_kbd.Plo ./$(DEPDIR)/kbd.Plo \
++	./$(DEPDIR)/hurd_kbd.Plo ./$(DEPDIR)/kbd.Plo ./$(DEPDIR)/roxy_kbd.Plo \
+ 	./$(DEPDIR)/sun_kbd.Plo ./$(DEPDIR)/sun_kbdMap.Plo
+ am__mv = mv -f
+ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+@@ -387,7 +387,7 @@ top_srcdir = @top_srcdir@
+ AM_CFLAGS = $(XORG_CFLAGS) $(CWARNFLAGS) $(OS_FLAGS)
+ kbd_drv_la_LTLIBRARIES = kbd_drv.la
+ kbd_drv_la_LDFLAGS = -avoid-version -module
+-kbd_drv_la_SOURCES = kbd.c xf86OSKbd.h xf86Keymap.h atKeynames.h \
++kbd_drv_la_SOURCES = kbd.c xf86OSKbd.h xf86Keymap.h atKeynames.h roxy_kbd.c \
+ 	$(am__append_1) $(am__append_2) $(am__append_3)
+ kbd_drv_la_LIBADD = $(XORG_LIBS)
+ kbd_drv_ladir = @inputdir@
+@@ -476,6 +476,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bsd_kbd.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hurd_kbd.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kbd.Plo@am__quote@ # am--include-marker
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/roxy_kbd.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sun_kbd.Plo@am__quote@ # am--include-marker
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sun_kbdMap.Plo@am__quote@ # am--include-marker
+ 
+diff --git xf86-input-keyboard-workdir/src/roxy_kbd.c xf86-input-keyboard-workdir/src/roxy_kbd.c
+new file mode 100644
+index 0000000..bbff0e3
+--- /dev/null
++++ xf86-input-keyboard-workdir/src/roxy_kbd.c
+@@ -0,0 +1,301 @@
++/*
++ * Roxy keyboard backend.
++ *
++ * Roxy exposes its keyboard as /dev/keyboard, a character device that serves fixed-size
++ * `roxy_key_event` records through read(2): one record per key transition, carrying a
++ * `ROXY_KEY_*` code and the press/release state (see <roxy/keyboard-dev.h>). The codes are
++ * Roxy's own rather than AT scancodes, so this backend maps them onto the X keycode offsets in
++ * atKeynames.h and lets the server's keymap and XKB layer turn those into keysyms and modifiers.
++ *
++ * There is no ioctl interface. Nothing has to be programmed to receive events, but that also
++ * means the keyboard lamps cannot be driven; see RoxySetLeds below.
++ */
++
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#include <errno.h>
++#include <fcntl.h>
++#include <stdio.h>
++#include <string.h>
++#include <unistd.h>
++
++#include <xorg-server.h>
++#include <X11/X.h>
++
++#include "compiler.h"
++#include "xf86.h"
++#include "xf86Xinput.h"
++#include "xf86OSKbd.h"
++#include "atKeynames.h"
++#include "xf86Keymap.h"
++
++#include <roxy/keyboard-dev.h>
++
++/* The node Roxy always creates for its keyboard. */
++#define ROXY_KEYBOARD_DEVICE "/dev/keyboard"
++
++/* Records read per syscall. The device returns as many whole records as fit, so a batch keeps
++ * the syscall count low while typing quickly. */
++#define ROXY_KEYBOARD_BATCH 32
++
++static void
++RoxyBell(InputInfoPtr pInfo, int loudness, int pitch, int duration)
++{
++    (void) pInfo;
++    (void) loudness;
++    (void) pitch;
++    (void) duration;
++}
++
++/* TODO(missing-capability: no ioctl channel for keyboard LEDs): /dev/keyboard serves its event
++ * stream through read only, so there is no way for userspace to program the LED state. X still
++ * tracks the lock state itself; only the lamps stay dark. Recorded in ISSUES.md. */
++static void
++RoxySetLeds(InputInfoPtr pInfo, int leds)
++{
++    (void) pInfo;
++    (void) leds;
++}
++
++static int
++RoxyGetLeds(InputInfoPtr pInfo)
++{
++    (void) pInfo;
++
++    return 0;
++}
++
++static void
++RoxyKbdGetMapping(InputInfoPtr pInfo, KeySymsPtr pKeySyms, CARD8 *pModMap)
++{
++    (void) pInfo;
++    (void) pModMap;
++
++    pKeySyms->map = map;
++    pKeySyms->mapWidth = GLYPHS_PER_KEY;
++    pKeySyms->minKeyCode = MIN_KEYCODE;
++    pKeySyms->maxKeyCode = MAX_KEYCODE;
++}
++
++/* Translates a `ROXY_KEY_*` code into the X keycode offset PostKbdEvent expects.
++ *
++ * The offsets are the ones atKeynames.h names after the AT scancode set, which is what the
++ * server's default keymap (xf86Keymap.h) is indexed by. Returns 0 for a code with no key here,
++ * which RoxyRemapScancode then drops.
++ */
++static int
++RoxyKeycode(int code)
++{
++    switch (code) {
++    case ROXY_KEY_ESCAPE: return KEY_Escape;
++    case ROXY_KEY_BACKSPACE: return KEY_BackSpace;
++    case ROXY_KEY_TAB: return KEY_Tab;
++    case ROXY_KEY_ENTER: return KEY_Enter;
++    case ROXY_KEY_INSERT: return KEY_Insert;
++    case ROXY_KEY_DELETE: return KEY_Delete;
++    case ROXY_KEY_HOME: return KEY_Home;
++    case ROXY_KEY_END: return KEY_End;
++    case ROXY_KEY_PAGE_UP: return KEY_PgUp;
++    case ROXY_KEY_PAGE_DOWN: return KEY_PgDown;
++    case ROXY_KEY_MENU: return KEY_Menu;
++
++    case ROXY_KEY_A: return KEY_A;
++    case ROXY_KEY_B: return KEY_B;
++    case ROXY_KEY_C: return KEY_C;
++    case ROXY_KEY_D: return KEY_D;
++    case ROXY_KEY_E: return KEY_E;
++    case ROXY_KEY_F: return KEY_F;
++    case ROXY_KEY_G: return KEY_G;
++    case ROXY_KEY_H: return KEY_H;
++    case ROXY_KEY_I: return KEY_I;
++    case ROXY_KEY_J: return KEY_J;
++    case ROXY_KEY_K: return KEY_K;
++    case ROXY_KEY_L: return KEY_L;
++    case ROXY_KEY_M: return KEY_M;
++    case ROXY_KEY_N: return KEY_N;
++    case ROXY_KEY_O: return KEY_O;
++    case ROXY_KEY_P: return KEY_P;
++    case ROXY_KEY_Q: return KEY_Q;
++    case ROXY_KEY_R: return KEY_R;
++    case ROXY_KEY_S: return KEY_S;
++    case ROXY_KEY_T: return KEY_T;
++    case ROXY_KEY_U: return KEY_U;
++    case ROXY_KEY_V: return KEY_V;
++    case ROXY_KEY_W: return KEY_W;
++    case ROXY_KEY_X: return KEY_X;
++    case ROXY_KEY_Y: return KEY_Y;
++    case ROXY_KEY_Z: return KEY_Z;
++
++    case ROXY_KEY_0: return KEY_0;
++    case ROXY_KEY_1: return KEY_1;
++    case ROXY_KEY_2: return KEY_2;
++    case ROXY_KEY_3: return KEY_3;
++    case ROXY_KEY_4: return KEY_4;
++    case ROXY_KEY_5: return KEY_5;
++    case ROXY_KEY_6: return KEY_6;
++    case ROXY_KEY_7: return KEY_7;
++    case ROXY_KEY_8: return KEY_8;
++    case ROXY_KEY_9: return KEY_9;
++
++    case ROXY_KEY_GRAVE: return KEY_Tilde;
++    case ROXY_KEY_MINUS: return KEY_Minus;
++    case ROXY_KEY_EQUALS: return KEY_Equal;
++    case ROXY_KEY_BRACKET_LEFT: return KEY_LBrace;
++    case ROXY_KEY_BRACKET_RIGHT: return KEY_RBrace;
++    case ROXY_KEY_BACKSLASH: return KEY_BSlash;
++    case ROXY_KEY_SEMICOLON: return KEY_SemiColon;
++    case ROXY_KEY_APOSTROPHE: return KEY_Quote;
++    case ROXY_KEY_COMMA: return KEY_Comma;
++    case ROXY_KEY_PERIOD: return KEY_Period;
++    case ROXY_KEY_SLASH: return KEY_Slash;
++    case ROXY_KEY_SPACE: return KEY_Space;
++
++    case ROXY_KEY_LEFT_SHIFT: return KEY_ShiftL;
++    case ROXY_KEY_RIGHT_SHIFT: return KEY_ShiftR;
++    case ROXY_KEY_LEFT_CTRL: return KEY_LCtrl;
++    case ROXY_KEY_RIGHT_CTRL: return KEY_RCtrl;
++    case ROXY_KEY_LEFT_ALT: return KEY_Alt;
++    case ROXY_KEY_RIGHT_ALT: return KEY_AltLang;
++    case ROXY_KEY_LEFT_SUPER: return KEY_LMeta;
++    case ROXY_KEY_RIGHT_SUPER: return KEY_RMeta;
++    case ROXY_KEY_CAPS_LOCK: return KEY_CapsLock;
++    case ROXY_KEY_SCROLL_LOCK: return KEY_ScrollLock;
++    case ROXY_KEY_NUM_LOCK: return KEY_NumLock;
++
++    case ROXY_KEY_F1: return KEY_F1;
++    case ROXY_KEY_F2: return KEY_F2;
++    case ROXY_KEY_F3: return KEY_F3;
++    case ROXY_KEY_F4: return KEY_F4;
++    case ROXY_KEY_F5: return KEY_F5;
++    case ROXY_KEY_F6: return KEY_F6;
++    case ROXY_KEY_F7: return KEY_F7;
++    case ROXY_KEY_F8: return KEY_F8;
++    case ROXY_KEY_F9: return KEY_F9;
++    case ROXY_KEY_F10: return KEY_F10;
++    case ROXY_KEY_F11: return KEY_F11;
++    case ROXY_KEY_F12: return KEY_F12;
++    case ROXY_KEY_PRINT_SCREEN: return KEY_Print;
++    case ROXY_KEY_PAUSE: return KEY_Pause;
++
++    case ROXY_KEY_UP: return KEY_Up;
++    case ROXY_KEY_DOWN: return KEY_Down;
++    case ROXY_KEY_LEFT: return KEY_Left;
++    case ROXY_KEY_RIGHT: return KEY_Right;
++    case ROXY_KEY_KP_DIVIDE: return KEY_KP_Divide;
++    case ROXY_KEY_KP_MULTIPLY: return KEY_KP_Multiply;
++    case ROXY_KEY_KP_SUBTRACT: return KEY_KP_Minus;
++    case ROXY_KEY_KP_ADD: return KEY_KP_Plus;
++    case ROXY_KEY_KP_ENTER: return KEY_KP_Enter;
++    case ROXY_KEY_KP_DECIMAL: return KEY_KP_Decimal;
++    case ROXY_KEY_KP_0: return KEY_KP_0;
++    case ROXY_KEY_KP_1: return KEY_KP_1;
++    case ROXY_KEY_KP_2: return KEY_KP_2;
++    case ROXY_KEY_KP_3: return KEY_KP_3;
++    case ROXY_KEY_KP_4: return KEY_KP_4;
++    case ROXY_KEY_KP_5: return KEY_KP_5;
++    case ROXY_KEY_KP_6: return KEY_KP_6;
++    case ROXY_KEY_KP_7: return KEY_KP_7;
++    case ROXY_KEY_KP_8: return KEY_KP_8;
++    case ROXY_KEY_KP_9: return KEY_KP_9;
++
++    default: return 0;
++    }
++}
++
++/* Replaces the Roxy code with its X keycode offset; returns non-zero to drop the event. */
++static int
++RoxyRemapScancode(InputInfoPtr pInfo, int *scanCode)
++{
++    int keycode = RoxyKeycode(*scanCode);
++
++    (void) pInfo;
++
++    if (keycode == 0)
++        return 1;
++
++    *scanCode = keycode;
++    return 0;
++}
++
++static int
++RoxyKbdInit(InputInfoPtr pInfo, int what)
++{
++    (void) pInfo;
++    (void) what;
++
++    return Success;
++}
++
++static int
++RoxyKbdOn(InputInfoPtr pInfo, int what)
++{
++    (void) pInfo;
++    (void) what;
++
++    return Success;
++}
++
++static int
++RoxyKbdOff(InputInfoPtr pInfo, int what)
++{
++    (void) pInfo;
++    (void) what;
++
++    return Success;
++}
++
++static Bool
++RoxyOpenKeyboard(InputInfoPtr pInfo)
++{
++    const char *device = xf86SetStrOption(pInfo->options, "Device", ROXY_KEYBOARD_DEVICE);
++
++    /* Non-blocking: RoxyReadInput drains the queue and returns on EAGAIN, so a blocking
++     * descriptor would park the input thread on the second read. */
++    pInfo->fd = open(device, O_RDONLY | O_NONBLOCK);
++    if (pInfo->fd < 0) {
++        xf86Msg(X_ERROR, "%s: cannot open %s (%s)\n", pInfo->name, device, strerror(errno));
++        return FALSE;
++    }
++
++    return TRUE;
++}
++
++static void
++RoxyReadInput(InputInfoPtr pInfo)
++{
++    KbdDevPtr pKbd = (KbdDevPtr) pInfo->private;
++    roxy_key_event records[ROXY_KEYBOARD_BATCH];
++    size_t count, i;
++    ssize_t bytes;
++
++    while ((bytes = read(pInfo->fd, records, sizeof(records))) > 0) {
++        count = (size_t) bytes / sizeof(roxy_key_event);
++
++        for (i = 0; i < count; i++) {
++            roxy_key_event *record = &records[i];
++
++            pKbd->PostEvent(pInfo, record->code, record->pressed ? TRUE : FALSE);
++        }
++    }
++}
++
++Bool
++xf86OSKbdPreInit(InputInfoPtr pInfo)
++{
++    KbdDevPtr pKbd = (KbdDevPtr) pInfo->private;
++
++    pKbd->KbdInit = RoxyKbdInit;
++    pKbd->KbdOn = RoxyKbdOn;
++    pKbd->KbdOff = RoxyKbdOff;
++    pKbd->Bell = RoxyBell;
++    pKbd->SetLeds = RoxySetLeds;
++    pKbd->GetLeds = RoxyGetLeds;
++    pKbd->KbdGetMapping = RoxyKbdGetMapping;
++    pKbd->RemapScanCode = RoxyRemapScancode;
++    pKbd->OpenKeyboard = RoxyOpenKeyboard;
++    pKbd->private = NULL;
++    pInfo->read_input = RoxyReadInput;
++    return TRUE;
++}

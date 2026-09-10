@@ -1,0 +1,221 @@
+diff --git xf86-input-mouse-clean/configure xf86-input-mouse-workdir/configure
+index be32633..cb5513a 100755
+--- xf86-input-mouse-clean/configure
++++ xf86-input-mouse-workdir/configure
+@@ -19608,6 +19608,9 @@ case $host_os in
+   linux*)
+     OS_MOUSE_NAME=lnx
+     ;;
++  roxy*)
++    OS_MOUSE_NAME=roxy
++    ;;
+   freebsd*|kfreebsd*-gnu|dragonfly*|netbsd*|openbsd*)
+     OS_MOUSE_NAME=bsd
+     ;;
+diff --git xf86-input-mouse-clean/src/mouse.c xf86-input-mouse-workdir/src/mouse.c
+index 1579555..ecc4862 100644
+--- xf86-input-mouse-clean/src/mouse.c
++++ xf86-input-mouse-workdir/src/mouse.c
+@@ -294,6 +294,9 @@ static MouseProtocolRec mouseProtocols[] = {
+     { "WSMouse",                MSE_MISC,       NULL,           PROT_WSMOUSE },
+     { "VUID",                   MSE_MISC,       NULL,           PROT_VUID },
+ 
++    /* Roxy: whole-sample records read from /dev/mouse. */
++    { "Roxy",                   MSE_MISC,       NULL,           PROT_ROXY },
++
+     /* end of list */
+     { NULL,                     MSE_NONE,       NULL,           PROT_UNKNOWN }
+ };
+@@ -1017,6 +1020,11 @@ MousePreInit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
+         goto out;
+     }
+ 
++    /* Roxy's backend reads a record stream instead of a byte stream, so it bypasses the packet
++     * state machine this driver otherwise drives. */
++    if (protocolID == PROT_ROXY)
++        pInfo->read_input = RoxyMouseReadInput;
++
+     pMse->protocolID = protocolID;
+     pMse->oldProtocolID = protocolID;  /* hack */
+ 
+diff --git xf86-input-mouse-clean/src/mouse.h xf86-input-mouse-workdir/src/mouse.h
+index e1165f2..fc1843b 100644
+--- xf86-input-mouse-clean/src/mouse.h
++++ xf86-input-mouse-workdir/src/mouse.h
+@@ -82,6 +82,7 @@ typedef enum {
+     PROT_SYSMOUSE,
+     PROT_WSMOUSE,
+     PROT_VUID,
++    PROT_ROXY,
+     PROT_NUMPROTOS      /* This must always be last. */
+ } MouseProtocolID;
+ 
+diff --git xf86-input-mouse-clean/src/mousePriv.h xf86-input-mouse-workdir/src/mousePriv.h
+index b15e461..3a9f52e 100644
+--- xf86-input-mouse-clean/src/mousePriv.h
++++ xf86-input-mouse-workdir/src/mousePriv.h
+@@ -78,4 +78,7 @@ Bool ps2EnableDataReporting(InputInfoPtr pInfo);
+ Bool ps2SendPacket(InputInfoPtr pInfo, unsigned char *bytes, int len);
+ int ps2GetDeviceID(InputInfoPtr pInfo);
+ 
++/* roxy_mouse.c */
++void RoxyMouseReadInput(InputInfoPtr pInfo);
++
+ #endif /* _X_MOUSE_H */
+diff --git xf86-input-mouse-workdir/src/roxy_mouse.c xf86-input-mouse-workdir/src/roxy_mouse.c
+new file mode 100644
+index 0000000..6340159
+--- /dev/null
++++ xf86-input-mouse-workdir/src/roxy_mouse.c
+@@ -0,0 +1,151 @@
++/*
++ * Roxy mouse backend.
++ *
++ * Roxy exposes its pointer as /dev/mouse, a character device that serves fixed-size
++ * `roxy_mouse_event` records through read(2): one record per hardware sample, carrying relative
++ * motion, the wheel delta and the button state (see <roxy/mouse-dev.h>). There is no PS/2 byte
++ * stream and no ioctl interface, so this backend bypasses the packet state machine the other
++ * backends feed and posts each whole record through the driver's MousePostEvent, which owns
++ * button mapping, wheel mapping, acceleration and button emulation.
++ */
++
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#include <xorg-server.h>
++#include <X11/X.h>
++
++#include "xf86.h"
++#include "xf86Xinput.h"
++#include "mouse.h"
++#include "mousePriv.h"
++
++#include <roxy/mouse-dev.h>
++
++/* The node Roxy always creates for its pointing device. */
++#define ROXY_MOUSE_DEVICE "/dev/mouse"
++
++/* Records read per syscall. The device returns as many whole records as fit, so a batch keeps the
++ * syscall count low during continuous motion without making the input thread hold a large
++ * buffer. */
++#define ROXY_MOUSE_BATCH 16
++
++static int
++RoxySupportedInterfaces(void)
++{
++    /* The Roxy protocol delivers already-decoded samples, so it carries no PS/2 or serial
++     * interface class. */
++    return MSE_MISC;
++}
++
++static const char *
++RoxyDefaultProtocol(void)
++{
++    return "Roxy";
++}
++
++static Bool
++RoxyCheckProtocol(const char *protocol)
++{
++    return xf86NameCmp(protocol, "Roxy") == 0;
++}
++
++static const char *
++RoxyFindDevice(InputInfoPtr pInfo, const char *protocol, int flags)
++{
++    (void) protocol;
++    (void) flags;
++
++    xf86Msg(X_INFO, "%s: using %s\n", pInfo->name, ROXY_MOUSE_DEVICE);
++    pInfo->options = xf86AddNewOption(pInfo->options, "Device", ROXY_MOUSE_DEVICE);
++    return ROXY_MOUSE_DEVICE;
++}
++
++static const char *
++RoxyGuessProtocol(InputInfoPtr pInfo, int flags)
++{
++    (void) pInfo;
++    (void) flags;
++
++    return "Roxy";
++}
++
++static const char *
++RoxySetupAuto(InputInfoPtr pInfo, int *protoPara)
++{
++    (void) protoPara;
++
++    return RoxyGuessProtocol(pInfo, 0);
++}
++
++/* Converts a record's button bitmap into the mask MousePostEvent expects.
++ *
++ * That mask is the one the PS/2 paths build: bit 0 is the right button, bit 1 the middle button
++ * and bit 2 the left button. The driver reverses it (reverseMap swaps bits 0 and 2) before
++ * indexing its button map, so building it the same way keeps the default mapping — left, middle,
++ * right — intact.
++ */
++static int
++RoxyButtons(uint32_t buttons)
++{
++    int mask = 0;
++
++    if (buttons & ROXY_MOUSE_BTN_RIGHT)
++        mask |= 1 << 0;
++    if (buttons & ROXY_MOUSE_BTN_MIDDLE)
++        mask |= 1 << 1;
++    if (buttons & ROXY_MOUSE_BTN_LEFT)
++        mask |= 1 << 2;
++
++    return mask;
++}
++
++void
++RoxyMouseReadInput(InputInfoPtr pInfo)
++{
++    MouseDevPtr pMse = pInfo->private;
++    roxy_mouse_event records[ROXY_MOUSE_BATCH];
++    size_t count, i;
++    ssize_t bytes;
++
++    /* The descriptor is non-blocking (xf86OpenSerial opens it that way), so this drains
++     * everything queued and returns on EAGAIN. */
++    while ((bytes = read(pInfo->fd, records, sizeof(records))) > 0) {
++        count = (size_t) bytes / sizeof(roxy_mouse_event);
++
++        for (i = 0; i < count; i++) {
++            roxy_mouse_event *record = &records[i];
++
++            /* The driver maps a negative Z delta to the negative-Z button, which the default
++             * ZAxisMapping "4 5" makes button 4 (wheel up), while the record reports a positive
++             * wheel as upward. */
++            pMse->PostEvent(pInfo, RoxyButtons(record->buttons), record->dx, record->dy,
++                            -record->wheel, 0);
++        }
++    }
++}
++
++OSMouseInfoPtr
++OSMouseInit(int flags)
++{
++    OSMouseInfoPtr p;
++
++    (void) flags;
++
++    p = calloc(sizeof(OSMouseInfoRec), 1);
++    if (!p)
++        return NULL;
++
++    p->SupportedInterfaces = RoxySupportedInterfaces;
++    p->CheckProtocol = RoxyCheckProtocol;
++    p->DefaultProtocol = RoxyDefaultProtocol;
++    p->FindDevice = RoxyFindDevice;
++    p->GuessProtocol = RoxyGuessProtocol;
++    p->SetupAuto = RoxySetupAuto;
++    return p;
++}

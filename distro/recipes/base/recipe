@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=1
-revision=4
+revision=5
 
 # This base metapackage contains the essential software for a normal system
 # together with Roxy's own userland defaults.  Package recipes build upstream
@@ -9,14 +9,14 @@ revision=4
 # (session startup script, X server configuration) are bundled here so that the
 # *program* packages stay clean and reusable.  The default files are kept
 # flat, named by what they are, and each install below pins its target path.
-deps="lua python duktape bash busybox vim evtest xorg-server xf86-video-fbdev xf86-input-evdev twm jwm xeyes xinit xterm xclock"
+deps="lua python duktape bash busybox vim xorg-server xf86-video-fbdev xf86-input-mouse xf86-input-keyboard twm jwm xeyes xinit xterm xclock"
 
 package() {
 	# Roxy's default session startup script (run by `startx`).
 	install -D -m 0755 "${base_dir}/recipes/base/xinitrc" \
 		"${dest_dir}/root/.xinitrc"
 
-	# Roxy's X server configuration (framebuffer device + evdev input).
+	# Roxy's X server configuration (framebuffer device + Roxy input devices).
 	install -D -m 0644 "${base_dir}/recipes/base/xorg.conf" \
 		"${dest_dir}/etc/X11/xorg.conf"
 }
