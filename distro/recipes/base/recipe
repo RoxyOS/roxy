@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=1
-revision=5
+revision=7
 
 # This base metapackage contains the essential software for a normal system
 # together with Roxy's own userland defaults.  Package recipes build upstream
@@ -9,7 +9,7 @@ revision=5
 # (session startup script, X server configuration) are bundled here so that the
 # *program* packages stay clean and reusable.  The default files are kept
 # flat, named by what they are, and each install below pins its target path.
-deps="lua python duktape bash busybox vim xorg-server xf86-video-fbdev xf86-input-mouse xf86-input-keyboard twm jwm xeyes xinit xterm xclock"
+deps="lua python duktape bash busybox vim xorg-server xf86-video-roxyfb xf86-input-mouse xf86-input-keyboard twm jwm xeyes xinit xterm xclock"
 
 package() {
 	# Roxy's default session startup script (run by `startx`).

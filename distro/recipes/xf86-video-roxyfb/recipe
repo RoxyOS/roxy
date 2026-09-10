@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+version=0.2.0
+revision=1
+
+git_url="https://github.com/RoxyOS/xf86-video-roxyfb"
+commit="92432291a4978dc0015612d7c575264fd57a4bd6"
+shallow=no
+
+cross_compile=yes
+
+deps="mlibc xorg-server xorgproto"
+hostdeps="roxy-llvm"
+imagedeps="meson ninja-build pkg-config"
+
+source "${base_dir}/build-systems/meson.sh"
+
+configure() {
+	meson_configure
+}
+
+build() {
+	meson_build
+}
+
+package() {
+	meson_install
+}

@@ -3,6 +3,9 @@ c = ['clang', '--target=x86_64-unknown-roxy', '--sysroot=/sysroot']
 cpp = ['clang++', '--target=x86_64-unknown-roxy', '--sysroot=/sysroot']
 ar = 'llvm-ar'
 strip = 'llvm-strip'
+# Meson needs a pkg-config designated for the host machine to look up target dependencies; the
+# host binary is the container's pkg-config, pointed at the sysroot by `pkg_config_libdir` below.
+pkgconfig = 'pkg-config'
 
 [properties]
 needs_exe_wrapper = true
