@@ -1,5 +1,3 @@
-mod evdev;
-mod evdev_abi;
 mod execute;
 mod framebuffer;
 mod framebuffer_abi;

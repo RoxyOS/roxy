@@ -31,8 +31,8 @@ PS/2 initialization follows scheduler registration and precedes both periodic ti
 global interrupt enable. The PS/2 subsystem completes its controller, keyboard, and mouse
 handshakes, registers IRQ1 and IRQ12, and unmasks both routes in that window. The composition
 root then combines the keyboard input with the selected terminal output through `roxy-tty`, which
-creates the shared line discipline, registers the keyboard evdev device, the mouse evdev device,
-and the keyboard and mouse listeners with their respective managers, before process initialization
+creates the shared line discipline, registers the `/dev/keyboard` and `/dev/mouse` devices, and the
+keyboard and mouse listeners with their respective managers, before process initialization
 registers the initial-FD injector. PS/2 keyboard hardware is required on the supported platform; a
 missing controller or keyboard handshake timeout is boot-fatal rather than a reason to expose an
 output-only framebuffer terminal. A missing or failed mouse is tolerated (the controller may have

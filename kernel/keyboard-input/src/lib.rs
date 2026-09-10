@@ -66,7 +66,7 @@ impl KeyboardManager {
 
 /// Registers a listener with the process-wide keyboard manager.
 ///
-/// Called at boot for each consumer (TTY, keyboard evdev, etc.).
+/// Called at boot for each consumer (TTY, `/dev/keyboard`, etc.).
 pub fn register_listener(listener: &Arc<dyn KeyboardListener>) {
     KEYBOARD_MANAGER.register(listener);
 }

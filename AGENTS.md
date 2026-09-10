@@ -233,8 +233,8 @@ procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`
   pointer interpretation only under `kernel/syscall`; never expose those records through a shared
   kernel API or reproduce them in process, FD, TTY, filesystem, or other domain subsystems.
   This exclusivity covers only ABI that crosses the syscall boundary through marshalled
-  arguments; it does not apply to device-serialised protocol records (e.g. the evdev
-  `input_event` stream) that a device serialises itself and serves to userspace through a
+  arguments; it does not apply to device-serialised protocol records (e.g. the `/dev/mouse`
+  sample record) that a device serialises itself and serves to userspace through a
   generic byte `read`, without the syscall layer interpreting the record layout.
 - Represent each direct syscall ABI record in the syscall subsystem with a typed `#[repr(C)]`
   struct. Model padding explicitly and initialize every field; do not encode or decode

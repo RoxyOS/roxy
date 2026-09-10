@@ -63,7 +63,7 @@ HMP input equivalents (`<skill-dir>/scripts/hmc.sh`): `sendkey`, `mouse_move dx 
 - **Screen**: [`screenshot.md`](screenshot.md) — `screendump` a PNG via QMP; framebuffer is
   1280x800.
 - **Keyboard**: [`keyboard.md`](keyboard.md) — QMP `input-send-event` (key down+up) or HMP
-  `sendkey`; guest path is PS/2 → evdev → tty.
+  `sendkey`; guest path is PS/2 → `roxy-keyboard-input` → tty.
 - **Mouse**: [`mouse.md`](mouse.md) — QMP relative/button events or HMP `mouse_move`/`mouse_button`;
   relative motion only, track the cursor yourself.
 - **GDB**: [`gdb.md`](gdb.md) — attach to `tcp:1234` with the ELF matching the `--profile` you

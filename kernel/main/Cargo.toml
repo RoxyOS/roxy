@@ -22,6 +22,8 @@ kernel-test = [
     "roxy-fbdev/kernel-test",
     "roxy-fbterm/kernel-test",
     "roxy-futex/kernel-test",
+    "roxy-keyboard-dev/kernel-test",
+    "roxy-mouse-dev/kernel-test",
     "roxy-line-discipline/kernel-test",
     "roxy-tty/kernel-test",
     "roxy-interrupt/kernel-test",
@@ -58,15 +60,14 @@ roxy-boot.workspace = true
 roxy-cpu.workspace = true
 roxy-devfs.workspace = true
 roxy-elf.workspace = true
-roxy-evdev.workspace = true
 roxy-ext4.workspace = true
 roxy-fbdev.workspace = true
 roxy-fbterm.workspace = true
 roxy-fd.workspace = true
 roxy-futex.workspace = true
-roxy-evdev-keyboard.workspace = true
-roxy-evdev-mouse.workspace = true
+roxy-keyboard-dev.workspace = true
 roxy-keyboard-input.workspace = true
+roxy-mouse-dev.workspace = true
 roxy-mouse-input.workspace = true
 roxy-interrupt.workspace = true
 roxy-line-discipline.workspace = true

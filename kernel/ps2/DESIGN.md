@@ -20,9 +20,9 @@ characters are produced.
 ### Mouse (second port)
 
 The mouse path decodes raw PS/2 data bytes into semantic `MouseEvent` batches and publishes them
-to the process-wide mouse manager (`roxy-mouse-input`).  The driver also preserves the legacy
-`/dev/psaux` path, which queues raw bytes for consumers that parse the PS/2 protocol in
-userspace.
+to the process-wide mouse manager (`roxy-mouse-input`).  The driver owns the PS/2 protocol: it
+does not expose raw bytes to userspace, so there is no equivalent of the legacy `/dev/psaux`
+byte queue.  `roxy-mouse-dev` turns those batches into the `/dev/mouse` record stream.
 
 ## Initialization and hardware ownership
 
@@ -56,7 +56,7 @@ interrupts are enabled).  The sequence is:
 
 A missing or failed mouse is tolerated: the controller may simply have no second port (common
 on real hardware without an auxiliary device), so failure is reported to the caller rather than
-panicking.  The `/dev/psaux` node is always registered regardless of attachment.
+panicking.
 
 ## Event publishing
 
@@ -64,20 +64,17 @@ panicking.  The `/dev/psaux` node is always registered regardless of attachment.
 
 The IRQ1 handler reads port `0x60` before taking the parser lock, then parses the scancode byte
 into a `KeyEvent`.  If the parse succeeds, the handler calls `roxy_keyboard_input::publish(key)`,
-which broadcasts the event to every registered input listener (TTY, evdev, …).  The handler does
-not queue, buffer, or filter events; it produces at most one `KeyEvent` per IRQ.
+which broadcasts the event to every registered input listener (TTY, `roxy-keyboard-dev`, …).  The
+handler does not queue, buffer, or filter events; it produces at most one `KeyEvent` per IRQ.
 
 ### Mouse
 
-The IRQ12 handler reads port `0x60` and sends the byte to **two** consumers in sequence:
+The IRQ12 handler reads port `0x60` and feeds the byte to the `MousePacketParser` state machine,
+which accumulates bytes into 3- or 4-byte packets (depending on the negotiated mode) and, on each
+complete packet, produces a `Vec<MouseEvent>` batch.  Non-empty batches are published via
+`roxy_mouse_input::publish(events)`.
 
-1. The legacy `psaux` byte queue (`/dev/psaux`), which preserves the raw byte stream for
-   userspace PS/2 drivers.
-2. The `MousePacketParser` state machine, which accumulates bytes into 3- or 4-byte packets
-   (depending on the negotiated mode) and, on each complete packet, produces a `Vec<MouseEvent>`
-   batch.  Non-empty batches are published via `roxy_mouse_input::publish(events)`.
-
-Both handlers run with interrupts disabled and must not allocate, block, switch threads, or
+Handlers run with interrupts disabled and must not allocate, block, switch threads, or
 retain terminal, process, descriptor, or scheduler locks across device I/O.  The interrupt
 subsystem owns EOI delivery; the handler has the common `roxy_interrupt::Handler = fn()`
 signature and returns no disposition.
@@ -90,8 +87,8 @@ IntelliMouse Z-axis extension.  Decoding behaviour follows Linux
 
 - X and Y are 9-bit signed deltas: `x = byte1 - ((byte0 << 4) & 0x100)`,
   `y = byte2 - ((byte0 << 3) & 0x100)`; a zero delta byte yields zero motion.
-- The Y delta is negated (`down = -y`) so that screen-down is positive, matching evdev's
-  `REL_Y` convention.
+- The Y delta is negated (`down = -y`) so that screen-down is positive, matching the `dy` sign
+  convention documented in `roxy/mouse-dev.h`.
 - The IntelliMouse Z-axis byte is sign-extended and negated
   (`up = -(s8)byte3`), so that a positive `Scroll { up }` means upward scrolling.
 - Buttons are the low three bits of byte0 (bit0 left, bit1 right, bit2 middle).  A `MouseEvent`
@@ -102,14 +99,14 @@ IntelliMouse Z-axis extension.  Decoding behaviour follows Linux
 
 ### Keyboard
 
-Each consumer (TTY, evdev-keyboard) registers with the keyboard manager via
+Each consumer (TTY, `roxy-keyboard-dev`) registers with the keyboard manager via
 `roxy_keyboard_input::register_listener(listener)`.  Registration happens at boot, before
 interrupts are enabled.  The consumer owns its own bounded queue and decides whether to process
 events immediately (IRQ-path for signal responsiveness) or defer to a read/wait path.
 
 ### Mouse
 
-Each consumer (evdev-mouse, future TTY mouse support) registers with the mouse manager via
+Each consumer (`roxy-mouse-dev`, future TTY mouse support) registers with the mouse manager via
 `roxy_mouse_input::register_listener(listener)`.  Registration happens at boot, before
 interrupts are enabled.  The listener receives a batch of `MouseEvent` records per hardware
 sample, and the consumer decodes them into its own internal representation or pushes them into

@@ -99,7 +99,7 @@ impl MouseManager {
 
 /// Registers a listener with the process-wide mouse manager.
 ///
-/// Called at boot for each consumer (mouse evdev, future TTY mouse support, …).
+/// Called at boot for each consumer (`/dev/mouse`, future TTY mouse support, …).
 pub fn register_listener(listener: &Arc<dyn MouseListener>) {
     MOUSE_MANAGER.register(listener);
 }

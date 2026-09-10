@@ -2,7 +2,7 @@ use roxy_fd::{IoctlError, OpenFile, StatusFlags};
 use roxy_memory::UserAddress;
 use roxy_tty_types::ApplyWhen;
 
-use super::{evdev, framebuffer, pty, terminal};
+use super::{framebuffer, pty, terminal};
 use crate::args::{SyscallArg, user_memory};
 use crate::errno::Errno;
 
@@ -10,12 +10,6 @@ use crate::errno::Errno;
 const FIONBIO: u64 = 0x5421;
 
 pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> Result<u64, Errno> {
-    // evdev requests carry the parameter size and direction inside the request word itself
-    // (`_IOC`), so they cannot be matched as exact constants. Dispatch them by type byte first.
-    if evdev::is_evioc_request(raw_request) {
-        return evdev::execute(file, raw_request, raw_argument);
-    }
-
     match raw_request {
         terminal::TCGETS => terminal::get_termios(file, raw_argument).map(|()| 0),
         terminal::TCSETS => {

@@ -132,16 +132,6 @@ impl TtyCore {
             IoctlRequest::FbGetVarInfo(_)
             | IoctlRequest::FbSetVarInfo(_)
             | IoctlRequest::FbGetFixedInfo(_)
-            | IoctlRequest::EvdevGetVersion(_)
-            | IoctlRequest::EvdevGetId(_)
-            | IoctlRequest::EvdevGetName(_)
-            | IoctlRequest::EvdevGetPhys(_)
-            | IoctlRequest::EvdevGetUniq(_)
-            | IoctlRequest::EvdevGetRep(_)
-            | IoctlRequest::EvdevSetRep(_)
-            | IoctlRequest::EvdevGetBits { .. }
-            | IoctlRequest::EvdevGrab(_)
-            | IoctlRequest::EvdevSetClockId(_)
             | IoctlRequest::PtyGetNumber(_)
             | IoctlRequest::PtySetLock(_) => Err(IoctlError::NotTty),
         }

@@ -54,7 +54,7 @@ bounded queue; the driver simply drops the event if the consumer's queue is full
 
 ## Consumer contract
 
-A consumer (TTY, evdev, …):
+A consumer (TTY, `roxy-keyboard-dev`, …):
 1. creates an `Arc<dyn KeyboardListener>` whose `on_recive_input` receives each `KeyEvent`,
 2. registers it with `roxy_keyboard_input::register_listener(listener)` at boot,
 3. buffers the event or processes it inline (including with `try_lock` in IRQ context).

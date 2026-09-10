@@ -286,11 +286,6 @@ impl I8042SecondPort {
         self.write_data(command)
     }
 
-    pub(crate) fn write_mouse_byte(byte: u8) -> Result<(), InitError> {
-        let mut port = Self::new();
-        port.write_mouse_command(byte)
-    }
-
     fn write_data(&mut self, data: u8) -> Result<(), InitError> {
         self.wait_input_clear()?;
         // SAFETY: The data port is fixed by the i8042 specification and exclusively owned here.

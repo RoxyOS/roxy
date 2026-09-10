@@ -1,19 +1,24 @@
 [package]
-name = "roxy-evdev-keyboard"
+name = "roxy-keyboard-dev"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
-[lints]
-workspace = true
+[features]
+kernel-test = ["dep:linkme", "dep:roxy-test"]
 
 [dependencies]
+heapless.workspace = true
+linkme = { workspace = true, optional = true }
+
 roxy-devfs.workspace = true
-roxy-evdev.workspace = true
-roxy-evdev-types.workspace = true
 roxy-fd.workspace = true
 roxy-keyboard-input.workspace = true
 roxy-poll.workspace = true
+roxy-test = { workspace = true, optional = true }
 roxy-time.workspace = true
 roxy-utils.workspace = true
+
+[lints]
+workspace = true

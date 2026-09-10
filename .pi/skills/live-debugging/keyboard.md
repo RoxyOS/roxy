@@ -1,6 +1,6 @@
 # Keyboard Input into the Live Roxy VM
 
-The framebuffer shell reads from `/dev/tty` via **PS/2 → evdev → tty**. Type into it by injecting
+The framebuffer shell reads from `/dev/tty` via **PS/2 → `roxy-keyboard-input` → tty**. Type into it by injecting
 virtual keyboard events into QEMU; `serial.log` is output-only.
 
 ## Preferred: QMP `input-send-event`

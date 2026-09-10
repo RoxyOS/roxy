@@ -108,3 +108,16 @@ marked with `TODO(<missing-capability>)` at their code sites in `kernel/process/
   without quiescing other threads.
 
 `kernel/process/DESIGN.md` documents the intended model.
+
+## Keyboard LEDs cannot be set
+
+`/dev/keyboard` deliberately has no ioctl interface: the Roxy keyboard device serves its event
+stream through `read` only. Keyboard LEDs (caps lock, num lock, scroll lock) therefore cannot be
+driven from userspace, and the X keyboard driver's `SetLeds`/`GetLeds` are no-op implementations.
+
+This is a deliberate capability gap rather than an oversight: adding LED control means adding a
+control channel, which is a separate design decision from the event stream. A later revision can
+introduce a small ioctl family with Roxy-owned request numbers, or a control record written back
+to the device with `write`. The gap is marked with
+`TODO(missing-capability: no ioctl channel for keyboard LEDs)` in the `xf86-input-keyboard` Roxy
+backend patch and in `kernel/keyboard-dev/DESIGN.md`.

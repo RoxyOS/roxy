@@ -374,18 +374,17 @@ dependencies = [
  "roxy-cpu",
  "roxy-devfs",
  "roxy-elf",
- "roxy-evdev",
- "roxy-evdev-keyboard",
- "roxy-evdev-mouse",
  "roxy-ext4",
  "roxy-fbdev",
  "roxy-fbterm",
  "roxy-fd",
  "roxy-futex",
  "roxy-interrupt",
+ "roxy-keyboard-dev",
  "roxy-keyboard-input",
  "roxy-line-discipline",
  "roxy-memory",
+ "roxy-mouse-dev",
  "roxy-mouse-input",
  "roxy-poll",
  "roxy-posix-timer",
@@ -613,50 +612,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "roxy-evdev"
-version = "0.1.0"
-dependencies = [
- "heapless",
- "roxy-devfs",
- "roxy-evdev-types",
- "roxy-fd",
- "roxy-poll",
- "roxy-utils",
-]
-
-[[package]]
-name = "roxy-evdev-keyboard"
-version = "0.1.0"
-dependencies = [
- "roxy-devfs",
- "roxy-evdev",
- "roxy-evdev-types",
- "roxy-fd",
- "roxy-keyboard-input",
- "roxy-poll",
- "roxy-time",
- "roxy-utils",
-]
-
-[[package]]
-name = "roxy-evdev-mouse"
-version = "0.1.0"
-dependencies = [
- "roxy-devfs",
- "roxy-evdev",
- "roxy-evdev-types",
- "roxy-fd",
- "roxy-mouse-input",
- "roxy-poll",
- "roxy-time",
- "roxy-utils",
-]
-
-[[package]]
-name = "roxy-evdev-types"
-version = "0.1.0"
-
-[[package]]
 name = "roxy-ext4"
 version = "0.1.0"
 dependencies = [
@@ -708,7 +663,6 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.13.1",
  "linkme",
- "roxy-evdev-types",
  "roxy-fb-types",
  "roxy-poll",
  "roxy-test",
@@ -753,6 +707,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxy-keyboard-dev"
+version = "0.1.0"
+dependencies = [
+ "heapless",
+ "linkme",
+ "roxy-devfs",
+ "roxy-fd",
+ "roxy-keyboard-input",
+ "roxy-poll",
+ "roxy-test",
+ "roxy-time",
+ "roxy-utils",
+]
+
+[[package]]
 name = "roxy-keyboard-input"
 version = "0.1.0"
 dependencies = [
@@ -781,6 +750,21 @@ dependencies = [
  "roxy-utils",
  "spin 0.12.2",
  "x86_64",
+]
+
+[[package]]
+name = "roxy-mouse-dev"
+version = "0.1.0"
+dependencies = [
+ "heapless",
+ "linkme",
+ "roxy-devfs",
+ "roxy-fd",
+ "roxy-mouse-input",
+ "roxy-poll",
+ "roxy-test",
+ "roxy-time",
+ "roxy-utils",
 ]
 
 [[package]]
@@ -925,7 +909,6 @@ dependencies = [
  "bitflags 2.13.1",
  "linkme",
  "roxy-arch",
- "roxy-evdev-types",
  "roxy-fb-types",
  "roxy-fd",
  "roxy-futex",
