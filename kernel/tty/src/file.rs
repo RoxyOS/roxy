@@ -103,7 +103,7 @@ mod tests {
         assert_eq!(&buffer[..2], b"x\n");
         assert_eq!(file.write(b"one"), Ok(3));
         assert_eq!(file.write(b"two"), Ok(3));
-        assert_eq!(output.bytes(), b"x\nonetwo");
+        assert_eq!(output.bytes(), b"x\r\nonetwo");
         assert_eq!(file.seek(SeekFrom::Start(0)), Err(SeekError::NotSeekable));
     });
 }

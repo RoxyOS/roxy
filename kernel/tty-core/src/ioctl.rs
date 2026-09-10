@@ -358,7 +358,12 @@ mod tests {
     use roxy_fd::{IoctlError, IoctlRequest};
     use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
 
+    use super::{ONLCR, OPOST};
     use crate::test_support::open;
+
+    /// `c_oflag` NLDLY (newline delay), an output flag outside the accepted mask: `OPOST`/`ONLCR`
+    /// are implemented and the remaining post-processing bits are accepted as no-ops.
+    const NLDLY: u32 = 0o400;
 
     roxy_test::kernel_test!("roxy-tty-core::termios-ioctl", updates_input_mode, {
         let (core, source, output) = open();
@@ -400,6 +405,54 @@ mod tests {
         );
         assert_eq!(returned, size);
     });
+
+    roxy_test::kernel_test!(
+        "roxy-tty-core::termios-output-flags",
+        round_trips_output_flags,
+        {
+            let (core, _source, _output) = open();
+            let mut termios = Termios::default();
+
+            core.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
+            // The default terminal advertises the output post-processing it implements.
+            assert_eq!(termios.output_flags, OPOST | ONLCR);
+
+            termios.output_flags = OPOST;
+            assert_eq!(
+                core.ioctl(IoctlRequest::SetTermios {
+                    when: ApplyWhen::Immediate,
+                    termios,
+                }),
+                Ok(())
+            );
+
+            core.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
+            assert_eq!(termios.output_flags, OPOST);
+        }
+    );
+
+    roxy_test::kernel_test!(
+        "roxy-tty-core::termios-output-unsupported",
+        rejects_output_flags_outside_the_mask,
+        {
+            let (core, _source, _output) = open();
+            let mut termios = Termios::default();
+
+            core.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
+            termios.output_flags = NLDLY;
+
+            assert_eq!(
+                core.ioctl(IoctlRequest::SetTermios {
+                    when: ApplyWhen::Immediate,
+                    termios,
+                }),
+                Err(IoctlError::Unsupported {
+                    operation: "ioctl.tcsetattr.output-flags",
+                    argument: u64::from(NLDLY),
+                })
+            );
+        }
+    );
 
     roxy_test::kernel_test!("roxy-tty-core::termios-unsupported", rejects_input_flags, {
         let (core, _source, _output) = open();

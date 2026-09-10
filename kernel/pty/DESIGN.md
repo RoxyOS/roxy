@@ -75,8 +75,10 @@ no slave is open lets the pair drop.
   instead.
 - `TODO(sigwinch)`: master `TIOCSWINSZ` does not yet propagate to the slave or deliver `SIGWINCH`;
   the process model has no `SIGWINCH` delivery.
-- Input/output transformations and non-default termios continue to be unsupported (rejected by
-  `TtyCore`).
+- Termios fields outside the implemented subset (`ICRNL`/`INLCR`/`IGNCR`, `OPOST`/`ONLCR`,
+  `ISIG`/`ICANON`/`ECHO`, and the round-tripped control characters) are accepted as no-ops instead
+  of rejected, so a cooked terminal can configure itself (see the `TODO` markers in
+  `validate_termios`).
 `PtySlave::terminal_path` reports the slave's openable path `/dev/pts/N` (from `pair.number`), matching
 the dynamic resolver's namespace, so `ttyname` on a slave descriptor returns a reopenable path. The
 master is not a terminal and returns no name.

@@ -2,7 +2,7 @@ use alloc::{sync::Arc, vec::Vec};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
 use roxy_fd::{FileError, PollEvents};
-use roxy_line_discipline::{LineDiscipline, ProcessResult};
+use roxy_line_discipline::{LineDiscipline, LineDisciplineSettings, ProcessResult};
 use roxy_poll::{PollListener, PollListeners, PollRegistration};
 use roxy_process::{ProcessGroupId, SessionId};
 use roxy_tty_types::WindowSize;
@@ -138,6 +138,7 @@ impl TtyCore {
         self.input_source.consume_peeked();
 
         let result = discipline.process(&input);
+        let settings = discipline.settings;
         drop(discipline);
 
         if let Some(signal) = result.signal {
@@ -161,7 +162,7 @@ impl TtyCore {
             buffered.extend(buffer);
         }
         if result.echo {
-            let _ = self.output.write(&input);
+            let _ = self.write_output(&input, settings);
         }
     }
 
@@ -202,33 +203,54 @@ impl TtyCore {
     ///
     /// This is the reverse of [`TtyCore::process_input`] (which feeds input in); `write` carries
     /// program output out. It is also how a descriptor's `File::write` reaches the terminal.
+    /// Output post-processing (`OPOST`/`ONLCR`) is applied on the way out.
+    ///
+    /// Returns the number of **input** bytes whose post-processed output the endpoint accepted.
+    /// That count is never larger than `output.len()`, so a caller resuming at `output[written..]`
+    /// always resumes at a boundary of its own buffer even though a newline expands to two output
+    /// bytes.
     ///
     /// # Errors
     ///
     /// Returns the output endpoint's `Io` error.
     pub fn write(&self, output: &[u8]) -> Result<usize, FileError> {
-        let translated = self.translate_output(output);
-        self.output.write(&translated).map_err(map_output_error)
+        let settings = self.line_discipline.lock().settings;
+
+        self.write_output(output, settings)
     }
 
-    /// Applies output post-processing for the current settings: with `OPOST`+`ONLCR` set, output
-    /// newlines are mapped to CR+NL (the conventional cooked-terminal line ending).
-    fn translate_output(&self, input: &[u8]) -> alloc::vec::Vec<u8> {
-        let settings = self.line_discipline.lock().settings;
+    /// Delivers `input` to the output endpoint with `settings`' output post-processing applied,
+    /// returning how many input bytes were fully delivered.
+    ///
+    /// Every output path — program writes and echoes — goes through here so both agree on
+    /// `OPOST`/`ONLCR`, the way a cooked terminal's line discipline post-processes its echo buffer
+    /// as well as program output.
+    fn write_output(
+        &self,
+        input: &[u8],
+        settings: LineDisciplineSettings,
+    ) -> Result<usize, FileError> {
         if !settings.opost || !settings.onlcr {
-            return input.to_vec();
+            return self.write_direct(input);
         }
 
-        input.iter().fold(
-            alloc::vec::Vec::with_capacity(input.len()),
-            |mut out, byte| {
-                if *byte == b'\n' {
-                    out.push(b'\r');
-                }
-                out.push(*byte);
-                out
-            },
-        )
+        let Some(translated) = translate_newlines(input) else {
+            // Nothing needs post-processing; hand the caller's buffer over without copying it.
+            return self.write_direct(input);
+        };
+
+        let written = self.output.write(&translated).map_err(map_output_error)?;
+
+        Ok(delivered_input_bytes(input, written))
+    }
+
+    /// Writes `input` unchanged, returning the number of input bytes the endpoint accepted.
+    fn write_direct(&self, input: &[u8]) -> Result<usize, FileError> {
+        let written = self.output.write(input).map_err(map_output_error)?;
+
+        // An endpoint cannot deliver more than it was given; clamping keeps a misreporting one
+        // from breaking the "never report more than the caller's buffer" contract.
+        Ok(written.min(input.len()))
     }
 
     /// Returns the session currently owning this terminal, if any.
@@ -364,12 +386,24 @@ impl TtyCore {
             return Ok(());
         }
 
-        let result = self.line_discipline.lock().process(input);
+        // Take the settings from the same guard that processed the event so the echo below is
+        // post-processed with the settings in force at processing time.
+        let (result, settings) = {
+            let mut discipline = self.line_discipline.lock();
+            let result = discipline.process(input);
 
-        self.apply_result(input, result)
+            (result, discipline.settings)
+        };
+
+        self.apply_result(input, result, settings)
     }
 
-    fn apply_result(&self, input: &[u8], result: ProcessResult) -> Result<(), FileError> {
+    fn apply_result(
+        &self,
+        input: &[u8],
+        result: ProcessResult,
+        settings: LineDisciplineSettings,
+    ) -> Result<(), FileError> {
         if let Some(signal) = result.signal {
             match *self.foreground_pgid.lock() {
                 Some(pgid) => {
@@ -387,7 +421,7 @@ impl TtyCore {
         }
 
         if result.echo {
-            let written = self.output.write(input).map_err(map_output_error)?;
+            let written = self.write_output(input, settings)?;
 
             if written != input.len() {
                 return Err(FileError::Io);
@@ -416,6 +450,59 @@ fn map_output_error(error: OutputError) -> FileError {
     match error {
         OutputError::Io => FileError::Io,
     }
+}
+
+/// Maps output newlines to CR+NL for `ONLCR`.
+///
+/// Returns `None` when no newline needs translating, so the caller can write its own buffer
+/// instead of a copy.
+fn translate_newlines(input: &[u8]) -> Option<Vec<u8>> {
+    let mut newlines = 0;
+    for byte in input {
+        if *byte == b'\n' {
+            newlines += 1;
+        }
+    }
+
+    if newlines == 0 {
+        return None;
+    }
+
+    let mut translated = Vec::with_capacity(input.len() + newlines);
+
+    for byte in input {
+        if *byte == b'\n' {
+            translated.push(b'\r');
+        }
+
+        translated.push(*byte);
+    }
+
+    Some(translated)
+}
+
+/// Returns how many input bytes are fully covered by the first `written` bytes of the translation
+/// [`translate_newlines`] produces.
+///
+/// Every input byte yields one translated byte except a newline, which yields CR+NL. A newline
+/// whose CR the endpoint accepted but whose NL it did not counts as undelivered, so the caller
+/// resumes at that newline and resends the pair; the resumption at worst repeats the CR, which
+/// only resets the column. `TtyOutput` exposes no way to ask for room before writing, so an
+/// endpoint that cannot accept both bytes of the pair cannot complete a translated newline.
+fn delivered_input_bytes(input: &[u8], written: usize) -> usize {
+    let mut produced = 0;
+
+    for (index, byte) in input.iter().enumerate() {
+        let translated_width = if *byte == b'\n' { 2 } else { 1 };
+
+        if produced + translated_width > written {
+            return index;
+        }
+
+        produced += translated_width;
+    }
+
+    input.len()
 }
 
 /// Weak references to every live terminal core, shared across console and pty terminals.
@@ -482,7 +569,9 @@ fn on_session_leader_exit(session: SessionId) {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use crate::test_support::open;
+    use alloc::sync::Arc;
+
+    use crate::test_support::{PartialOutput, open, open_with};
 
     roxy_test::kernel_test!("roxy-tty-core::canonical-commit", commits_on_newline, {
         let (core, source, output) = open();
@@ -491,8 +580,57 @@ mod tests {
 
         assert_eq!(core.read(&mut buffer), Ok(3));
         assert_eq!(&buffer[..3], b"ab\n");
-        assert_eq!(output.bytes(), b"ab\n");
+        // The committed line is readable verbatim, while the echo of its newline is
+        // post-processed like any other output.
+        assert_eq!(output.bytes(), b"ab\r\n");
     });
+
+    roxy_test::kernel_test!(
+        "roxy-tty-core::output-post-processing",
+        translates_output_newlines,
+        {
+            let (core, _source, output) = open();
+
+            // Defaults have OPOST+ONLCR set, so each output newline reaches the endpoint as
+            // CR+NL while the caller is told only the input bytes that were consumed.
+            assert_eq!(core.write(b"a\nb"), Ok(3));
+            assert_eq!(output.bytes(), b"a\r\nb");
+        }
+    );
+
+    roxy_test::kernel_test!(
+        "roxy-tty-core::output-post-processing-disabled",
+        preserves_output_without_opost,
+        {
+            let (core, _source, output) = open();
+            core.line_discipline.lock().settings.opost = false;
+
+            assert_eq!(core.write(b"a\n"), Ok(2));
+            assert_eq!(output.bytes(), b"a\n");
+        }
+    );
+
+    roxy_test::kernel_test!(
+        "roxy-tty-core::output-post-processing-resume",
+        resumes_at_input_boundaries,
+        {
+            let output = Arc::new(PartialOutput::new(2));
+            let (core, _source) = open_with(output.clone());
+            let input = b"ab\ncd\n";
+            let mut remaining = &input[..];
+
+            while !remaining.is_empty() {
+                let written = core.write(remaining).unwrap();
+
+                assert!(written <= remaining.len(), "write over-reported progress");
+                assert!(written > 0, "write made no progress");
+                remaining = &remaining[written..];
+            }
+
+            // Resuming at input boundaries reconstructs exactly one CR+NL per newline.
+            assert_eq!(output.bytes(), b"ab\r\ncd\r\n");
+        }
+    );
 
     roxy_test::kernel_test!("roxy-tty-core::echo-disabled", skips_echo, {
         let (core, source, output) = open();

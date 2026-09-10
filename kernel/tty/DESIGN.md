@@ -61,8 +61,8 @@ path a pty slave uses; there is no console-specific exit handler.
 
 The layout decoder is fixed to the US 104-key layout (`Us104Key`); layout selection and switching
 are outside the current scope. Remaining terminal limits (unsupported `termios` fields, control
-characters, job control, `SIGWINCH`, input/output transformations) live in
-`roxy-tty-core/DESIGN.md` and apply to the console exactly as to a pty slave.
+characters, job control, `SIGWINCH`) live in `roxy-tty-core/DESIGN.md` and apply to the console
+exactly as to a pty slave.
 ### Terminal name and `/dev/tty0`
 
 The console exposes its openable device path through a path capability: `Tty::terminal_path`

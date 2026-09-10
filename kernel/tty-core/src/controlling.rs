@@ -110,7 +110,7 @@ mod tests {
             assert_eq!(device.read(&mut buffer), Ok(3));
             assert_eq!(&buffer[..3], b"hi\n");
             assert_eq!(device.write(b"out"), Ok(3));
-            assert_eq!(output.bytes(), b"hi\nout");
+            assert_eq!(output.bytes(), b"hi\r\nout");
             assert_eq!(
                 device.ioctl(IoctlRequest::GetWindowSize(&mut WindowSize::default())),
                 Ok(())

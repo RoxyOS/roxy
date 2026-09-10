@@ -200,7 +200,7 @@ mod tests {
         // Type "ab", backspace erases 'b', then "c", newline commits "ac\n".
         assert_eq!(file.read(&mut buffer), Ok(3));
         assert_eq!(&buffer[..3], b"ac\n");
-        assert_eq!(output.bytes(), b"ab\x08c\n");
+        assert_eq!(output.bytes(), b"ab\x08c\r\n");
     });
 
     kernel_test!("roxy-tty::canonical-escape", commits_escape_sequence, {
@@ -210,7 +210,7 @@ mod tests {
 
         assert_eq!(file.read(&mut buffer), Ok(4));
         assert_eq!(&buffer, b"\x1b[D\n");
-        assert_eq!(output.bytes(), b"\x1b[D\n");
+        assert_eq!(output.bytes(), b"\x1b[D\r\n");
     });
 
     kernel_test!("roxy-tty::shared-line", shares_partial_canonical_line, {
@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(second.read(&mut second_half), Ok(2));
         assert_eq!(&first_half, b"ab");
         assert_eq!(&second_half, b"c\n");
-        assert_eq!(output.bytes(), b"abc\n");
+        assert_eq!(output.bytes(), b"abc\r\n");
     });
 
     kernel_test!("roxy-tty::disabled-echo", skips_disabled_echo, {

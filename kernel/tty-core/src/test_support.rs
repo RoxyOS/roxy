@@ -1,5 +1,5 @@
-//! Test scaffolding shared by `roxy-tty-core`'s kernel-tests: a byte-queue input source and a
-//! mock output endpoint.
+//! Test scaffolding shared by `roxy-tty-core`'s kernel-tests: a byte-queue input source and mock
+//! output endpoints (one that accepts everything and one that accepts a bounded prefix per write).
 
 use alloc::sync::Arc;
 
@@ -83,12 +83,55 @@ impl TtyOutput for MockOutput {
     }
 }
 
+/// An output endpoint that accepts at most `budget` bytes per write, standing in for a terminal
+/// whose backing buffer is temporarily full.
+///
+/// A budget of at least two delivers a translated `CR`+`NL` pair in one call, which is what a
+/// real endpoint does.
+pub(crate) struct PartialOutput {
+    budget: usize,
+    bytes: Mutex<alloc::vec::Vec<u8>>,
+}
+
+impl PartialOutput {
+    pub(crate) fn new(budget: usize) -> Self {
+        Self {
+            budget,
+            bytes: Mutex::new(alloc::vec::Vec::new()),
+        }
+    }
+
+    pub(crate) fn bytes(&self) -> alloc::vec::Vec<u8> {
+        self.bytes.lock().clone()
+    }
+}
+
+impl TtyOutput for PartialOutput {
+    fn write(&self, input: &[u8]) -> Result<usize, OutputError> {
+        let accepted = input.len().min(self.budget);
+        self.bytes.lock().extend_from_slice(&input[..accepted]);
+
+        Ok(accepted)
+    }
+
+    fn window_size(&self) -> WindowSize {
+        WindowSize::UNKNOWN
+    }
+}
+
 pub(crate) fn open() -> (Arc<TtyCore>, Arc<ByteQueue>, Arc<MockOutput>) {
     let output = Arc::new(MockOutput::new());
+    let (core, source) = open_with(output.clone());
+
+    (core, source, output)
+}
+
+/// Builds a terminal core around a caller-supplied output endpoint.
+pub(crate) fn open_with(output: Arc<dyn TtyOutput>) -> (Arc<TtyCore>, Arc<ByteQueue>) {
     let source = Arc::new(ByteQueue {
         queue: Mutex::new(alloc::vec::Vec::new()),
     });
-    let core = TtyCore::new(output.clone(), source.clone());
+    let core = TtyCore::new(output, source.clone());
 
-    (core, source, output)
+    (core, source)
 }

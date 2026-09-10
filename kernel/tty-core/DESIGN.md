@@ -45,6 +45,24 @@ buffer is empty, returns `Interrupted` when a signal is pending, and otherwise b
 architecture interrupt wait. `poll` uses the same under-lock filling and reports read readiness
 from the buffer; output is always writable because terminal output has no backpressure model.
 
+### Output path
+
+`TtyCore::write` carries the terminal program's output to the `TtyOutput` endpoint, and the echo
+of accepted input goes to that same endpoint. Both run through one delivery path that applies
+output post-processing: with `OPOST`+`ONLCR` set, every newline is delivered as CR+NL. That
+matches a cooked terminal, whose line discipline post-processes both program output and its own
+echo buffer. `OPOST`/`ONLCR` are the only `c_oflag` bits that change the output; the remaining
+post-processing bits are accepted as no-ops.
+
+`TtyOutput::write` may accept a prefix of what it is given. `TtyCore::write` therefore reports the
+number of **input** bytes whose translated output the endpoint accepted, never more than the
+caller's buffer length, so a caller that resumes at `output[written..]` resumes on an input byte
+boundary even though a newline expands to two output bytes. If the endpoint stops between a CR and
+its NL, that newline is reported undelivered and the resumption repeats the CR, which is harmless
+because it only resets the column; `TtyOutput` exposes no way to ask for room before writing, so an
+endpoint that cannot accept both bytes of the pair cannot complete a translated newline. The echo
+path treats any partial delivery as an I/O error, as before.
+
 ### Terminal attributes and ioctls
 
 `TtyCore::ioctl` handles termios get/set with their application timing, window-size get/set,
@@ -90,8 +108,10 @@ moved into the readable buffer, matching the prior TTY behavior.
 
 ## Limits
 
-Input/output transformations (`ONLCR` …), extra control characters, `VMIN`/`VTIME` combinations,
-timeout-based noncanonical reads, job-control stop/continue, and `SIGWINCH` remain unsupported;
-unsupported `termios` fields are rejected. The session model is shared with `roxy-process`'s
-minimal `setsid`/`setpgid` checks. The registry keeps a weak set of all live cores rather than a
+Input transformations are limited to `ICRNL`/`INLCR`/`IGNCR` and output post-processing to
+`OPOST`/`ONLCR`; the remaining `termios` flag bits are accepted as no-ops (with in-place `TODO`
+markers) and the control characters are round-tripped, so a cooked terminal can configure itself.
+`VMIN`/`VTIME` combinations, timeout-based noncanonical reads, job-control stop/continue, and
+`SIGWINCH` remain unsupported. The session model is shared with `roxy-process`'s minimal
+`setsid`/`setpgid` checks. The registry keeps a weak set of all live cores rather than a
 per-session index; an index is unnecessary while few terminals are live.

@@ -36,6 +36,8 @@ the owning TTY decides how to deliver the signal.
 
 ## Limits
 
-Control characters other than erase, the interrupt character, EOF, line kill, input and output
-transformations, timeout-based noncanonical reads, PTYs, and job control are outside the current
-implementation.
+Control characters other than erase, the interrupt character, EOF, line kill, input
+transformations other than `ICRNL`/`INLCR`/`IGNCR`, timeout-based noncanonical reads, PTYs, and
+job control are outside the current implementation. The settings bag also carries the
+`OPOST`/`ONLCR` output post-processing flags, but the discipline never applies them: the owning TTY
+does, on the way to its output endpoint.
