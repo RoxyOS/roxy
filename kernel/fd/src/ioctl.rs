@@ -1,6 +1,6 @@
 use crate::OpenFile;
 
-pub use roxy_fb_types::{FbBitfield, FbFixedInfo, FbVarInfo};
+pub use roxy_fb_types::{FbChannel, FbInfo};
 pub use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
 
 #[derive(Debug)]
@@ -25,9 +25,7 @@ pub enum IoctlRequest<'a> {
     PtyGetNumber(&'a mut u32),
     /// Sets whether the pty slave device is locked (`TIOCSPTLCK`).
     PtySetLock(bool),
-    FbGetVarInfo(&'a mut FbVarInfo),
-    FbSetVarInfo(FbVarInfo),
-    FbGetFixedInfo(&'a mut FbFixedInfo),
+    FbGetInfo(&'a mut FbInfo),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

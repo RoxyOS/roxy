@@ -1,258 +1,108 @@
 use core::mem::{align_of, offset_of, size_of};
 
-use roxy_fb_types::{FbBitfield, FbFixedInfo, FbVarInfo};
-use roxy_memory::UserAddress;
+use roxy_fb_types::FbInfo;
 
-use crate::{
-    args::{Out, SyscallArg, user_memory},
-    errno::Errno,
-};
+use crate::{args::Out, errno::Errno};
 
-/// Linux `struct fb_var_screeninfo` as seen by `x86_64` userspace.
+/// Roxy `struct roxy_framebuffer_info`, the record `/dev/framebuffer` reports.
 ///
-/// The layout mirrors `include/uapi/linux/fb.h` for the `x86_64` personality: every field is a
-/// 32-bit integer and the record is 160 bytes with no padding.
+/// The layout is Roxy's own and mirrors `sysdeps/roxy/include/roxy/framebuffer-dev.h` in the Roxy
+/// mlibc fork: four 32-bit fields, eight single-byte channel fields, and two reserved bytes, for
+/// 24 bytes without padding. Pixels are always 32 bits wide, so no bit-depth field is needed.
+///
+/// This record only ever travels kernel-to-userspace: the device has no request that takes an
+/// input record, so no decoding side exists.
 #[repr(C)]
-pub(super) struct FbVarScreenInfoAbi {
-    xres: u32,
-    yres: u32,
-    xres_virtual: u32,
-    yres_virtual: u32,
-    xoffset: u32,
-    yoffset: u32,
-    bits_per_pixel: u32,
-    grayscale: u32,
-    red: FbBitfieldAbi,
-    green: FbBitfieldAbi,
-    blue: FbBitfieldAbi,
-    transp: FbBitfieldAbi,
-    nonstd: u32,
-    activate: u32,
-    height: u32,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct RoxyFramebufferInfoAbi {
     width: u32,
-    accel_flags: u32,
-    pixclock: u32,
-    left_margin: u32,
-    right_margin: u32,
-    upper_margin: u32,
-    lower_margin: u32,
-    hsync_len: u32,
-    vsync_len: u32,
-    sync: u32,
-    vmode: u32,
-    rotate: u32,
-    colorspace: u32,
-    reserved: [u32; 4],
+    height: u32,
+    stride: u32,
+    memory_length: u32,
+    red_size: u8,
+    red_shift: u8,
+    green_size: u8,
+    green_shift: u8,
+    blue_size: u8,
+    blue_shift: u8,
+    reserved0: u8,
+    reserved1: u8,
 }
 
-const _: () = assert!(size_of::<FbVarScreenInfoAbi>() == 160);
-const _: () = assert!(align_of::<FbVarScreenInfoAbi>() == 4);
-const _: () = assert!(offset_of!(FbVarScreenInfoAbi, xres) == 0);
-const _: () = assert!(offset_of!(FbVarScreenInfoAbi, yres) == 4);
-const _: () = assert!(offset_of!(FbVarScreenInfoAbi, bits_per_pixel) == 24);
-const _: () = assert!(offset_of!(FbVarScreenInfoAbi, red) == 32);
-const _: () = assert!(offset_of!(FbVarScreenInfoAbi, reserved) == 144);
+const _: () = assert!(size_of::<RoxyFramebufferInfoAbi>() == 24);
+const _: () = assert!(align_of::<RoxyFramebufferInfoAbi>() == 4);
+const _: () = assert!(offset_of!(RoxyFramebufferInfoAbi, width) == 0);
+const _: () = assert!(offset_of!(RoxyFramebufferInfoAbi, height) == 4);
+const _: () = assert!(offset_of!(RoxyFramebufferInfoAbi, stride) == 8);
+const _: () = assert!(offset_of!(RoxyFramebufferInfoAbi, memory_length) == 12);
+const _: () = assert!(offset_of!(RoxyFramebufferInfoAbi, red_size) == 16);
+const _: () = assert!(offset_of!(RoxyFramebufferInfoAbi, green_size) == 18);
+const _: () = assert!(offset_of!(RoxyFramebufferInfoAbi, blue_size) == 20);
+const _: () = assert!(offset_of!(RoxyFramebufferInfoAbi, reserved0) == 22);
 
-impl FbVarScreenInfoAbi {
-    const fn zeroed() -> Self {
-        const ZERO_BITFIELD: FbBitfieldAbi = FbBitfieldAbi {
-            offset: 0,
-            length: 0,
-            msb_right: 0,
-        };
-
+impl RoxyFramebufferInfoAbi {
+    /// Encodes the device-neutral description, zeroing both reserved bytes.
+    const fn encode(info: FbInfo) -> Self {
         Self {
-            xres: 0,
-            yres: 0,
-            xres_virtual: 0,
-            yres_virtual: 0,
-            xoffset: 0,
-            yoffset: 0,
-            bits_per_pixel: 0,
-            grayscale: 0,
-            red: ZERO_BITFIELD,
-            green: ZERO_BITFIELD,
-            blue: ZERO_BITFIELD,
-            transp: ZERO_BITFIELD,
-            nonstd: 0,
-            activate: 0,
-            height: 0,
-            width: 0,
-            accel_flags: 0,
-            pixclock: 0,
-            left_margin: 0,
-            right_margin: 0,
-            upper_margin: 0,
-            lower_margin: 0,
-            hsync_len: 0,
-            vsync_len: 0,
-            sync: 0,
-            vmode: 0,
-            rotate: 0,
-            colorspace: 0,
-            reserved: [0; 4],
+            width: info.width,
+            height: info.height,
+            stride: info.stride,
+            memory_length: info.memory_length,
+            red_size: info.red.size,
+            red_shift: info.red.shift,
+            green_size: info.green.size,
+            green_shift: info.green.shift,
+            blue_size: info.blue.size,
+            blue_shift: info.blue.shift,
+            reserved0: 0,
+            reserved1: 0,
         }
     }
 }
 
-impl SyscallArg for FbVarScreenInfoAbi {
-    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
-        let address = UserAddress::parse(raw, error)?;
-        let mut abi = Self::zeroed();
+/// Writes the device's description into a client-provided record.
+pub(super) fn write_info(output: Out<RoxyFramebufferInfoAbi>, info: FbInfo) -> Result<(), Errno> {
+    let abi = RoxyFramebufferInfoAbi::encode(info);
 
-        // SAFETY: FbVarScreenInfoAbi's checked repr(C) layout has no padding and contains only
-        // integers, and every bit pattern is valid.
-        unsafe { user_memory::read(address, &mut abi) }?;
-
-        Ok(abi)
-    }
-}
-
-/// Linux `struct fb_bitfield` as seen by `x86_64` userspace.
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct FbBitfieldAbi {
-    offset: u32,
-    length: u32,
-    msb_right: u32,
-}
-
-const _: () = assert!(size_of::<FbBitfieldAbi>() == 12);
-const _: () = assert!(align_of::<FbBitfieldAbi>() == 4);
-
-pub(super) fn read_var_screen_info(address: UserAddress) -> Result<FbVarInfo, Errno> {
-    let abi = FbVarScreenInfoAbi::parse(address.as_u64(), Errno::Fault)?;
-
-    Ok(FbVarInfo {
-        xres: abi.xres,
-        yres: abi.yres,
-        xres_virtual: abi.xres_virtual,
-        yres_virtual: abi.yres_virtual,
-        bits_per_pixel: abi.bits_per_pixel,
-        red: fb_bitfield(abi.red),
-        green: fb_bitfield(abi.green),
-        blue: fb_bitfield(abi.blue),
-    })
-}
-
-/// Linux `struct fb_fix_screeninfo` as seen by `x86_64` userspace.
-///
-/// The layout mirrors `include/uapi/linux/fb.h`: two `unsigned long` fields force 8-byte
-/// alignment and the record totals 80 bytes on `x86_64`.
-#[repr(C)]
-pub(super) struct FbFixScreenInfoAbi {
-    id: [u8; 16],
-    smem_start: u64,
-    smem_len: u32,
-    fb_type: u32,
-    type_aux: u32,
-    visual: u32,
-    xpanstep: u16,
-    ypanstep: u16,
-    ywrapstep: u16,
-    line_length: u32,
-    mmio_start: u64,
-    mmio_len: u32,
-    accel: u32,
-    capabilities: u16,
-    reserved: [u16; 2],
-}
-
-const _: () = assert!(size_of::<FbFixScreenInfoAbi>() == 80);
-const _: () = assert!(align_of::<FbFixScreenInfoAbi>() == 8);
-const _: () = assert!(offset_of!(FbFixScreenInfoAbi, id) == 0);
-const _: () = assert!(offset_of!(FbFixScreenInfoAbi, smem_start) == 16);
-const _: () = assert!(offset_of!(FbFixScreenInfoAbi, smem_len) == 24);
-const _: () = assert!(offset_of!(FbFixScreenInfoAbi, visual) == 36);
-const _: () = assert!(offset_of!(FbFixScreenInfoAbi, line_length) == 48);
-const _: () = assert!(offset_of!(FbFixScreenInfoAbi, mmio_start) == 56);
-const _: () = assert!(offset_of!(FbFixScreenInfoAbi, reserved) == 74);
-
-pub(super) fn write_var_screen_info(
-    output: Out<FbVarScreenInfoAbi>,
-    info: FbVarInfo,
-) -> Result<(), Errno> {
-    let abi = FbVarScreenInfoAbi {
-        xres: info.xres,
-        yres: info.yres,
-        xres_virtual: info.xres_virtual,
-        yres_virtual: info.yres_virtual,
-        xoffset: 0,
-        yoffset: 0,
-        bits_per_pixel: info.bits_per_pixel,
-        grayscale: 0,
-        red: bitfield(info.red),
-        green: bitfield(info.green),
-        blue: bitfield(info.blue),
-        transp: bitfield(FbBitfield {
-            offset: 0,
-            length: 0,
-        }),
-        nonstd: 0,
-        activate: 0,
-        height: 0,
-        width: 0,
-        accel_flags: 0,
-        pixclock: 0,
-        left_margin: 0,
-        right_margin: 0,
-        upper_margin: 0,
-        lower_margin: 0,
-        hsync_len: 0,
-        vsync_len: 0,
-        sync: 0,
-        vmode: 0,
-        rotate: 0,
-        colorspace: 0,
-        reserved: [0; 4],
-    };
-
-    // SAFETY: FbVarScreenInfoAbi contains only initialized integer fields without implicit
-    // padding, so every byte of its object representation is defined.
+    // SAFETY: every field is initialized and the layout has no implicit padding, so every byte of
+    // the object representation is defined.
     unsafe { output.write(&abi) }
 }
 
-pub(super) fn write_fix_screen_info(
-    output: Out<FbFixScreenInfoAbi>,
-    info: FbFixedInfo,
-) -> Result<(), Errno> {
-    let abi = FbFixScreenInfoAbi {
-        id: info.id,
-        smem_start: info.smem_start,
-        smem_len: info.smem_len,
-        fb_type: FB_TYPE_PACKED_PIXELS,
-        type_aux: 0,
-        visual: info.visual,
-        xpanstep: 0,
-        ypanstep: 0,
-        ywrapstep: 0,
-        line_length: info.line_length,
-        mmio_start: 0,
-        mmio_len: 0,
-        accel: FB_ACCEL_NONE,
-        capabilities: 0,
-        reserved: [0; 2],
-    };
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use roxy_fb_types::{FbChannel, FbInfo};
+    use roxy_test::kernel_test;
 
-    // SAFETY: FbFixScreenInfoAbi's checked repr(C) layout represents all padding explicitly and
-    // initializes every field, so every byte of its object representation is defined.
-    unsafe { output.write(&abi) }
+    use super::RoxyFramebufferInfoAbi;
+
+    kernel_test!(
+        "roxy-syscall::framebuffer-info-encoding",
+        encodes_neutral_info,
+        {
+            let info = FbInfo {
+                width: 1280,
+                height: 800,
+                stride: 5120,
+                memory_length: 5120 * 800,
+                red: FbChannel { size: 8, shift: 16 },
+                green: FbChannel { size: 8, shift: 8 },
+                blue: FbChannel { size: 8, shift: 0 },
+            };
+
+            let abi = RoxyFramebufferInfoAbi::encode(info);
+            assert_eq!(abi.width, 1280);
+            assert_eq!(abi.height, 800);
+            assert_eq!(abi.stride, 5120);
+            assert_eq!(abi.memory_length, 5120 * 800);
+            assert_eq!(abi.red_size, 8);
+            assert_eq!(abi.red_shift, 16);
+            assert_eq!(abi.green_size, 8);
+            assert_eq!(abi.green_shift, 8);
+            assert_eq!(abi.blue_size, 8);
+            assert_eq!(abi.blue_shift, 0);
+            assert_eq!(abi.reserved0, 0);
+            assert_eq!(abi.reserved1, 0);
+        }
+    );
 }
-
-fn bitfield(bitfield: FbBitfield) -> FbBitfieldAbi {
-    FbBitfieldAbi {
-        offset: bitfield.offset,
-        length: bitfield.length,
-        msb_right: 0,
-    }
-}
-
-fn fb_bitfield(abi: FbBitfieldAbi) -> FbBitfield {
-    FbBitfield {
-        offset: abi.offset,
-        length: abi.length,
-    }
-}
-
-const FB_TYPE_PACKED_PIXELS: u32 = 0;
-const FB_ACCEL_NONE: u32 = 0;

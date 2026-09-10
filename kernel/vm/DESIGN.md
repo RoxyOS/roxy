@@ -35,7 +35,7 @@ persistent process dispatch uses handle activation until another table is select
 recorded as `PageState::MappedPhysical` and unmapping, protecting, or dropping the address space
 only removes the user page-table entries: the caller retains ownership of the physical pages,
 which must remain valid for the mapping's lifetime. This is the device-mapping path used by
-`mmap` of `/dev/fb0`.
+`mmap` of `/dev/framebuffer`.
 
 Unmap accepts any page-aligned contiguous segment of one physical mapping, while anonymous
 allocations must still match exactly. Fork shares physical mappings between the parent and child

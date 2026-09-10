@@ -22,8 +22,8 @@ execution and path normalization complete before any filesystem or mount-table o
 
 Mount resolution selects the longest matching component boundary. The resolved filesystem
 receives a path local to its mount: the unchanged absolute path for the root mount, and
-otherwise the mount prefix stripped without a leading separator, so `/dev/fb0` at a `/dev`
-mount arrives as `fb0`. The mount point itself arrives as the root path. A mount owns an
+otherwise the mount prefix stripped without a leading separator, so `/dev/framebuffer` at a
+`/dev` mount arrives as `framebuffer`. The mount point itself arrives as the root path. A mount owns an
 `Arc<dyn FileSystem>` and active-handle counter; unmount is rejected while any file or
 directory from that mount remains active.
 

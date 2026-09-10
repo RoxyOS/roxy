@@ -29,14 +29,8 @@ pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> R
         terminal::TCFLSH => terminal::tcflush(file, raw_argument).map(|()| 0),
         pty::TIOCGPTN => pty::get_pty_number(file, raw_argument).map(|()| 0),
         pty::TIOCSPTLCK => pty::set_pty_lock(file, raw_argument).map(|()| 0),
-        framebuffer::FBIOGET_VSCREENINFO => {
-            framebuffer::get_var_screen_info(file, raw_argument).map(|()| 0)
-        }
-        framebuffer::FBIOPUT_VSCREENINFO => {
-            framebuffer::set_var_screen_info(file, raw_argument).map(|()| 0)
-        }
-        framebuffer::FBIOGET_FSCREENINFO => {
-            framebuffer::get_fix_screen_info(file, raw_argument).map(|()| 0)
+        framebuffer::ROXY_FRAMEBUFFER_GET_INFO => {
+            framebuffer::get_info(file, raw_argument).map(|()| 0)
         }
         FIONBIO => set_nonblocking(file, raw_argument).map(|()| 0),
         _ => Err(Errno::NotTty),

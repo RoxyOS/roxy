@@ -14,14 +14,14 @@ unconditionally alongside hardware drivers. Block devices, fifos, and sockets ar
 
 ## Ownership model
 
-`DeviceRegistry` owns a `BTreeMap` from mount-relative byte paths (such as `fb0`) to
+`DeviceRegistry` owns a `BTreeMap` from mount-relative byte paths (such as `framebuffer`) to
 `Arc<dyn Device>`. Registration happens exactly once during kernel initialization and never
 removes entries; the registry and its devices therefore live for the kernel lifetime. The
 composition root (`kernel-main`) creates one registry, hands it to `DevFs` for the `/dev` mount,
 and passes the same `Arc` to drivers that register their devices.
 
 The null sink (`NullDevice`) is an intrinsic pseudo-device defined in this crate. The composition
-root calls `register_null` to register it under `null`; unlike `fb0` this registration is
+root calls `register_null` to register it under `null`; unlike the framebuffer device this registration is
 unconditional because `/dev/null` must always exist regardless of hardware.
 
 `DevFs` implements `FileSystem` against that registry. Its mount root is a directory whose
@@ -34,7 +34,7 @@ across open and directory listing.
 ## Contract
 
 ```text
-open("/dev/fb0")
+open("/dev/framebuffer")
   → VFS mount routing → DevFs::open → registry lookup → DeviceFile { device }
   → VfsFile → descriptor-layer File
 open("/dev/null")

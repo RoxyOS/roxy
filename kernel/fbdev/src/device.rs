@@ -7,7 +7,7 @@ use crate::convert;
 
 const DEVICE_ID: u64 = 1;
 
-/// The boot framebuffer character device exposed as `/dev/fb0`.
+/// The boot framebuffer character device exposed as `/dev/framebuffer`.
 ///
 /// The device is stateless: it reports the layout published by `roxy-fbterm` and maps the
 /// framebuffer's physical memory without copying or ownership transfer. The framebuffer mapping
@@ -36,23 +36,8 @@ impl Device for FramebufferDevice {
 
     fn ioctl(&self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
         match request {
-            IoctlRequest::FbGetVarInfo(info) => {
-                *info = convert::var_info(self.layout);
-                Ok(())
-            }
-            IoctlRequest::FbSetVarInfo(info) => {
-                // The boot loader fixes the framebuffer mode, so there is no mode hardware to
-                // program. Mirror fixed-mode Linux drivers: accept requests that describe the
-                // current mode (including FB_ACTIVATE_TEST probes) and reject actual mode
-                // changes.
-                if info == convert::var_info(self.layout) {
-                    Ok(())
-                } else {
-                    Err(IoctlError::Invalid)
-                }
-            }
-            IoctlRequest::FbGetFixedInfo(info) => {
-                *info = convert::fixed_info(self.layout);
+            IoctlRequest::FbGetInfo(info) => {
+                *info = convert::info(self.layout);
                 Ok(())
             }
             _ => Err(IoctlError::Unsupported {
@@ -70,9 +55,8 @@ impl Device for FramebufferDevice {
         let length =
             usize::try_from(convert::memory_length(self.layout)).expect("memory length fits usize");
 
-        // Userspace rounds the mapping length up to whole pages (fbmem_len in the Linux fbdev
-        // ABI), so accept sizes up to the page-rounded framebuffer length even when
-        // pitch * height is not itself page-aligned.
+        // Userspace rounds the mapping length up to whole pages, so accept sizes up to the
+        // page-rounded framebuffer length even when pitch * height is not itself page-aligned.
         if size > length.next_multiple_of(usize::try_from(PAGE_SIZE).expect("page size fits usize"))
         {
             return Err(MmapError::InvalidArgument);
@@ -90,8 +74,7 @@ mod tests {
     use roxy_devfs::Device;
     use roxy_fbterm::{ColorChannelLayout, FramebufferLayout};
     use roxy_fd::{
-        FbFixedInfo, FbVarInfo, FileType, IoctlError, IoctlRequest, MmapError, MmapTarget,
-        WindowSize,
+        FbChannel, FbInfo, FileType, IoctlError, IoctlRequest, MmapError, MmapTarget, WindowSize,
     };
     use roxy_test::kernel_test;
 
@@ -116,35 +99,15 @@ mod tests {
         ..LAYOUT
     };
 
-    fn var_info_request() -> FbVarInfo {
-        FbVarInfo {
-            xres: 0,
-            yres: 0,
-            xres_virtual: 0,
-            yres_virtual: 0,
-            bits_per_pixel: 0,
-            red: roxy_fd::FbBitfield {
-                offset: 0,
-                length: 0,
-            },
-            green: roxy_fd::FbBitfield {
-                offset: 0,
-                length: 0,
-            },
-            blue: roxy_fd::FbBitfield {
-                offset: 0,
-                length: 0,
-            },
-        }
-    }
-
-    fn fixed_info_request() -> FbFixedInfo {
-        FbFixedInfo {
-            id: [0; 16],
-            smem_start: 0,
-            smem_len: 0,
-            visual: 0,
-            line_length: 0,
+    fn empty_info() -> FbInfo {
+        FbInfo {
+            width: 0,
+            height: 0,
+            stride: 0,
+            memory_length: 0,
+            red: FbChannel { size: 0, shift: 0 },
+            green: FbChannel { size: 0, shift: 0 },
+            blue: FbChannel { size: 0, shift: 0 },
         }
     }
 
@@ -155,48 +118,15 @@ mod tests {
         assert_eq!(metadata.permissions, 0o600);
     });
 
-    kernel_test!("roxy-fbdev::var-info-ioctl", dispatches_var_info, {
+    kernel_test!("roxy-fbdev::get-info-ioctl", dispatches_framebuffer_info, {
         let device = FramebufferDevice::new(&LAYOUT);
-        let mut info = var_info_request();
+        let mut info = empty_info();
 
-        device.ioctl(IoctlRequest::FbGetVarInfo(&mut info)).unwrap();
-        assert_eq!(info.xres, 1024);
-        assert_eq!(info.bits_per_pixel, 32);
-    });
-
-    kernel_test!("roxy-fbdev::set-var-ioctl", accepts_current_mode, {
-        let device = FramebufferDevice::new(&LAYOUT);
-        let mut info = var_info_request();
-        device.ioctl(IoctlRequest::FbGetVarInfo(&mut info)).unwrap();
-
-        assert!(device.ioctl(IoctlRequest::FbSetVarInfo(info)).is_ok());
-    });
-
-    kernel_test!(
-        "roxy-fbdev::set-var-ioctl-mode-change",
-        rejects_mode_changes,
-        {
-            let device = FramebufferDevice::new(&LAYOUT);
-            let mut info = var_info_request();
-            device.ioctl(IoctlRequest::FbGetVarInfo(&mut info)).unwrap();
-            info.xres = 800;
-
-            assert_eq!(
-                device.ioctl(IoctlRequest::FbSetVarInfo(info)),
-                Err(IoctlError::Invalid)
-            );
-        }
-    );
-
-    kernel_test!("roxy-fbdev::fixed-info-ioctl", dispatches_fixed_info, {
-        let device = FramebufferDevice::new(&LAYOUT);
-        let mut info = fixed_info_request();
-
-        device
-            .ioctl(IoctlRequest::FbGetFixedInfo(&mut info))
-            .unwrap();
-        assert_eq!(info.smem_start, 0x1000);
-        assert_eq!(info.smem_len, 4096 * 768);
+        device.ioctl(IoctlRequest::FbGetInfo(&mut info)).unwrap();
+        assert_eq!(info.width, 1024);
+        assert_eq!(info.height, 768);
+        assert_eq!(info.stride, 4096);
+        assert_eq!(info.red, FbChannel { size: 8, shift: 16 });
     });
 
     kernel_test!("roxy-fbdev::mmap", maps_framebuffer_memory, {

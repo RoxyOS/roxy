@@ -129,9 +129,7 @@ impl TtyCore {
                 Ok(())
             }
             IoctlRequest::SetControllingTerminal { force } => self.set_controlling_terminal(force),
-            IoctlRequest::FbGetVarInfo(_)
-            | IoctlRequest::FbSetVarInfo(_)
-            | IoctlRequest::FbGetFixedInfo(_)
+            IoctlRequest::FbGetInfo(_)
             | IoctlRequest::PtyGetNumber(_)
             | IoctlRequest::PtySetLock(_) => Err(IoctlError::NotTty),
         }

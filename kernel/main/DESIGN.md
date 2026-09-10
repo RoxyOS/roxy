@@ -52,7 +52,8 @@ policy.
 The root filesystem setup mounts the ext4 root, then mounts a `roxy-devfs` device filesystem at
 `/dev` and publishes its shared `DeviceRegistry`. Immediately after the root filesystem is
 initialized, the composition root asks `roxy-fbdev` to register the boot framebuffer; the device
-appears only when `fbterm` published a validated layout, so serial-only boots expose no `fb0`.
+appears only when `fbterm` published a validated layout, so serial-only boots expose no
+framebuffer device.
 This ordering keeps device registration before any userspace process can open `/dev` nodes while
 leaving hardware and driver ownership in their subsystems.
 
