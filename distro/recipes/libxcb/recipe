@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=1.17.0
-revision=1
+revision=2
 
 tarball_url="https://www.x.org/releases/individual/xcb/libxcb-${version}.tar.xz"
 tarball_sha256="599ebf9996710fea71622e6e184f3a8ad5b43d0e5fa8c4e407123c88a59a6d55"

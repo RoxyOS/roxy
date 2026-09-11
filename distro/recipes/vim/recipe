@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=9.2.0854
-revision=3
+revision=4
 
 tarball_url="https://github.com/vim/vim/archive/refs/tags/v${version}.tar.gz"
 tarball_sha256="b0e3afbc106a0aff2f945e60bf305dc249170cd13ef4d3c5c6cbd34760585c12"

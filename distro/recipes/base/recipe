@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=1
-revision=7
+revision=8
 
 # This base metapackage contains the essential software for a normal system
 # together with Roxy's own userland defaults.  Package recipes build upstream

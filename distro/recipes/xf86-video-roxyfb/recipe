@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=0.3.1
-revision=1
+revision=2
 
 git_url="https://github.com/RoxyOS/xf86-video-roxyfb"
 commit="8ea003d4bdc096c17b642342b8eb6a6aceda664c"
