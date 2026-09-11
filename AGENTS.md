@@ -14,7 +14,10 @@ one cross-repository contract: syscall or ABI work may require coordinated chang
 The current platform is intentionally narrow. The supported architecture backend is x86_64, the
 kernel and scheduler bring up multiple application processors (SMP), the QEMU configuration uses
 16 virtual CPUs, and the build tooling assumes an x86_64 Linux host. Kernel Rust targets `x86_64-unknown-none`; userspace Clang
-targets `x86_64-unknown-roxy`.
+targets `x86_64-unknown-roxy`. That Clang is the Roxy fork of `llvm-project` (pinned by
+`distro/host-recipes/roxy-llvm`), and it recognizes the triple's `roxy` OS component: for the
+x86_64 target it defines `__roxy__` (and `__unix__`), so ported code detects this platform with
+`#if defined(__roxy__)` instead of probing for another platform's macros.
 
 The current userspace exposes only the Roxy ABI, but the kernel architecture must remain capable
 of hosting multiple Unix-like ABI personalities, including Linux-, BSD-, and Solaris-compatible
