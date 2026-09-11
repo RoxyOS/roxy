@@ -34,16 +34,15 @@ impl SignalSetAbi {
         Self { bits }
     }
 
-    pub(super) fn to_set(self, signal: Signal) -> Result<SignalSet, Errno> {
-        if self.bits[1..].iter().any(|bits| *bits != 0) {
-            return Err(unsupported_argument(
-                "signal_set.extended_bits",
-                signal.number(),
-                Errno::NotSupported,
-            ));
-        }
-
-        Ok(SignalSet::from_bits_retain(self.bits[0]))
+    /// Decodes the set, keeping the first word and ignoring the reserved rest.
+    ///
+    /// The record is the 128-byte `sigset_t` layout every libc uses, but only its first word
+    /// carries signals: the remaining words are reserved. Callers do fill them — glibc's and
+    /// mlibc's `sigfillset` set every byte of the set — so rejecting a non-zero reserved word
+    /// would fail ordinary programs, and Linux never sees those bytes because its syscall reads a
+    /// single word. Only the first word is therefore interpreted.
+    pub(super) fn to_set(self) -> SignalSet {
+        SignalSet::from_bits_retain(self.bits[0])
     }
 }
 
@@ -55,15 +54,7 @@ impl SyscallArg for SignalSet {
         // SAFETY: SignalSetAbi has a checked C layout and is fully initialized.
         unsafe { user_memory::read(address, &mut set) }?;
 
-        if set.bits[1..].iter().any(|bits| *bits != 0) {
-            return Err(unsupported_argument(
-                "signal_set.extended_bits",
-                "set",
-                Errno::NotSupported,
-            ));
-        }
-
-        Ok(SignalSet::from_bits_retain(set.bits[0]))
+        Ok(set.to_set())
     }
 }
 
@@ -155,6 +146,36 @@ mod tests {
 
         assert_eq!(SignalSetAbi::from_set(set).bits[0], set.bits());
     });
+
+    kernel_test!(
+        "roxy-syscall::signal-set-reserved",
+        ignores_reserved_words,
+        {
+            // A `sigfillset` set: the reserved words are all ones, as glibc and mlibc fill them.
+            let set = SignalSetAbi {
+                bits: [
+                    0b1010,
+                    u64::MAX,
+                    u64::MAX,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                ],
+            };
+
+            assert_eq!(set.to_set(), SignalSet::from_bits_retain(0b1010));
+        }
+    );
 
     kernel_test!(
         "roxy-syscall::sigreturn-number",

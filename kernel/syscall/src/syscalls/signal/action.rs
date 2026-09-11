@@ -71,7 +71,7 @@ fn handle(
     }
 
     let new_action = match newact.into_option() {
-        Some(value) => Some(decode(value, signal)?),
+        Some(value) => Some(decode(value)?),
         None => None,
     };
 
@@ -92,7 +92,7 @@ fn handle(
     Ok(0)
 }
 
-fn decode(value: SigactionAbi, signal: Signal) -> Result<SignalAction, Errno> {
+fn decode(value: SigactionAbi) -> Result<SignalAction, Errno> {
     // Only `SA_SIGINFO` (three-argument form with `siginfo_t`/`ucontext_t`) and `SA_RESTART`
     // (re-execute an interrupted blocking syscall after the handler) are defined in the Roxy ABI
     // today; any other flag is rejected through the centralized diagnostic.
@@ -110,7 +110,7 @@ fn decode(value: SigactionAbi, signal: Signal) -> Result<SignalAction, Errno> {
 
     // The kernel injects its own sigreturn trampoline, so a user-supplied restorer is never
     // required or consulted.
-    let mask = value.mask.to_set(signal)?;
+    let mask = value.mask.to_set();
 
     Ok(match value.handler {
         0 => SignalAction::Default,
