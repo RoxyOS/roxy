@@ -1,0 +1,36 @@
+diff --git libx11-clean/src/XlibInt.c libx11-workdir/src/XlibInt.c
+index 1949111..8deb2d2 100644
+--- libx11-clean/src/XlibInt.c
++++ libx11-workdir/src/XlibInt.c
+@@ -62,6 +62,9 @@ from The Open Group.
+ #include <unistd.h>
+ #endif
+ 
++/* Roxy: <sys/ioctl.h> defines no FIONREAD, so SocketBytesReadable() asks poll(). */
++#include <poll.h>
++
+ #ifdef XTHREADS
+ #include "locking.h"
+ 
+@@ -1255,7 +1258,21 @@ SocketBytesReadable(Display *dpy)
+     WSASetLastError(last_error);
+ #else
+     last_error = errno;
++#ifdef FIONREAD
+     ioctl(ConnectionNumber(dpy), FIONREAD, &bytes);
++#else
++    /* Roxy: the kernel implements no FIONREAD. The only caller asks whether the
++       connection has anything readable, to tell an idle connection from a broken
++       one, so ask poll() that question instead of inventing a request number. */
++    {
++        struct pollfd pfd;
++        pfd.fd = ConnectionNumber(dpy);
++        pfd.events = POLLIN;
++        pfd.revents = 0;
++        if (poll(&pfd, 1, 0) > 0)
++            bytes = 1;
++    }
++#endif
+     errno = last_error;
+ #endif
+     return bytes;

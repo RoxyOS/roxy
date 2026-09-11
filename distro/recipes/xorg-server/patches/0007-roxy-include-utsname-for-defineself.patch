@@ -1,0 +1,18 @@
+diff --git xorg-server-clean/os/access.c xorg-server-workdir/os/access.c
+index bf8e961..a38391d 100644
+--- xorg-server-clean/os/access.c
++++ xorg-server-workdir/os/access.c
+@@ -123,6 +123,13 @@ SOFTWARE.
+ #if defined(SVR4) ||  (defined(SYSV) && defined(__i386__)) || defined(__GNU__)
+ #include <sys/utsname.h>
+ #endif
++/* Roxy: with no SIOCGIFCONF the !SIOCGIFCONF branch of DefineSelf() is the one that
++ * gets built, and it identifies the host with uname() and gethostname() rather than
++ * by enumerating interfaces. */
++#if !defined(SIOCGIFCONF) && !defined(WIN32)
++#include <sys/utsname.h>
++#include <unistd.h>
++#endif
+ #if defined(SYSV) &&  defined(__i386__)
+ #include <sys/stream.h>
+ #endif

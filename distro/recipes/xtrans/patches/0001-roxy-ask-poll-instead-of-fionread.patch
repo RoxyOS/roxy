@@ -1,0 +1,68 @@
+diff --git xtrans-clean/Xtranslcl.c xtrans-workdir/Xtranslcl.c
+index ba33bce..bb5c0d7 100644
+--- xtrans-clean/Xtranslcl.c
++++ xtrans-workdir/Xtranslcl.c
+@@ -75,6 +75,8 @@ from The Open Group.
+ #include <sys/signal.h>
+ #include <sys/ioctl.h>
+ #include <sys/stat.h>
++/* Roxy: the kernel implements no FIONREAD, so the readability check uses poll(). */
++#include <poll.h>
+ #if defined(SVR4) || defined(__SVR4)
+ #include <sys/filio.h>
+ #endif
+@@ -1241,6 +1243,19 @@ TRANS(LocalBytesReadable)(XtransConnInfo ciptr, BytesReadable_t *pend )
+           (void *) ciptr, ciptr->fd, (void *) pend);
+ 
+     return ioctl(ciptr->fd, FIONREAD, (char *)pend);
++#else
++    /* Roxy: the kernel implements no FIONREAD; report readability instead, which is
++       what callers use this for. */
++    {
++	struct pollfd pfd;
++
++	pfd.fd = ciptr->fd;
++	pfd.events = POLLIN;
++	pfd.revents = 0;
++	*pend = (poll (&pfd, 1, 0) > 0) ? 1 : 0;
++	return 0;
++    }
++#endif
+ }
+ 
+ static int
+diff --git xtrans-clean/Xtranssock.c xtrans-workdir/Xtranssock.c
+index 4c7f80b..ceea454 100644
+--- xtrans-clean/Xtranssock.c
++++ xtrans-workdir/Xtranssock.c
+@@ -111,6 +111,8 @@ from the copyright holders.
+ #if defined(SVR4) || defined(__SVR4)
+ #include <sys/filio.h>
+ #endif
++/* Roxy: the kernel implements no FIONREAD, so the readability check uses poll(). */
++#include <poll.h>
+ 
+ #include <unistd.h>
+ 
+@@ -1988,7 +1990,21 @@ TRANS(SocketBytesReadable) (XtransConnInfo ciptr, BytesReadable_t *pend)
+ 	return ret;
+     }
+ #else
++#ifdef FIONREAD
+     return ioctl (ciptr->fd, FIONREAD, (char *) pend);
++#else
++    /* Roxy: the kernel implements no FIONREAD; report readability instead, which is
++       what callers use this for. */
++    {
++	struct pollfd pfd;
++
++	pfd.fd = ciptr->fd;
++	pfd.events = POLLIN;
++	pfd.revents = 0;
++	*pend = (poll (&pfd, 1, 0) > 0) ? 1 : 0;
++	return 0;
++    }
++#endif
+ #endif /* WIN32 */
+ }
+ 
