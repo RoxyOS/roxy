@@ -1,0 +1,66 @@
+diff --git busybox-clean/coreutils/ls.c busybox-workdir/coreutils/ls.c
+index 40017ef..dece980 100644
+--- busybox-clean/coreutils/ls.c
++++ busybox-workdir/coreutils/ls.c
+@@ -616,9 +616,14 @@ static NOINLINE unsigned display_single(const struct dnode *dn)
+ #endif
+ 		/* long listing: show size */
+ 		if (S_ISBLK(dn->dn_mode) || S_ISCHR(dn->dn_mode)) {
++#if defined(__roxy__)
++			/* Roxy: no device numbers, so show the raw st_rdev instead of a pair. */
++			column += printf("%4u ", dn->dn_rdev_maj);
++#else
+ 			column += printf("%4u, %3u ",
+ 					dn->dn_rdev_maj,
+ 					dn->dn_rdev_min);
++#endif
+ 		} else {
+ 			if (opt & OPT_h) {
+ 				column += printf("%"HUMAN_READABLE_MAX_WIDTH_STR"s ",
+@@ -829,8 +834,16 @@ static struct dnode *my_stat(const char *fullname, const char *name, int force_f
+ 	cur->dn_nlink  = statbuf.st_nlink ;
+ 	cur->dn_uid    = statbuf.st_uid   ;
+ 	cur->dn_gid    = statbuf.st_gid   ;
++#if defined(__roxy__)
++/* Roxy: the kernel reports no device numbers, so st_rdev is always 0 and there is no
++ * major/minor pair to decode; the long format shows that raw value instead.
++ * TODO(dev-numbers): decode major/minor once the kernel exposes device numbers. */
++	cur->dn_rdev_maj = (int)statbuf.st_rdev;
++	cur->dn_rdev_min = 0;
++#else
+ 	cur->dn_rdev_maj = major(statbuf.st_rdev);
+ 	cur->dn_rdev_min = minor(statbuf.st_rdev);
++#endif
+ 
+ 	return cur;
+ }
+diff --git busybox-clean/include/libbb.h busybox-workdir/include/libbb.h
+index 37f9da5..aa25be7 100644
+--- busybox-clean/include/libbb.h
++++ busybox-workdir/include/libbb.h
+@@ -46,7 +46,9 @@
+ #include <sys/stat.h>
+ #include <sys/time.h>
+ #include <sys/types.h>
+-#if !defined(major) || defined(__GLIBC__)
++#if !defined(__roxy__) && (!defined(major) || defined(__GLIBC__))
++/* Roxy: mlibc has no <sys/sysmacros.h> and its <sys/types.h> defines no major(),
++ * because the kernel reports no device numbers. */
+ # include <sys/sysmacros.h>
+ #endif
+ #include <sys/wait.h>
+diff --git busybox-clean/libbb/makedev.c busybox-workdir/libbb/makedev.c
+index 06c4039..0acc10b 100644
+--- busybox-clean/libbb/makedev.c
++++ busybox-workdir/libbb/makedev.c
+@@ -11,7 +11,9 @@
+ 
+ /* Different Unixes want different headers for makedev */
+ #if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) \
+- || defined(__APPLE__)
++ || defined(__APPLE__) || defined(__roxy__)
++/* Roxy: mlibc provides no <sys/sysmacros.h>, so <sys/types.h> is all there is;
++ * the bb_makedev() wrapper below is glibc-only anyway. */
+ # include <sys/types.h>
+ #else
+ # include <features.h>

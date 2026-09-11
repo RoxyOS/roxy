@@ -1,35 +1,21 @@
 diff --git busybox-clean/include/platform.h busybox-workdir/include/platform.h
-index c9a5fb4..3112f83 100644
+index c449075..3414b97 100644
 --- busybox-clean/include/platform.h
 +++ busybox-workdir/include/platform.h
-@@ -435,6 +435,14 @@ typedef unsigned smalluint;
+@@ -437,6 +437,16 @@ typedef unsigned smalluint;
  #define HAVE_DEV_FD 1
  #define DEV_FD_PREFIX "/dev/fd/"
  
 +#if defined(__roxy__)
-+/* Roxy: mlibc provides neither mempcpy nor strverscmp. Drop the assumptions above so
-+ * that busybox's own inline mempcpy fallback and its HAVE_STRVERSCMP gates take over,
-+ * the way the platforms listed below do it. */
++/* Roxy: mlibc has no mempcpy, strverscmp, mntent or statfs. Drop the assumptions
++ * above so busybox's own fallbacks (its inline mempcpy, the HAVE_*_H gates) take
++ * over, the way the platforms listed below do it. */
 +# undef HAVE_MEMPCPY
++# undef HAVE_MNTENT_H
 +# undef HAVE_STRVERSCMP
++# undef HAVE_SYS_STATFS_H
 +#endif
 +
  #if defined(__UCLIBC__)
  # if UCLIBC_VERSION < KERNEL_VERSION(0, 9, 32)
  #  undef HAVE_STRVERSCMP
-diff --git busybox-clean/libbb/makedev.c busybox-workdir/libbb/makedev.c
-index 06c4039..ac06b3e 100644
---- busybox-clean/libbb/makedev.c
-+++ busybox-workdir/libbb/makedev.c
-@@ -14,7 +14,10 @@
-  || defined(__APPLE__)
- # include <sys/types.h>
- #else
--# include <features.h>
-+/* Roxy: <features.h> belongs to the glibc family; mlibc has none and needs none. */
-+# if defined(__GLIBC__) || defined(__UCLIBC__)
-+#  include <features.h>
-+# endif
- # include <sys/sysmacros.h>
- #endif
- 
