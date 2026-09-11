@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=6.6
-revision=1
+revision=2
 
 tarball_url="https://invisible-mirror.net/archives/ncurses/ncurses-${version}.tar.gz"
 tarball_sha256="355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11"

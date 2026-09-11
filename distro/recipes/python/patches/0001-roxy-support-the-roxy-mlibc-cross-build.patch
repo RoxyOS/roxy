@@ -1,12 +1,12 @@
 diff --git python-clean/configure python-workdir/configure
-index 2088290..d6fabba 100755
+index 2088290..09a0ff0 100755
 --- python-clean/configure
 +++ python-workdir/configure
 @@ -4112,6 +4112,9 @@ then
  	*-*-linux*)
  		ac_sys_system=Linux
  		;;
-+	*-*-none*)
++	*-*-roxy*)
 +		ac_sys_system=Roxy
 +		;;
  	*-*-cygwin*)
@@ -16,7 +16,7 @@ index 2088290..d6fabba 100755
  	*-*-vxworks*)
  		_host_ident=$host_cpu
  		;;
-+	*-*-none*)
++	*-*-roxy*)
 +		_host_ident=$host_cpu
 +		;;
  	*-*-emscripten)
@@ -50,14 +50,14 @@ index 2088290..d6fabba 100755
  	Darwin/*|iOS/*)
  		LINKFORSHARED="$extra_undefs -framework CoreFoundation"
 diff --git python-clean/configure.ac python-workdir/configure.ac
-index aed1494..3b6b295 100644
+index aed1494..082b1a6 100644
 --- python-clean/configure.ac
 +++ python-workdir/configure.ac
 @@ -324,6 +324,9 @@ then
  	*-*-linux*)
  		ac_sys_system=Linux
  		;;
-+	*-*-none*)
++	*-*-roxy*)
 +		ac_sys_system=Roxy
 +		;;
  	*-*-cygwin*)
@@ -67,7 +67,7 @@ index aed1494..3b6b295 100644
  	*-*-vxworks*)
  		_host_ident=$host_cpu
  		;;
-+	*-*-none*)
++	*-*-roxy*)
 +		_host_ident=$host_cpu
 +		;;
  	*-*-emscripten)
