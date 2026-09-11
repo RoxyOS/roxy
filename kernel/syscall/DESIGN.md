@@ -251,6 +251,16 @@ address that the kernel's refusal of client-side `bind` guarantees.
 Other families, types, protocols, and socket operations emit the centralized unsupported
 diagnostic when they reach this ABI boundary.
 
+## Clocks
+
+`clock_get` (syscall 8) and `clock_getres` (syscall 83) share one `roxy_clock_result` record and one
+clock set, so both the record layout and the identifiers live in the `syscalls::clock` module and
+neither handler carries its own copy. Both accept `CLOCK_REALTIME` and `CLOCK_MONOTONIC`;
+`clock_get` reports the reading, `clock_getres` the interval in which that clock advances, which
+`roxy-time` derives from the periodic timer tick. Every other `clockid_t` returns `EINVAL` through
+the centralized diagnostic, so a caller such as Xorg's `GetTimeInMillis` that probes a coarse clock
+first falls back to `CLOCK_MONOTONIC` instead of failing.
+
 ### `TTYNAME`
 
 `ROXY_SYS_TTYNAME(fd, buf, size)` (72) writes the NUL-terminated openable pathname of the terminal

@@ -40,6 +40,11 @@ fn on_tick() {
     super::advance(Duration::from_nanos(TICK_NANOS));
 }
 
+/// Returns the interval in which the periodic timer advances the monotonic clock.
+pub(super) const fn resolution() -> Duration {
+    Duration::from_nanos(TICK_NANOS)
+}
+
 mod sealed {
     pub trait Sealed {}
 }

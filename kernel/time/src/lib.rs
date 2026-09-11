@@ -62,6 +62,15 @@ pub fn monotonic_time() -> Duration {
     Duration::from_nanos(MONOTONIC_NANOS.load(Ordering::Relaxed))
 }
 
+/// Returns the interval in which the monotonic and realtime clocks advance.
+///
+/// Both clocks are driven by the periodic timer, so time moves in whole ticks of this length and
+/// never between them; it is the resolution a `clock_getres` client observes.
+#[must_use]
+pub fn resolution() -> Duration {
+    timer::resolution()
+}
+
 #[cfg(feature = "kernel-test")]
 mod tests {
     use core::time::Duration;

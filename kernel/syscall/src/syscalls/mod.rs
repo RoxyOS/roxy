@@ -3,7 +3,7 @@ mod anon_allocate;
 mod anon_free;
 mod chdir;
 mod chmod;
-mod clock_get;
+mod clock;
 mod close;
 mod dup2;
 mod execve;
@@ -56,7 +56,7 @@ mod writev;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 83] = [
+pub(super) const SYSCALLS: [Syscall; 84] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -65,7 +65,8 @@ pub(super) const SYSCALLS: [Syscall; 83] = [
     anon_allocate::SYSCALL,
     anon_free::SYSCALL,
     tcb_set::SYSCALL,
-    clock_get::SYSCALL,
+    clock::GET_SYSCALL,
+    clock::GETRES_SYSCALL,
     vm::MAP_SYSCALL,
     vm::UNMAP_SYSCALL,
     close::SYSCALL,

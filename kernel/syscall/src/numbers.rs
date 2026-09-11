@@ -84,6 +84,7 @@ pub(crate) enum SyscallNumber {
     GetTid = 80,
     SigtimedWait = 81,
     Tgkill = 82,
+    ClockGetres = 83,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -174,6 +175,7 @@ impl TryFrom<u64> for SyscallNumber {
             80 => Ok(Self::GetTid),
             81 => Ok(Self::SigtimedWait),
             82 => Ok(Self::Tgkill),
+            83 => Ok(Self::ClockGetres),
             _ => Err(()),
         }
     }
@@ -258,6 +260,20 @@ mod tests {
         assert_eq!(SyscallNumber::try_from(70), Ok(SyscallNumber::SetSid));
         assert_eq!(SyscallNumber::try_from(71), Ok(SyscallNumber::Writev));
         assert_eq!(SyscallNumber::try_from(72), Ok(SyscallNumber::Ttyname));
-        assert!(SyscallNumber::try_from(73).is_err());
+        assert_eq!(SyscallNumber::try_from(73), Ok(SyscallNumber::TimerCreate));
+        assert_eq!(SyscallNumber::try_from(74), Ok(SyscallNumber::TimerSettime));
+        assert_eq!(SyscallNumber::try_from(75), Ok(SyscallNumber::TimerGettime));
+        assert_eq!(
+            SyscallNumber::try_from(76),
+            Ok(SyscallNumber::TimerGetoverrun)
+        );
+        assert_eq!(SyscallNumber::try_from(77), Ok(SyscallNumber::TimerDelete));
+        assert_eq!(SyscallNumber::try_from(78), Ok(SyscallNumber::ThreadCreate));
+        assert_eq!(SyscallNumber::try_from(79), Ok(SyscallNumber::ThreadExit));
+        assert_eq!(SyscallNumber::try_from(80), Ok(SyscallNumber::GetTid));
+        assert_eq!(SyscallNumber::try_from(81), Ok(SyscallNumber::SigtimedWait));
+        assert_eq!(SyscallNumber::try_from(82), Ok(SyscallNumber::Tgkill));
+        assert_eq!(SyscallNumber::try_from(83), Ok(SyscallNumber::ClockGetres));
+        assert!(SyscallNumber::try_from(84).is_err());
     });
 }

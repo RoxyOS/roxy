@@ -22,6 +22,11 @@ The periodic timer backend is initialized separately after the local interrupt c
 The current x86_64 backend programs the local APIC timer, calibrates it against PIT channel 2, and
 registers a timer interrupt handler that advances monotonic time by one fixed tick.
 
+Because time moves only in whole ticks, `resolution` reports one tick as the interval a
+`clock_getres` client observes: no clock reading can be finer than the rate at which the counter
+advances. Realtime shares the monotonic clock's resolution, because it is that clock plus a fixed
+offset.
+
 ## Concurrency and limits
 
 The monotonic nanosecond counter is atomic and may be read without a lock. Each CPU runs its own
