@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-version=0.2.0
+version=0.3.0
 revision=1
 
 git_url="https://github.com/RoxyOS/xf86-video-roxyfb"
-commit="92432291a4978dc0015612d7c575264fd57a4bd6"
+commit="9571655f9652dfac2363ca8453982418e16034b0"
 shallow=no
 
 cross_compile=yes
