@@ -29,7 +29,10 @@ borrowed typed output. A getter fills that output directly during object dispatc
 cannot produce a response type that mismatches its request. `OpenFile::ioctl` holds the open-file
 lock across this dispatch. `OpenFile::truncate` uses the same lock to serialize a length change
 without changing the shared open-file offset. The `File` trait's default implementation returns
-`IoctlError::NotTty`; file kinds override it only for supported requests.
+`IoctlError::NotTty`; file kinds override it only for supported requests. `IoctlError` classifies
+failures as not-a-terminal, invalid arguments, unsupported requests, and a resource held by another
+client (the last used by the framebuffer's visible-frame claim), so the syscall layer maps
+descriptors to errno rather than individual devices doing so.
 
 Terminal-specific ioctl payload types belong to `roxy-tty-types`, which both this crate and
 `roxy-tty` depend on. Framebuffer-specific payload types belong to `roxy-fb-types`, a
@@ -54,7 +57,7 @@ request numbers, errno policy, and raw userspace pointers remain exclusive to `r
 - Removing a descriptor drops one reference; the underlying object remains alive while other
   references or active VFS handles exist.
 - Errors distinguish bad descriptors, unsupported operations, seekability, unconnected sockets,
-  and underlying I/O failures at their owning layer.
+  resources held by another client, and underlying I/O failures at their owning layer.
 - Stream-specific broken-pipe errors remain ABI-neutral until the syscall layer translates them
   into errno and signal behavior.
 

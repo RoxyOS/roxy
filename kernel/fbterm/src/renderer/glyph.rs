@@ -15,6 +15,11 @@ use crate::framebuffer::Framebuffer;
 impl TextRenderer {
     pub(crate) fn draw_ascii(&mut self, column: usize, row: usize, byte: u8) {
         assert!((0x20..=0x7e).contains(&byte));
+
+        if self.is_suspended() {
+            return;
+        }
+
         self.clear_cell(column, row);
 
         let glyph_index = FONT_8x16

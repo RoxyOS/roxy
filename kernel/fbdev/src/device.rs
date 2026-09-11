@@ -9,9 +9,11 @@ const DEVICE_ID: u64 = 1;
 
 /// The boot framebuffer character device exposed as `/dev/framebuffer`.
 ///
-/// The device is stateless: it reports the layout published by `roxy-fbterm` and maps the
-/// framebuffer's physical memory without copying or ownership transfer. The framebuffer mapping
-/// lives for the kernel lifetime, so the device never releases it.
+/// The device reports the layout published by `roxy-fbterm`, maps the framebuffer's physical
+/// memory without copying or ownership transfer, and hands the visible frame to one process at a
+/// time. It holds no mutable state of its own: ownership lives in [`crate::claim`], which is
+/// process-wide because there is exactly one boot framebuffer. The framebuffer mapping lives for
+/// the kernel lifetime, so the device never releases it.
 pub struct FramebufferDevice {
     layout: &'static FramebufferLayout,
 }
@@ -39,6 +41,13 @@ impl Device for FramebufferDevice {
             IoctlRequest::FbGetInfo(info) => {
                 *info = convert::info(self.layout);
                 Ok(())
+            }
+            // Control is claimed for the calling process, which is the identity every other
+            // request of this device is independent of: mapping stays available while another
+            // process holds the frame, exactly as it is before anyone holds it.
+            IoctlRequest::FbTakeControl => super::claim::take(roxy_process::current_process_id()),
+            IoctlRequest::FbReleaseControl => {
+                super::claim::release(roxy_process::current_process_id())
             }
             _ => Err(IoctlError::Unsupported {
                 operation: "fbdev.ioctl",
@@ -76,9 +85,11 @@ mod tests {
     use roxy_fd::{
         FbChannel, FbInfo, FileType, IoctlError, IoctlRequest, MmapError, MmapTarget, WindowSize,
     };
+    use roxy_process::ProcessId;
     use roxy_test::kernel_test;
 
     use super::FramebufferDevice;
+    use crate::claim;
 
     const LAYOUT: FramebufferLayout = FramebufferLayout {
         address: 0x1000,
@@ -159,4 +170,33 @@ mod tests {
             Err(IoctlError::Unsupported { .. })
         ));
     });
+
+    kernel_test!(
+        "roxy-fbdev::framebuffer-claim",
+        hands_the_frame_to_one_process,
+        {
+            let first = ProcessId::new(1).unwrap();
+            let second = ProcessId::new(2).unwrap();
+
+            assert_eq!(claim::take(first), Ok(()));
+            // The holder can assert ownership again, while another process cannot take the frame.
+            assert_eq!(claim::take(first), Ok(()));
+            assert_eq!(claim::take(second), Err(IoctlError::Busy));
+            assert_eq!(claim::release(second), Err(IoctlError::Invalid));
+
+            assert_eq!(claim::release(first), Ok(()));
+            assert_eq!(claim::release(first), Err(IoctlError::Invalid));
+            assert_eq!(claim::take(second), Ok(()));
+
+            // A process that exits without releasing frees the frame for the next client.
+            claim::release_exited(second);
+            assert_eq!(claim::release(second), Err(IoctlError::Invalid));
+            assert_eq!(claim::take(first), Ok(()));
+            assert_eq!(claim::release(first), Ok(()));
+
+            // The frame is free again, so an unrelated process can still take it.
+            assert_eq!(claim::take(second), Ok(()));
+            claim::release_exited(second);
+        }
+    );
 }

@@ -26,6 +26,10 @@ pub enum IoctlRequest<'a> {
     /// Sets whether the pty slave device is locked (`TIOCSPTLCK`).
     PtySetLock(bool),
     FbGetInfo(&'a mut FbInfo),
+    /// Takes exclusive control of the framebuffer's visible frame for the calling process.
+    FbTakeControl,
+    /// Releases control of the visible frame taken by [`IoctlRequest::FbTakeControl`].
+    FbReleaseControl,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -33,6 +37,8 @@ pub enum IoctlError {
     NotTty,
     /// The request is supported but its arguments are not (reported as `EINVAL`).
     Invalid,
+    /// The requested resource is held by another client (reported as `EBUSY`).
+    Busy,
     Unsupported {
         operation: &'static str,
         argument: u64,

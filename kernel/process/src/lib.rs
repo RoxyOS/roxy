@@ -24,8 +24,8 @@ pub use execve::execve_current;
 pub use fork::{ForkError, fork_current};
 pub use initial_fds::InitialFdInjector;
 pub use lifecycle::{
-    SessionLeaderExitHandler, exit_current, initialize, register_session_leader_exit_handler,
-    thread_exit_current,
+    ProcessExitHandler, SessionLeaderExitHandler, exit_current, initialize,
+    register_process_exit_handler, register_session_leader_exit_handler, thread_exit_current,
 };
 pub use memory::{
     MemoryError, allocate_anonymous, allocate_anonymous_at, free_anonymous, map_physical,

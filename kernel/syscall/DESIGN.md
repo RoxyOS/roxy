@@ -20,11 +20,12 @@ filesystem, scheduler, and other domain APIs must never accept or return a perso
 record. Adding an ABI personality therefore adds adapters here rather than conditional layouts or
 compatibility branches throughout the kernel.
 
-The ioctl family follows the same rule: a request number such as `GET_INFO` (`0`, the whole Roxy
-framebuffer request set) and the `roxy_framebuffer_info` record are private to this subsystem,
-whose adapter decodes them into the fd layer's layout-neutral `FbInfo` before dispatch and encodes
-them back at the userspace copy boundary. Size and offset assertions pin the checked `x86_64`
-layout.
+The ioctl family follows the same rule: request numbers such as `GET_INFO` (`0`), `TAKE_CONTROL`
+(`1`), and `RELEASE_CONTROL` (`2`) and the `roxy_framebuffer_info` record are private to this
+subsystem, whose adapter decodes them into the fd layer's layout-neutral `FbInfo` before dispatch
+and encodes it back at the userspace copy boundary. Size and offset assertions pin the checked
+`x86_64` layout. `TAKE_CONTROL` and `RELEASE_CONTROL` carry no argument; the frame is claimed for
+the calling process, which the framebuffer device resolves, not this layer.
 
 ## Registry and dispatch
 

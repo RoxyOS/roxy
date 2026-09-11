@@ -32,6 +32,12 @@ The scheduler owns threads and saved contexts, but never owns a process address-
 ELF and VM crates provide construction primitives; process decides when a constructed image becomes
 published.
 
+Resources that a client takes on behalf of a process are released through the process-exit
+notification (`register_process_exit_handler`), a single reverse-dependency slot that `roxy-fbdev`
+uses to free the framebuffer's visible frame when its owner exits. It complements the
+session-leader-exit handler by covering release that is tied to the process rather than to a
+descriptor: an owner that exits without closing the descriptor still frees the resource.
+
 ## Threads
 
 A process is created with one main thread, and `create_thread` adds a runnable user thread that
@@ -161,6 +167,9 @@ at the syscall boundary; process reports whether a matching child is pending or 
 - Only a direct parent removes a child's exited entry, and each exited entry is returned once.
 - Process-table inspection, waiter registration, scheduler block preparation, and exit publication
   share one lock order: process table before scheduler.
+- A process starts exiting exactly once, when its first exiting thread marks it `Exiting`; its
+  caller publishes the process-exit notification after releasing the process-table lock, so a
+  handler may call process queries without re-entering the lock.
 - The scheduler dispatch hook must activate the address space currently stored by the target
   process immediately before a user thread runs.
 

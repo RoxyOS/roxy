@@ -4,6 +4,10 @@ impl TextRenderer {
     pub(crate) fn clear_cell(&mut self, column: usize, row: usize) {
         assert!(column < self.columns && row < self.rows);
 
+        if self.is_suspended() {
+            return;
+        }
+
         self.framebuffer.fill_rect(
             column * GLYPH_WIDTH,
             row * GLYPH_HEIGHT,
@@ -15,6 +19,11 @@ impl TextRenderer {
 
     pub(crate) fn clear_cells(&mut self, row: usize, start: usize, end: usize) {
         assert!(row < self.rows && start <= end && end <= self.columns);
+
+        if self.is_suspended() {
+            return;
+        }
+
         self.framebuffer.fill_rect(
             start * GLYPH_WIDTH,
             row * GLYPH_HEIGHT,
@@ -26,6 +35,11 @@ impl TextRenderer {
 
     pub(crate) fn clear_rows(&mut self, start: usize, end: usize) {
         assert!(start <= end && end <= self.rows);
+
+        if self.is_suspended() {
+            return;
+        }
+
         self.framebuffer.fill_rect(
             0,
             start * GLYPH_HEIGHT,
@@ -38,6 +52,11 @@ impl TextRenderer {
     /// Removes the cursor when this cell has one, or draws it when it is absent.
     pub(crate) fn toggle_cursor(&mut self, column: usize, row: usize) {
         assert!(column < self.columns && row < self.rows);
+
+        if self.is_suspended() {
+            return;
+        }
+
         self.framebuffer.xor_rect(
             column * GLYPH_WIDTH,
             row * GLYPH_HEIGHT,
@@ -48,6 +67,10 @@ impl TextRenderer {
     }
 
     pub(crate) fn scroll_line(&mut self) {
+        if self.is_suspended() {
+            return;
+        }
+
         let text_height = self.rows * GLYPH_HEIGHT;
 
         self.framebuffer

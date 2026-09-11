@@ -32,6 +32,15 @@ impl FbTerminal {
     pub(crate) fn layout(&self) -> FramebufferLayout {
         self.layout
     }
+    /// Stops writing pixels while an external client owns the visible frame.
+    pub(crate) fn suspend_drawing(&self) {
+        self.console.lock().suspend();
+    }
+
+    /// Resumes writing pixels on a cleared screen.
+    pub(crate) fn resume_drawing(&self) {
+        self.console.lock().resume();
+    }
 }
 
 impl TerminalOutput for FbTerminal {

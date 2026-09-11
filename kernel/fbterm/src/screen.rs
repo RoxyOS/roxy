@@ -54,7 +54,6 @@ impl Screen {
             self.toggle_cursor();
         }
     }
-
     pub(crate) fn finish_update(&mut self) {
         if self.cursor_visible {
             self.toggle_cursor();
@@ -131,6 +130,40 @@ impl Screen {
 
     pub(crate) fn set_cursor_visible(&mut self, visible: bool) {
         self.cursor_visible = visible;
+    }
+
+    /// Stops writing pixels because an external client owns the visible frame.
+    ///
+    /// Parsing continues, so cursor, saved cursor, colour, and visibility state stay consistent,
+    /// but nothing reaches the framebuffer until [`Self::resume`].
+    pub(crate) fn suspend(&mut self) {
+        self.renderer.set_suspended(true);
+    }
+
+    /// Resumes writing pixels on a cleared screen, restoring the state a fresh console starts in.
+    ///
+    /// The console keeps no text model, so content written while suspended cannot be repainted:
+    /// the screen is emptied instead, and the cursor returns to the home cell.
+    ///
+    /// TODO(missing-capability: console-text-model): keep a cell grid so a release can repaint the
+    /// console's own content rather than clearing it.
+    pub(crate) fn resume(&mut self) {
+        if !self.renderer.is_suspended() {
+            return;
+        }
+
+        self.renderer.set_suspended(false);
+        self.renderer.reset_foreground();
+        self.renderer.reset_background();
+        self.renderer.clear_rows(0, self.rows());
+        self.column = 0;
+        self.row = 0;
+        self.saved_column = 0;
+        self.saved_row = 0;
+
+        if self.cursor_visible {
+            self.toggle_cursor();
+        }
     }
 
     pub(crate) fn erase_display(&mut self, mode: EraseMode) {

@@ -31,6 +31,16 @@ impl Console {
     pub(crate) fn window_size(&self) -> WindowSize {
         self.screen.window_size()
     }
+
+    /// Stops drawing because an external client owns the visible frame.
+    pub(crate) fn suspend(&mut self) {
+        self.screen.suspend();
+    }
+
+    /// Resumes drawing on a cleared screen after the external client released the frame.
+    pub(crate) fn resume(&mut self) {
+        self.screen.resume();
+    }
 }
 
 #[cfg(feature = "kernel-test")]
@@ -172,6 +182,43 @@ mod tests {
         assert!(bright.as_chunks::<4>().0.contains(&[0x55, 0x55, 0xff, 0]));
         assert!(bright.as_chunks::<4>().0.contains(&[0xff, 0x55, 0x55, 0]));
     });
+
+    kernel_test!(
+        "roxy-fbterm::suspended-drawing",
+        drops_output_until_resumed,
+        {
+            let mut storage = vec![0u8; 32 * 64];
+            let mut console = console(&mut storage, 16, 32);
+
+            console.write(b"\x1b[?25lA");
+            let glyph = cell_bytes(&storage, 64, 0, 0);
+
+            console.suspend();
+            console.write(b"\x1b[31mBC");
+
+            // Parsing keeps running, so cursor and colour state advance while no pixel is written.
+            assert_eq!((console.screen.column(), console.screen.row()), (1, 1));
+            assert_eq!(cell_bytes(&storage, 64, 0, 0), glyph);
+            assert!(storage.iter().skip(64 * 4 + 32).all(|byte| *byte == 0));
+
+            // Releasing the frame starts from a cleared screen at the home cell.
+            console.resume();
+            assert_eq!((console.screen.column(), console.screen.row()), (0, 0));
+            assert!(storage.iter().all(|byte| *byte == 0));
+
+            // Drawing resumes with default colours, and a second release changes nothing.
+            console.write(b"D");
+            assert!(
+                cell_bytes(&storage, 64, 0, 0)
+                    .as_chunks::<4>()
+                    .0
+                    .contains(&[0xff, 0xff, 0xff, 0])
+            );
+            let resumed = cell_bytes(&storage, 64, 0, 0);
+            console.resume();
+            assert_eq!(cell_bytes(&storage, 64, 0, 0), resumed);
+        }
+    );
 
     kernel_test!("roxy-fbterm::ansi-colored-cursor", restores_colored_cell, {
         let mut storage = vec![0u8; 32 * 64];

@@ -121,3 +121,16 @@ introduce a small ioctl family with Roxy-owned request numbers, or a control rec
 to the device with `write`. The gap is marked with
 `TODO(missing-capability: no ioctl channel for keyboard LEDs)` in the `xf86-input-keyboard` Roxy
 backend patch and in `kernel/keyboard-dev/DESIGN.md`.
+
+## Console output written while a client owns the framebuffer is lost from the display
+
+`/dev/framebuffer`'s `TAKE_CONTROL` request suspends framebuffer terminal drawing so the kernel
+cannot paint over a graphics client's pixels. The console has no cell grid or scrollback: the
+rendered pixels are its only state, so output produced while drawing is suspended cannot be
+repainted when the client releases the frame. Releasing therefore clears the screen and returns the
+cursor to the home cell, which loses that output from the display (it remains on the serial
+terminal and, for user programs, in the terminal's own buffered state).
+
+The gap is marked with `TODO(missing-capability: console-text-model)` in
+`kernel/fbterm/src/screen.rs`. A console that owns a cell grid and a redraw path could repaint its
+own content on release, the way a Linux VT restores its text buffer, instead of clearing.

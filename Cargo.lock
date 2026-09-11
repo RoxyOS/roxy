@@ -638,7 +638,9 @@ dependencies = [
  "roxy-fbterm",
  "roxy-fd",
  "roxy-memory",
+ "roxy-process",
  "roxy-test",
+ "roxy-utils",
  "spin 0.12.2",
 ]
 

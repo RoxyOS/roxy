@@ -48,6 +48,22 @@ alternate screens, terminal replies, input devices, PTYs, and diagnostic mirrori
 current contract. Consequently this subset targets ordinary shell output rather than full-screen
 ncurses application compatibility.
 
+## External control of the visible frame
+
+The console can be suspended while another client owns the visible frame, which is how
+`/dev/framebuffer` keeps the kernel from painting over a graphics client's pixels. Suspension
+stops pixel output only: `Console::write` keeps parsing, so cursor, saved cursor, colour, and
+visibility state stay consistent and `window_size` continues to report the real grid. Draws are
+dropped rather than buffered, and the parser keeps its state, so a long write that spans a
+suspension boundary simply renders its post-resume part.
+
+Resuming clears the screen and returns the cursor to the home cell, which is the state a freshly
+constructed console is in. The console has no cell grid or scrollback to repaint from, so content
+written while suspended cannot be restored; the `TODO(missing-capability: console-text-model)` in
+`screen.rs` names that gap. Suspension and resumption are counted by the framebuffer device's
+process-owned claim, so a device may suspend once and resume once without the console tracking
+requests.
+
 ## Rendering model
 
 Rendering is split into three ownership layers:
@@ -69,7 +85,10 @@ adapts Terminus's binary glyph output to pixels inside one selected cell. The ad
 private to the rendering layer, so neither the framebuffer boundary nor the terminal state machine
 depends on third-party graphics types. The renderer can draw or clear a cell, reversibly invert a
 selected cell for cursor display, and scroll the complete text region upward by one cell row. It
-does not own a current cell, advance a cursor, or interpret control bytes.
+does not own a current cell, advance a cursor, or interpret control bytes. It also owns the
+`suspended` flag, and every drawing primitive returns early while it is set, so suspension cannot be
+bypassed by a new drawing path that forgets to check it. `screen` remains the layer that decides
+what a suspension means.
 
 `Console` owns the persistent `vte` parser and one `Screen`. `Screen` implements `vte::Perform`,
 owns current and saved cursor positions plus cursor visibility, and translates supported parser

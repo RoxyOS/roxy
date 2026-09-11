@@ -2,6 +2,7 @@
 
 extern crate alloc;
 
+mod claim;
 mod convert;
 mod device;
 
@@ -14,7 +15,9 @@ use roxy_devfs::DeviceRegistry;
 /// Registers the boot framebuffer as `/dev/framebuffer` when the framebuffer terminal
 /// initialized it.
 ///
-/// Serial-only or unsupported-mode boots publish no layout and register no device.
+/// Serial-only or unsupported-mode boots publish no layout, register no device, and register no
+/// ownership notification, because they have neither a visible frame to hand over nor a terminal
+/// that draws on one.
 ///
 /// # Panics
 ///
@@ -27,4 +30,6 @@ pub fn register(registry: &DeviceRegistry) {
     registry
         .register(b"framebuffer", Arc::new(FramebufferDevice::new(layout)))
         .expect("framebuffer is registered exactly once");
+
+    roxy_process::register_process_exit_handler(claim::release_exited);
 }

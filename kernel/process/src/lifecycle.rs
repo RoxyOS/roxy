@@ -1,7 +1,8 @@
 use roxy_thread::{ThreadId, scheduler};
 
 use crate::{
-    ExitStatus, InitialFdInjector, ProcessState, SessionId, current_umask, cwd, initial_fds,
+    ExitStatus, InitialFdInjector, ProcessId, ProcessState, SessionId, current_umask, cwd,
+    initial_fds,
     table::{PROCESS_TABLE, ProcessTable},
 };
 
@@ -33,6 +34,42 @@ fn notify_session_leader_exit(session: SessionId) {
     handler(session);
 }
 
+/// Invoked when a process starts exiting, so subsystems holding resources on its behalf can
+/// release them.
+///
+/// Registered by the resource owner (reverse dependency: process does not depend on its clients).
+/// A handler runs after the process table is unlocked, so it may use process queries; the exiting
+/// process ID is still passed because the caller already has it.
+pub type ProcessExitHandler = fn(ProcessId);
+
+static PROCESS_EXIT_HANDLER: spin::Once<ProcessExitHandler> = spin::Once::new();
+
+/// Registers the handler invoked when a process starts exiting.
+///
+/// # Panics
+///
+/// Panics when a handler was already registered.
+pub fn register_process_exit_handler(handler: ProcessExitHandler) {
+    assert!(
+        PROCESS_EXIT_HANDLER.get().is_none(),
+        "process exit handler already registered"
+    );
+    PROCESS_EXIT_HANDLER.call_once(|| handler);
+}
+
+fn notify_process_exit(process: ProcessId) {
+    if let Some(handler) = PROCESS_EXIT_HANDLER.get() {
+        handler(process);
+    }
+}
+
+/// What a process's transition to `Exiting` obliges its caller to publish once the process-table
+/// lock is released.
+struct ExitNotification {
+    process: ProcessId,
+    session: Option<SessionId>,
+}
+
 /// Initializes process integration and registers its VFS and descriptor hooks.
 ///
 /// # Panics
@@ -54,8 +91,9 @@ fn activate_addrspace(thread_id: ThreadId) {
 
 pub fn exit_current(status: ExitStatus) -> ! {
     let thread_id = scheduler::current_thread_id();
-    let exited_session = PROCESS_TABLE.lock().begin_exit(thread_id, status);
-    if let Some(session) = exited_session {
+    let exited = PROCESS_TABLE.lock().begin_exit(thread_id, status);
+    notify_process_exit(exited.process);
+    if let Some(session) = exited.session {
         notify_session_leader_exit(session);
     }
     scheduler::exit_current()
@@ -75,10 +113,11 @@ pub fn thread_exit_current() -> ! {
         table.is_last_thread(process_id, thread_id)
     };
     if is_last {
-        let exited_session = PROCESS_TABLE
+        let exited = PROCESS_TABLE
             .lock()
             .begin_exit(thread_id, ExitStatus::exited(0));
-        if let Some(session) = exited_session {
+        notify_process_exit(exited.process);
+        if let Some(session) = exited.session {
             notify_session_leader_exit(session);
         }
     }
@@ -90,17 +129,22 @@ fn on_thread_reaped(thread_id: ThreadId) {
 }
 
 impl ProcessTable {
-    /// Marks a process as exiting and returns its session ID when the process is a session
-    /// leader (its session ID equals its PID), so the caller can notify its controlling
-    /// terminal that the session ended.
-    fn begin_exit(&mut self, thread_id: ThreadId, status: ExitStatus) -> Option<SessionId> {
+    /// Marks a process as exiting and reports what the caller must publish.
+    ///
+    /// The caller publishes the notification after this call returns, so no handler runs while the
+    /// process table is locked.
+    fn begin_exit(&mut self, thread_id: ThreadId, status: ExitStatus) -> ExitNotification {
         let process_id = self.thread_owners[&thread_id];
         let process = self.processes.get_mut(&process_id).unwrap();
         assert!(matches!(process.state, ProcessState::Running));
         process.state = ProcessState::Exiting(status);
 
         let is_session_leader = process.session_id == Some(SessionId::from(process_id));
-        is_session_leader.then_some(process.session_id).flatten()
+
+        ExitNotification {
+            process: process_id,
+            session: is_session_leader.then_some(process.session_id).flatten(),
+        }
     }
 
     fn finish_thread_reap(&mut self, thread_id: ThreadId) {

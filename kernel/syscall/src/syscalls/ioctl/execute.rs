@@ -32,6 +32,10 @@ pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> R
         framebuffer::ROXY_FRAMEBUFFER_GET_INFO => {
             framebuffer::get_info(file, raw_argument).map(|()| 0)
         }
+        framebuffer::ROXY_FRAMEBUFFER_TAKE_CONTROL => framebuffer::take_control(file).map(|()| 0),
+        framebuffer::ROXY_FRAMEBUFFER_RELEASE_CONTROL => {
+            framebuffer::release_control(file).map(|()| 0)
+        }
         FIONBIO => set_nonblocking(file, raw_argument).map(|()| 0),
         _ => Err(Errno::NotTty),
     }
@@ -54,6 +58,7 @@ pub(super) fn map_ioctl_error(error: IoctlError) -> Errno {
     match error {
         IoctlError::NotTty => Errno::NotTty,
         IoctlError::Invalid => Errno::Invalid,
+        IoctlError::Busy => Errno::Busy,
         IoctlError::Unsupported {
             operation,
             argument,

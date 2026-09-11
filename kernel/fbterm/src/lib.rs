@@ -72,3 +72,27 @@ pub fn terminal() -> Option<Arc<dyn TerminalOutput>> {
 pub fn framebuffer_layout() -> Option<&'static FramebufferLayout> {
     LAYOUT.get()
 }
+
+/// Stops writing pixels because an external client owns the visible frame.
+///
+/// The console keeps parsing output, so cursor, colour, and window state stay consistent, but no
+/// pixel change reaches the visible frame until [`resume_drawing`]. Draws are dropped rather than
+/// buffered: the console keeps no text model, so nothing written while suspended can be replayed.
+///
+/// Does nothing in terminals without a framebuffer, such as serial-only boots.
+pub fn suspend_drawing() {
+    if let Some(terminal) = TERMINAL.get() {
+        terminal.suspend_drawing();
+    }
+}
+
+/// Resumes writing pixels after an external client released the visible frame.
+///
+/// The screen is cleared and the cursor returns to the home cell, because the console cannot
+/// repaint what was written while drawing was suspended. Does nothing when drawing was not
+/// suspended, or when the boot has no framebuffer terminal.
+pub fn resume_drawing() {
+    if let Some(terminal) = TERMINAL.get() {
+        terminal.resume_drawing();
+    }
+}

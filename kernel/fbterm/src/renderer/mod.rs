@@ -16,6 +16,7 @@ pub(crate) struct TextRenderer {
     foreground: u32,
     background: u32,
     cursor_mask: u32,
+    suspended: bool,
 }
 
 impl TextRenderer {
@@ -40,7 +41,21 @@ impl TextRenderer {
             foreground,
             background,
             cursor_mask,
+            suspended: false,
         })
+    }
+
+    /// Reports whether an external client owns the visible frame.
+    pub(crate) fn is_suspended(&self) -> bool {
+        self.suspended
+    }
+
+    /// Suspends or resumes pixel output.
+    ///
+    /// Suspension only stops this renderer from touching the framebuffer: the memory keeps its
+    /// contents, so the caller decides what has to be repainted before output resumes.
+    pub(crate) fn set_suspended(&mut self, suspended: bool) {
+        self.suspended = suspended;
     }
 
     pub(crate) fn columns(&self) -> usize {
@@ -117,6 +132,29 @@ mod tests {
 
         assert!(storage[..16 * 64].iter().any(|byte| *byte != 0));
         assert!(storage[16 * 64..].iter().all(|byte| *byte == 0));
+    });
+
+    kernel_test!("roxy-fbterm::suspended-pixels", suppresses_every_draw, {
+        let mut storage = vec![0u8; 32 * 64];
+        let framebuffer = Framebuffer::from_info(&info(storage.as_mut_ptr() as u64)).unwrap();
+        let mut renderer = TextRenderer::new(framebuffer).unwrap();
+
+        renderer.draw_ascii(0, 0, b'A');
+        let drawn = storage.clone();
+
+        renderer.set_suspended(true);
+        renderer.draw_ascii(1, 0, b'B');
+        renderer.clear_rows(0, 1);
+        renderer.scroll_line();
+        renderer.toggle_cursor(0, 0);
+
+        // Every drawing primitive leaves the mapping untouched while the frame is not ours.
+        assert!(renderer.is_suspended());
+        assert_eq!(storage, drawn);
+
+        renderer.set_suspended(false);
+        renderer.draw_ascii(1, 0, b'B');
+        assert_ne!(storage, drawn);
     });
 
     kernel_test!("roxy-fbterm::minimum-size", rejects_incomplete_cell, {
