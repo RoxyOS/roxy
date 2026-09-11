@@ -2,22 +2,23 @@ use roxy_fd::{IoctlRequest, OpenFile};
 use roxy_memory::UserAddress;
 use roxy_tty_types::{ApplyWhen, Termios, WindowSize};
 
-use super::terminal_abi;
+use super::{numbers, terminal_abi};
 use crate::{
     args::{Out, SyscallArg, user_memory},
     errno::Errno,
 };
 
-pub(super) const TCGETS: u64 = 0x5401;
-pub(super) const TCSETS: u64 = 0x5402;
-pub(super) const TCSETSW: u64 = 0x5403;
-pub(super) const TCSETSF: u64 = 0x5404;
-pub(super) const TIOCGWINSZ: u64 = 0x5413;
-pub(super) const TIOCSWINSZ: u64 = 0x5414;
-pub(super) const TIOCGPGRP: u64 = 0x540f;
-pub(super) const TIOCSPGRP: u64 = 0x5410;
-pub(super) const TIOCSCTTY: u64 = 0x540e;
-pub(super) const TCFLSH: u64 = 0x540b;
+/// Offsets into the terminal block, in the order the requests were added.
+pub(super) const TCGETS: u64 = numbers::TERMINAL_BASE;
+pub(super) const TCSETS: u64 = numbers::TERMINAL_BASE + 1;
+pub(super) const TCSETSW: u64 = numbers::TERMINAL_BASE + 2;
+pub(super) const TCSETSF: u64 = numbers::TERMINAL_BASE + 3;
+pub(super) const TIOCGWINSZ: u64 = numbers::TERMINAL_BASE + 4;
+pub(super) const TIOCSWINSZ: u64 = numbers::TERMINAL_BASE + 5;
+pub(super) const TIOCGPGRP: u64 = numbers::TERMINAL_BASE + 6;
+pub(super) const TIOCSPGRP: u64 = numbers::TERMINAL_BASE + 7;
+pub(super) const TIOCSCTTY: u64 = numbers::TERMINAL_BASE + 8;
+pub(super) const TCFLSH: u64 = numbers::TERMINAL_BASE + 9;
 
 pub(super) fn get_termios(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
     let address = UserAddress::parse(raw_argument, Errno::Fault)?;

@@ -20,12 +20,18 @@ filesystem, scheduler, and other domain APIs must never accept or return a perso
 record. Adding an ABI personality therefore adds adapters here rather than conditional layouts or
 compatibility branches throughout the kernel.
 
-The ioctl family follows the same rule: request numbers such as `GET_INFO` (`0`), `TAKE_CONTROL`
-(`1`), and `RELEASE_CONTROL` (`2`) and the `roxy_framebuffer_info` record are private to this
+The ioctl family follows the same rule: the request numbers, such as the framebuffer `GET_INFO`,
+`TAKE_CONTROL`, and `RELEASE_CONTROL`, and the `roxy_framebuffer_info` record are private to this
 subsystem, whose adapter decodes them into the fd layer's layout-neutral `FbInfo` before dispatch
 and encodes it back at the userspace copy boundary. Size and offset assertions pin the checked
 `x86_64` layout. `TAKE_CONTROL` and `RELEASE_CONTROL` carry no argument; the frame is claimed for
 the calling process, which the framebuffer device resolves, not this layer.
+
+`ioctl/numbers.rs` owns the request numbers. They form a flat, global space in which every device
+family owns a `0x100`-aligned block, so two families cannot collide as either grows, and no number
+carries a direction or size encoding: dispatch matches whole numbers, and each handler already
+knows the direction and record layout of its own request. Adding a family means claiming a new
+block in that module; its test checks that no request has left the block that owns it.
 
 ## Registry and dispatch
 
@@ -168,9 +174,9 @@ nanoseconds in the half-open range `[0, 1_000_000_000)`. It converts the relativ
 monotonic deadline and delegates blocking to the timer-wait subsystem. Signals are not implemented, so a
 sleep cannot be interrupted and no remaining duration is reported.
 
-`ioctl` validates and resolves the descriptor before decoding the raw request number and any mode
-encoded in it. For terminal requests, the syscall layer copies the Roxy mlibc
-`termios` or `winsize` record between userspace and an initialized typed kernel value. Setters own
+`ioctl` validates and resolves the descriptor before decoding the raw request number. For terminal
+requests, the syscall layer copies the Roxy mlibc `termios` or `winsize` record between userspace
+and an initialized typed kernel value. Setters own
 their copied value; getters borrow a typed local that the file object fills before it is copied
 back. The FD layer owns locked object dispatch, while the syscall layer maps operation errors to
 errno. Unknown requests return `ENOTTY` without a diagnostic. Consequently an invalid descriptor
@@ -226,9 +232,13 @@ parser is the sole exception: unknown requests currently return `ENOTTY` without
 
 The only active personality is currently Roxy-specific and manually mirrored by the Roxy mlibc
 sysdeps. Every ABI change must keep syscall numbers, private layout adapters, registry tests, and
-userspace symbols in sync. Terminal ioctls intentionally use Linux-compatible request numbers and
-mlibc's Linux `termios` layout inside the Roxy personality adapter; other ioctl families remain
-unsupported.
+userspace symbols in sync. The ioctl request numbers are Roxy's own rather than Linux's, allocated
+in `ioctl/numbers.rs` and mirrored by the Roxy mlibc `abi-bits/ioctls.h`; the request *names* keep
+their conventional Unix spelling so ported userspace compiles unchanged, while the values stay
+disjoint from every other personality's. The `termios` and `winsize` records copied across this
+boundary keep mlibc's layout. Requests the kernel does not implement, such as `TIOCGSID`,
+`TIOCMGET`, and the `SIOC*` socket requests, keep their generic mlibc definitions and return
+`ENOTTY`; other ioctl families remain unsupported.
 
 `socketpair` is syscall 48 and accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero. It asks
 `roxy-unix-socket` to create the connected files, then owns descriptor insertion and the checked

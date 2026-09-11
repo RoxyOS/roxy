@@ -1,17 +1,16 @@
 use roxy_fd::{IoctlRequest, OpenFile};
 use roxy_memory::UserAddress;
 
+use super::numbers;
 use crate::{
     args::{Out, SyscallArg, user_memory},
     errno::Errno,
 };
 
-/// pty ioctl request numbers and semantics follow the Linux `TIOC*` values under the `T`
-/// direction/size layout, matching mlibc's `sysdeps/roxy` abi-bits.
 /// `TIOCGPTN`: returns the allocated slave number for a pty master.
-pub(super) const TIOCGPTN: u64 = 0x8004_5430;
+pub(super) const TIOCGPTN: u64 = numbers::PTY_BASE;
 /// `TIOCSPTLCK`: takes an `int`; non-zero locks the slave, zero unlocks it.
-pub(super) const TIOCSPTLCK: u64 = 0x4004_5431;
+pub(super) const TIOCSPTLCK: u64 = numbers::PTY_BASE + 1;
 
 pub(super) fn get_pty_number(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
     let address = UserAddress::parse(raw_argument, Errno::Fault)?;

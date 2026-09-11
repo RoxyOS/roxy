@@ -2,12 +2,12 @@ use roxy_fd::{IoctlError, OpenFile, StatusFlags};
 use roxy_memory::UserAddress;
 use roxy_tty_types::ApplyWhen;
 
-use super::{framebuffer, pty, terminal};
+use super::{framebuffer, numbers, pty, terminal};
 use crate::args::{SyscallArg, user_memory};
 use crate::errno::Errno;
 
 /// FIONBIO: set/clear the file description's `O_NONBLOCK` from an `int` argument.
-const FIONBIO: u64 = 0x5421;
+pub(super) const FIONBIO: u64 = numbers::DESCRIPTION_BASE;
 
 pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> Result<u64, Errno> {
     match raw_request {
