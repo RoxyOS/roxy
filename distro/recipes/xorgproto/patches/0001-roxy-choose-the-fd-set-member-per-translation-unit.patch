@@ -1,0 +1,23 @@
+diff --git xorgproto-clean/include/X11/Xpoll.h.in xorgproto-workdir/include/X11/Xpoll.h.in
+index ab0aeba..c458544 100644
+--- xorgproto-clean/include/X11/Xpoll.h.in
++++ xorgproto-workdir/include/X11/Xpoll.h.in
+@@ -96,7 +96,17 @@ typedef struct fd_set {
+ 
+ # define Select(n,r,w,e,t) select(n,(fd_set*)r,(fd_set*)w,(fd_set*)e,(struct timeval*)t)
+ 
+-#define __X_FDS_BITS @USE_FDS_BITS@
++/*
++ * Roxy: mlibc names the fd_set member `fds_bits` only when the translation unit asks
++ * for XOPEN support, the way glibc does, so the name is not a property of the platform
++ * and cannot be baked in at configure time. Choose it per translation unit instead;
++ * <sys/select.h>, included above, has already provided mlibc's configuration header.
++ */
++#if defined(__MLIBC_XOPEN) && (__MLIBC_XOPEN)
++# define __X_FDS_BITS fds_bits
++#else
++# define __X_FDS_BITS __fds_bits
++#endif
+ 
+ #ifndef __FDS_BITS
+ # define __FDS_BITS(p)  ((p)->__X_FDS_BITS)

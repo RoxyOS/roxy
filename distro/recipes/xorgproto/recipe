@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=2025.1
-revision=1
+revision=2
 
 tarball_url="https://www.x.org/releases/individual/proto/xorgproto-${version}.tar.xz"
 tarball_sha256="56898c716c0578df8a2d828c9c3e5c528277705c0484381a81960fe1a67668e8"
