@@ -265,6 +265,11 @@ foreign, and the handler reports the header's unsupported marker and another lib
 distinct diagnostics. All unsupported commands sharing one value is deliberate: telling them apart
 would preserve information no caller can act on.
 
+The `access` mode word carries the rule into a bit field. `access.rs` owns it, each right is one
+bit above `ACCESS_BASE`, and a word below the base is another personality's numbering, which the
+handler reports as foreign. The rights themselves stay ABI-neutral: the handler decodes the word
+into the VFS's `AccessMode` list, and the VFS never sees the encoding.
+
 `socketpair` is syscall 48 and accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero. It asks
 `roxy-unix-socket` to create the connected files, then owns descriptor insertion and the checked
 copy of the descriptor pair to userspace.
