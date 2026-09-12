@@ -13,9 +13,9 @@ pub enum SignalAction {
     ///
     /// `mask` is added to the process mask for the duration of the handler. When `include_siginfo` is
     /// set the handler was installed with `SA_SIGINFO`, so it is invoked as
-    /// `(signo, siginfo_t *, ucontext_t *)` with real structures on the signal frame; otherwise
-    /// it receives the signal number as its only argument. `restart` indicates that `SA_RESTART`
-    /// was set, so an interrupted blocking syscall is re-executed after the handler returns.
+    /// `(signo, siginfo_t *, null)` with the record on the signal frame; otherwise it receives the
+    /// signal number as its only argument. `restart` indicates that `SA_RESTART` was set, so an
+    /// interrupted blocking syscall is re-executed after the handler returns.
     Handler {
         address: u64,
         mask: SignalSet,

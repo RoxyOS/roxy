@@ -106,14 +106,19 @@ fn prepare_handler_resume(
     process.signal_frames.push(frame_base);
     process.masked_signals |= handler_mask | SignalSet::from_signal(signal);
 
-    // An `SA_SIGINFO` handler receives pointers into its own frame; a plain handler gets the
-    // signal number and zeroed arguments (the frame still carries the structures so the layout is
-    // uniform, but the handler cannot observe them).
+    // An `SA_SIGINFO` handler receives the record's address within its own frame; a plain handler
+    // gets the signal number and zeroed arguments. The third argument is null: POSIX points it at
+    // the interrupted machine context, and this ABI defines none, so there is no object to point
+    // at.
+    //
+    // TODO(signal-handler-context): a handler therefore cannot inspect or redirect the context it
+    // interrupted. Serving that means defining a context record here and exporting its layout,
+    // which the ABI deliberately does not carry today.
     let arguments = if include_siginfo {
         [
             u64::from(signal.number()),
             frame_base + signal_frame::SIGINFO_OFFSET as u64,
-            frame_base + signal_frame::UCONTEXT_OFFSET as u64,
+            0,
         ]
     } else {
         [u64::from(signal.number()), 0, 0]

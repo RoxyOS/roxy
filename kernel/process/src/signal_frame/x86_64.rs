@@ -19,43 +19,15 @@ pub(crate) const RETURN_ADDRESS_SIZE: usize = size_of::<u64>();
 const OLD_MASK_SIZE: usize = size_of::<u64>();
 pub(crate) const USER_CONTEXT_SIZE: usize = size_of::<UserContext>();
 
-/// Size of the `x86_64` `ucontext_t` passed as a handler's third argument.
-const UCONTEXT_SIZE: usize = 968;
-
-/// Total frame size: return address, saved user context, the mask active before delivery, the
-/// `siginfo_t`, and the `ucontext_t` handed to `SA_SIGINFO` handlers.
+/// Total frame size: return address, saved user context, the mask active before delivery, and the
+/// `siginfo_t` handed to `SA_SIGINFO` handlers.
 pub(crate) const SIGNAL_FRAME_SIZE: usize =
-    RETURN_ADDRESS_SIZE + USER_CONTEXT_SIZE + OLD_MASK_SIZE + SIGINFO_SIZE + UCONTEXT_SIZE;
+    RETURN_ADDRESS_SIZE + USER_CONTEXT_SIZE + OLD_MASK_SIZE + SIGINFO_SIZE;
 
 pub(crate) const USER_CONTEXT_OFFSET: usize = RETURN_ADDRESS_SIZE;
 const OLD_MASK_OFFSET: usize = USER_CONTEXT_OFFSET + USER_CONTEXT_SIZE;
 /// Offset of the `siginfo_t` within the frame; also the `RSI` argument of an `SA_SIGINFO` handler.
 pub(crate) const SIGINFO_OFFSET: usize = OLD_MASK_OFFSET + OLD_MASK_SIZE;
-/// Offset of the `ucontext_t` within the frame; also the `RDX` argument of an `SA_SIGINFO` handler.
-pub(crate) const UCONTEXT_OFFSET: usize = SIGINFO_OFFSET + SIGINFO_SIZE;
-
-/// The `x86_64` `ucontext_t` per mlibc `abis/linux/signal.h`.
-///
-/// The general registers and sigmask are populated; FPU/SSE state and the segment, error, trap,
-/// and reserved slots stay zeroed.
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct Ucontext {
-    uc_flags: u64,
-    uc_link: u64,
-    ss_sp: u64,
-    ss_flags: i32,
-    ss_size: u64,
-    gregs: [u64; 23],
-    fpregs: u64,
-    reserved: [u64; 8],
-    sigmask: [u64; 16],
-    _fpregs_mem_and_ssp: [u8; 544],
-}
-
-const _: () = assert!(size_of::<Ucontext>() == 968);
-const _: () = assert!(core::mem::offset_of!(Ucontext, gregs) == 40);
-const _: () = assert!(core::mem::offset_of!(Ucontext, sigmask) == 296);
 
 core::arch::global_asm!(
     ".section .rodata",
@@ -92,8 +64,8 @@ pub(crate) fn trampoline() -> &'static [u8] {
 /// Builds the frame bytes for one signal delivery.
 ///
 /// Layout: the trampoline entry (the handler's `ret` target), a snapshot of the interrupted user
-/// context that `sigreturn` restores, the mask that was active before delivery, and — for
-/// `SA_SIGINFO` handlers — the `siginfo_t` and `ucontext_t` those handlers receive.
+/// context that `sigreturn` restores, the mask that was active before delivery, and the `siginfo_t`
+/// an `SA_SIGINFO` handler receives.
 ///
 /// The frame address must satisfy the System V entry alignment (`frame % 16 == 8`), which the
 /// caller selects when placing the frame.
@@ -117,11 +89,6 @@ pub(crate) fn build_bytes(
         context,
     );
     write_struct(&mut frame, SIGINFO_OFFSET, build_siginfo(pending));
-    write_struct(
-        &mut frame,
-        UCONTEXT_OFFSET,
-        build_ucontext(context, old_mask),
-    );
 
     frame
 }
@@ -211,36 +178,6 @@ fn write_context(slot: &mut [u8], context: &UserContext) {
         let start = index * size_of::<u64>();
         write_u64(&mut slot[start..start + size_of::<u64>()], *value);
     }
-}
-
-/// Builds the `ucontext_t` whose general registers mirror `context` and whose sigmask is
-/// `old_mask`. FPU/SSE state and the segment, error, trap, and reserved slots stay zeroed.
-fn build_ucontext(context: &UserContext, old_mask: SignalSet) -> Ucontext {
-    // SAFETY: `Ucontext` is a POD of `u64`/`i32`/`u8` fields, so an all-zero bit pattern is a valid
-    // `ucontext_t`.
-    let mut value = unsafe { core::mem::zeroed::<Ucontext>() };
-
-    // `REG_*` indices from `abis/linux/signal.h`; `REG_R11` and `REG_RCX` are clobbered by the
-    // syscall and stay zeroed.
-    value.gregs[0] = context.r8;
-    value.gregs[1] = context.r9;
-    value.gregs[2] = context.r10;
-    value.gregs[4] = context.r12;
-    value.gregs[5] = context.r13;
-    value.gregs[6] = context.r14;
-    value.gregs[7] = context.r15;
-    value.gregs[8] = context.rdi;
-    value.gregs[9] = context.rsi;
-    value.gregs[10] = context.rbp;
-    value.gregs[11] = context.rbx;
-    value.gregs[12] = context.rdx;
-    value.gregs[13] = context.rax;
-    value.gregs[15] = context.stack_pointer;
-    value.gregs[16] = context.instruction_pointer;
-    value.gregs[17] = context.flags;
-    value.sigmask[0] = old_mask.bits();
-
-    value
 }
 
 /// Copies a POD struct into `frame` at `offset`.
