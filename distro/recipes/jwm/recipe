@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=2.4.6
-revision=4
+revision=5
 
 tarball_url="https://github.com/joewing/jwm/releases/download/v${version}/jwm-${version}.tar.xz"
 tarball_sha256="b5871ec28317594b3fa22b83ed5524cc911d498c455eaab3ae68def195dd802d"

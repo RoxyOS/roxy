@@ -33,6 +33,14 @@ carries a direction or size encoding: dispatch matches whole numbers, and each h
 knows the direction and record layout of its own request. Adding a family means claiming a new
 block in that module; its test checks that no request has left the block that owns it.
 
+The space is also one narrow window, `[SPACE_BASE, SPACE_END)`, placed above every number another
+personality produces for these requests, so a request outside it is never mistaken for one of
+ours. `in_space` makes that distinction available to dispatch, which reports a request outside the
+window as foreign and a request inside it that no handler defines as an undefined request of our
+own; both keep `ENOTTY`. Assertions beside the constants pin the base above Linux's `_IO(type, nr)`
+range and the end below its `_IOC` direction bit and below `2^31`, so every request of ours fits a
+signed `int`.
+
 ## Registry and dispatch
 
 The static syscall table is validated for duplicate numbers before the architecture entry is
@@ -225,8 +233,10 @@ success it invokes the architecture's fresh-user resume path and never returns t
 Subsystem errors are translated to stable ABI errno values at this boundary. Invalid userspace
 addresses return `EFAULT`; size limits and format failures use their defined errno values. Missing
 kernel functionality must emit the centralized unconditional `UNSUPPORTED` diagnostic before an
-error is returned, including operation, argument, PID/TID, and errno. The provisional `ioctl`
-parser is the sole exception: unknown requests currently return `ENOTTY` without a diagnostic.
+error is returned, including operation, argument, PID/TID, and errno. The `ioctl` parser reports a
+request no handler serves the same way, separating a foreign request from an undefined one of its
+own, and returns `ENOTTY`: the errno a probe expects from a device that does not serve the
+request.
 
 ## Limits
 

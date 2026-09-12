@@ -37,7 +37,22 @@ pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> R
             framebuffer::release_control(file).map(|()| 0)
         }
         FIONBIO => set_nonblocking(file, raw_argument).map(|()| 0),
-        _ => Err(Errno::NotTty),
+        _ => Err(unknown_request(raw_request)),
+    }
+}
+
+/// Reports a request no arm served, keeping the `ENOTTY` a probe expects from a device that does
+/// not serve it.
+///
+/// A request outside the Roxy space carries another personality's numbering — the caller was
+/// compiled against another libc's header, or hardcoded one of its constants — and is reported
+/// apart from a request inside the space that this kernel simply does not define, because only the
+/// first says the caller was built against a different ABI.
+fn unknown_request(request: u64) -> Errno {
+    if numbers::in_space(request) {
+        crate::unsupported::unsupported_argument("ioctl.request", request, Errno::NotTty)
+    } else {
+        crate::unsupported::unsupported_argument("ioctl.request.foreign", request, Errno::NotTty)
     }
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=6.0.1
-revision=3
+revision=4
 
 tarball_url="https://www.x.org/releases/individual/lib/libXfixes-${version}.tar.xz"
 tarball_sha256="b695f93cd2499421ab02d22744458e650ccc88c1d4c8130d60200213abc02d58"

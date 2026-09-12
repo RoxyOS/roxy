@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=1.4.2
-revision=6
+revision=7
 
 tarball_url="https://www.x.org/releases/individual/app/xinit-${version}.tar.xz"
 tarball_sha256="b7d8dc8d22ef9f15985a10b606ee4f2aad6828befa437359934647e88d331f23"
