@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=2.1.0
-revision=2
+revision=3
 
 tarball_url="https://www.x.org/releases/individual/driver/xf86-input-keyboard-${version}.tar.xz"
 tarball_sha256="77ce50f28c30347c6eb59169c12c19b639d73f10e49284b2849f023c6dee7c57"

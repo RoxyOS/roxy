@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=1.3.2
-revision=2
+revision=3
 
 tarball_url="https://zlib.net/zlib-${version}.tar.gz"
 tarball_sha256="bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"

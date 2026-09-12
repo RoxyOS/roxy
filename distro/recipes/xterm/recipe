@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=411
-revision=3
+revision=4
 
 # xterm is maintained outside x.org by Thomas Dickey and released as xterm-<NNN>.tgz.
 tarball_url="https://invisible-mirror.net/archives/xterm/xterm-${version}.tgz"

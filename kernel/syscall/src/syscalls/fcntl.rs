@@ -9,7 +9,27 @@ syscall!(SyscallNumber::Fcntl, handle(
     argument: u64,
 ));
 
-/// The `fcntl` commands this kernel supports, matching the values in `abi-bits/fcntl.h`.
+/// Base of the Roxy `fcntl` command space; a supported command's value is this base plus the
+/// command's index.
+///
+/// The base sits above every command number another personality uses, so a command below it can
+/// only be another personality's numbering and the handler can report that instead of misreading
+/// it as an unrelated command of its own. Linux's highest `fcntl` command is `F_GET_SEALS` at
+/// 1034.
+const COMMAND_BASE: u64 = 0x1000;
+
+/// The value `abi-bits/fcntl.h` defines every command this kernel does not implement to.
+///
+/// Pinning them all to one value keeps ported sources compiling while making the call unmissable
+/// at runtime, and keeps them out of the supported range.
+const UNSUPPORTED_COMMAND: u64 = 0x100;
+
+/// Every unsupported command lies below the base, so no value in the supported range is one of
+/// them.
+const _: () = assert!(UNSUPPORTED_COMMAND < COMMAND_BASE);
+
+/// The `fcntl` commands this kernel supports, numbered from zero; the value on the wire is
+/// [`COMMAND_BASE`] plus the index. The indices match `abi-bits/fcntl.h`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum FcntlCommand {
     DupFd = 0,
@@ -17,20 +37,38 @@ enum FcntlCommand {
     SetFd = 2,
     GetFl = 3,
     SetFl = 4,
-    DupFdCloexec = 1030,
+    DupFdCloexec = 5,
 }
 
 impl FcntlCommand {
     fn parse(raw: u64) -> Result<Self, Errno> {
-        match raw {
+        let Some(index) = raw.checked_sub(COMMAND_BASE) else {
+            return Err(unsupported_command(raw));
+        };
+
+        match index {
             0 => Ok(Self::DupFd),
             1 => Ok(Self::GetFd),
             2 => Ok(Self::SetFd),
             3 => Ok(Self::GetFl),
             4 => Ok(Self::SetFl),
-            1030 => Ok(Self::DupFdCloexec),
+            5 => Ok(Self::DupFdCloexec),
             _ => Err(unsupported("fcntl.command", raw)),
         }
+    }
+}
+
+/// Reports a command below the base as the two cases that can produce one.
+///
+/// Below the base is either the header's [`UNSUPPORTED_COMMAND`] marker for a command this kernel
+/// deliberately does not implement, or a foreign personality's numbering from a program compiled
+/// against another libc's header. Naming them separately keeps a stale caller visible in the
+/// diagnostic stream instead of looking like an ordinary unknown command.
+fn unsupported_command(raw: u64) -> Errno {
+    if raw == UNSUPPORTED_COMMAND {
+        unsupported("fcntl.command.unsupported", raw)
+    } else {
+        unsupported("fcntl.command.foreign", raw)
     }
 }
 
@@ -135,23 +173,54 @@ fn unsupported(operation: &str, argument: u64) -> Errno {
 mod tests {
     use roxy_test::kernel_test;
 
-    use super::FcntlCommand;
+    use super::{COMMAND_BASE, FcntlCommand, UNSUPPORTED_COMMAND};
     use crate::errno::Errno;
 
     kernel_test!("roxy-syscall::fcntl-command", parses_supported_commands, {
-        assert_eq!(FcntlCommand::parse(0), Ok(FcntlCommand::DupFd));
-        assert_eq!(FcntlCommand::parse(1), Ok(FcntlCommand::GetFd));
-        assert_eq!(FcntlCommand::parse(2), Ok(FcntlCommand::SetFd));
-        assert_eq!(FcntlCommand::parse(3), Ok(FcntlCommand::GetFl));
-        assert_eq!(FcntlCommand::parse(4), Ok(FcntlCommand::SetFl));
-        assert_eq!(FcntlCommand::parse(1030), Ok(FcntlCommand::DupFdCloexec));
+        assert_eq!(FcntlCommand::parse(COMMAND_BASE), Ok(FcntlCommand::DupFd));
+        assert_eq!(
+            FcntlCommand::parse(COMMAND_BASE + 1),
+            Ok(FcntlCommand::GetFd)
+        );
+        assert_eq!(
+            FcntlCommand::parse(COMMAND_BASE + 2),
+            Ok(FcntlCommand::SetFd)
+        );
+        assert_eq!(
+            FcntlCommand::parse(COMMAND_BASE + 3),
+            Ok(FcntlCommand::GetFl)
+        );
+        assert_eq!(
+            FcntlCommand::parse(COMMAND_BASE + 4),
+            Ok(FcntlCommand::SetFl)
+        );
+        assert_eq!(
+            FcntlCommand::parse(COMMAND_BASE + 5),
+            Ok(FcntlCommand::DupFdCloexec)
+        );
     });
 
     kernel_test!(
         "roxy-syscall::fcntl-command",
-        rejects_unsupported_commands,
+        rejects_commands_outside_the_space,
         {
-            assert_eq!(FcntlCommand::parse(1000), Err(Errno::NotSupported));
+            // The header's marker for a command the kernel does not implement.
+            assert_eq!(
+                FcntlCommand::parse(UNSUPPORTED_COMMAND),
+                Err(Errno::NotSupported)
+            );
+
+            // Another personality's numbering: Linux `F_DUPFD` is 0, `F_GETFD` is 1, and
+            // `F_DUPFD_CLOEXEC` is 1030, all below the base.
+            for foreign in [0, 1, 2, 3, 4, 1030, COMMAND_BASE - 1] {
+                assert_eq!(FcntlCommand::parse(foreign), Err(Errno::NotSupported));
+            }
+
+            // A well-formed Roxy command the kernel does not define.
+            assert_eq!(
+                FcntlCommand::parse(COMMAND_BASE + 6),
+                Err(Errno::NotSupported)
+            );
         }
     );
 }

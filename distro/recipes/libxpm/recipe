@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=3.5.19
-revision=2
+revision=3
 
 tarball_url="https://www.x.org/releases/individual/lib/libXpm-${version}.tar.xz"
 tarball_sha256="ad3576d689221a39dc728f0e0dc02ca7bb6a0d724c9a77fd1bfa1e9af83be900"

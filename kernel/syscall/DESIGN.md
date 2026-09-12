@@ -240,6 +240,14 @@ boundary keep mlibc's layout. Requests the kernel does not implement, such as `T
 `TIOCMGET`, and the `SIOC*` socket requests, keep their generic mlibc definitions and return
 `ENOTTY`; other ioctl families remain unsupported.
 
+The `fcntl` commands form a single family with one owned space, mirrored by the Roxy mlibc
+`abi-bits/fcntl.h`. A supported command is `COMMAND_BASE` plus its index, and every command the
+kernel does not implement is pinned to one `UNSUPPORTED_COMMAND` value below that base. The base
+sits above every command number another personality uses, so a command below it can only be
+foreign, and the handler reports the header's unsupported marker and another libc's numbering as
+distinct diagnostics. All unsupported commands sharing one value is deliberate: telling them apart
+would preserve information no caller can act on.
+
 `socketpair` is syscall 48 and accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero. It asks
 `roxy-unix-socket` to create the connected files, then owns descriptor insertion and the checked
 copy of the descriptor pair to userspace.
