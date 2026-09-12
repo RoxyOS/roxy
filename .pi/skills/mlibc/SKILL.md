@@ -18,6 +18,20 @@ fork at `github.com/RoxyOS/mlibc` (branch `master`).
 The fork's purpose is the **roxy sysdeps**: the OS-specific layer that implements mlibc's sysdep
 interface on top of Roxy OS kernel syscalls. This is what you'll most often modify.
 
+## What the fork may change
+
+Only Roxy-owned code may be modified:
+
+- `sysdeps/roxy/**` — the sysdeps, their `meson.build` registry, `arch/`, `crt-*`, and the
+  `include/roxy/` and `include/sys/` headers they install;
+- `abis/roxy/**` — the Roxy ABI headers installed as `abi-bits/*` (the entries under
+  `sysdeps/roxy/include/abi-bits/` are symlinks into this directory).
+
+Everything else is upstream mlibc and stays untouched: `options/**` — generic implementations,
+their headers, and their Meson build files — the other `abis/*` platforms, `options/internal/**`,
+and the top-level build files. Editing those turns every upstream merge into a conflict, which is
+the cost this fork exists to avoid.
+
 ## Repository layout (fork-relevant parts)
 
 ```
@@ -34,6 +48,7 @@ mlibc/
 │       ├── abi-bits/              ← installed ABI headers (stat.h, errno.h, ...)
 │       ├── mlibc/sysdeps.hpp      ← sysdep interface overrides
 │       └── sys/
+├── abis/roxy/                     ← the Roxy ABI headers, symlinked from abi-bits/ below
 └── options/…                      ← the rest of upstream mlibc (generic + linux options)
 ```
 
