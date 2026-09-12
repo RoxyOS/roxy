@@ -258,3 +258,12 @@ procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`
   syscalls and partially implemented interfaces, must use the repository's centralized
   unsupported-operation helper. Direct returns of `ENOSYS`, `ENOTSUP`, or `EOPNOTSUPP` are
   forbidden and must be rejected by tests or static checks.
+
+### Bit Values
+
+- Write a bit value as a shift from the value it derives from — `BASE << 1`, `FLAG << 2`, `1 << 3` —
+  instead of a literal such as `1`, `2`, `4`, `8`, or `0x10`. A literal hides which bit it is and
+  goes stale when the field is extended or reordered. This covers every bit in the tree: the ABI
+  value layouts built on a base (`ioctl/numbers.rs`, `COMMAND_BASE`, `SYSCALL_BASE`, `ACCESS_BASE`),
+  `bitflags` definitions such as `roxy-fd`'s `StatusFlags`, Roxy-owned mlibc headers, and hardware
+  register fields.
