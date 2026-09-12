@@ -1,0 +1,27 @@
+diff --git xorg-server-clean/hw/xfree86/common/xf86Xinput.c xorg-server-workdir/hw/xfree86/common/xf86Xinput.c
+index 8cf3f62..1df735e 100644
+--- xorg-server-clean/hw/xfree86/common/xf86Xinput.c
++++ xorg-server-workdir/hw/xfree86/common/xf86Xinput.c
+@@ -855,6 +855,7 @@ xf86InputDevicePostInit(DeviceIntPtr dev)
+ static void
+ xf86stat(const char *path, int *maj, int *min)
+ {
++#ifdef SYSTEMD_LOGIND
+     struct stat st;
+ 
+     if (stat(path, &st) == -1)
+@@ -862,6 +863,14 @@ xf86stat(const char *path, int *maj, int *min)
+ 
+     *maj = major(st.st_rdev);
+     *min = minor(st.st_rdev);
++#else
++    /* Roxy: device numbers are only consumed by the systemd-logind fd-passing
++     * path, which is not built here, and this platform's libc provides no
++     * major()/minor() macros. Without logind support the numbers are unused. */
++    (void) path;
++    (void) maj;
++    (void) min;
++#endif
+ }
+ 
+ static inline InputDriverPtr
