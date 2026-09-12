@@ -80,7 +80,7 @@ pub fn fork_current(context: UserContext) -> Result<ProcessId, ForkError> {
 
 #[inline(never)]
 fn child_context(context: UserContext) -> UserContext {
-    context.with_syscall_result(0)
+    context.with_syscall_outcome(roxy_arch::SyscallOutcome::Value(0))
 }
 
 fn map_vm_error(error: VmError) -> ForkError {

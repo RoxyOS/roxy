@@ -1,4 +1,4 @@
-use roxy_arch::{RawSyscall, SyscallExit, UserContext};
+use roxy_arch::{RawSyscall, SyscallExit, SyscallOutcome, UserContext};
 
 use crate::{
     Handler,
@@ -15,7 +15,7 @@ impl Registry {
             .find(|syscall| syscall.number == number)
         else {
             crate::unsupported::unsupported_argument("syscall", number as u64, Errno::NoSys);
-            return with_pending_signal(Errno::NoSys.encode(), &request.context);
+            return with_pending_signal(failed(Errno::NoSys), &request.context);
         };
 
         match syscall.handler {
@@ -31,26 +31,30 @@ impl Registry {
 }
 
 fn syscall_result_to_exit(result: crate::SyscallResult, request: &RawSyscall) -> SyscallExit {
-    match result {
-        Ok(value) => with_pending_signal(value, &request.context),
-        Err(error) => with_pending_signal(error.encode(), &request.context),
-    }
+    let outcome = match result {
+        Ok(value) => SyscallOutcome::Value(value),
+        Err(error) => failed(error),
+    };
+
+    with_pending_signal(outcome, &request.context)
 }
 
-/// Wraps a computed return value into a `SyscallExit`, delivering any pending signal first: a
-/// handler turns it into a `Resume`; otherwise the value is returned as-is.
-fn with_pending_signal(value: u64, context: &UserContext) -> SyscallExit {
+/// The outcome of a syscall that failed with `error`, carrying no value.
+fn failed(error: Errno) -> SyscallOutcome {
+    SyscallOutcome::Failed(error.number())
+}
+
+/// Wraps a computed outcome into a `SyscallExit`, delivering any pending signal first: a
+/// handler turns it into a `Resume`; otherwise the outcome is returned as-is.
+fn with_pending_signal(outcome: SyscallOutcome, context: &UserContext) -> SyscallExit {
     // An interrupted blocking syscall returns `EINTR`; that is the only case where a `SA_RESTART`
     // handler should re-execute the syscall after returning. Pass the signal down so delivery can
     // rewind the saved instruction pointer accordingly.
-    let is_interrupted = value == Errno::Interrupted.encode();
+    let is_interrupted = outcome == SyscallOutcome::Failed(Errno::Interrupted.number());
 
     match roxy_process::deliver_pending_signal(context, is_interrupted) {
-        Some(resume) => SyscallExit::Resume {
-            return_value: value,
-            resume,
-        },
-        None => SyscallExit::Returned(value),
+        Some(resume) => SyscallExit::Resume { outcome, resume },
+        None => SyscallExit::Returned(outcome),
     }
 }
 
@@ -63,7 +67,7 @@ pub(super) fn dispatch(request: RawSyscall) -> SyscallExit {
             request.number,
             Errno::NoSys,
         );
-        with_pending_signal(Errno::NoSys.encode(), &request.context)
+        with_pending_signal(failed(Errno::NoSys), &request.context)
     }
 }
 

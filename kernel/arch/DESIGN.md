@@ -60,7 +60,9 @@ and SSE2 capabilities.
 
 Syscall entry normalizes the raw register frame, dispatches one handler, and restores the saved
 userspace general-purpose registers when that handler returns. The handler returns a `SyscallExit` (`Returned`, `Resume`, or `RestoreContext`)
-instead of a bare value: `value` is written back as the syscall result, an optional `redirect`
+carrying a `SyscallOutcome` — the syscall's value or its error code, before the active
+personality chooses the registers they travel in: the outcome is written back as the syscall
+result, an optional `redirect`
 rewrites the saved instruction/stack pointers and argument registers (signal delivery), and an
 optional `restore` replaces the entire saved context (`sigreturn`). A fresh `execve` image uses
 the separate

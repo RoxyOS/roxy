@@ -245,6 +245,13 @@ request no handler serves the same way, separating a foreign request from an und
 own, and returns `ENOTTY`: the errno a probe expects from a device that does not serve the
 request.
 
+The Roxy personality returns an outcome in two registers: the value in `rax` and the error code in
+`r10`, with `0` meaning success. Dispatch builds one `SyscallOutcome` per handler result, which is
+either a value or an error, never both, so a failure travels the same path as a value and signal
+delivery cannot lose it; `sigreturn`'s `RestoreContext` is the exception, restoring the whole saved
+context instead. Keeping the error out of the value's register is what leaves the value its full
+width, and a second personality encodes its own register pair at this same boundary.
+
 ## Limits
 
 The only active personality is currently Roxy-specific and manually mirrored by the Roxy mlibc

@@ -137,16 +137,44 @@ pub struct ResumeInfo {
     pub arguments: [u64; 3],
 }
 
+/// A syscall's outcome, before the personality encodes it into the user context.
+///
+/// An outcome is a value or an error, never both: keeping them apart is what lets a syscall return
+/// a value that uses the whole register.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SyscallOutcome {
+    /// The syscall produced `value`.
+    Value(u64),
+    /// The syscall failed with `error`.
+    Failed(u64),
+}
+
+impl SyscallOutcome {
+    /// The register pair the active personality returns this outcome in: the value and the error
+    /// code, with `0` standing for success.
+    ///
+    /// This is the single source of the Roxy personality's return convention, used by both the
+    /// syscall return path and the seeding of a context that must appear to have returned from one.
+    /// A second personality encodes its own pair here and nowhere else.
+    #[must_use]
+    pub(crate) const fn registers(self) -> (u64, u64) {
+        match self {
+            Self::Value(value) => (value, 0),
+            Self::Failed(error) => (0, error),
+        }
+    }
+}
+
 /// The exit state of one syscall.
 #[derive(Clone, Copy, Debug)]
 pub enum SyscallExit {
-    /// Resumes the interrupted userspace context with `value` as the syscall result.
-    Returned(u64),
-    /// Resumes with `return_value` as the syscall result, but resumes into the user code
+    /// Resumes the interrupted userspace context with `outcome` as the syscall result.
+    Returned(SyscallOutcome),
+    /// Resumes with `outcome` as the syscall result, but resumes into the user code
     /// described by `resume` first — currently the only producer is signal delivery into a user
     /// handler.
     Resume {
-        return_value: u64,
+        outcome: SyscallOutcome,
         resume: ResumeInfo,
     },
     /// Replaces the entire saved context — including the syscall result — with the context

@@ -1,4 +1,4 @@
-use roxy_arch::{RawSyscall, SyscallExit};
+use roxy_arch::{RawSyscall, SyscallExit, SyscallOutcome};
 
 use crate::{Syscall, errno::Errno, numbers::SyscallNumber};
 
@@ -12,6 +12,6 @@ pub(super) const SYSCALL: Syscall = Syscall::with_exit(SyscallNumber::Sigreturn,
 fn handle(request: RawSyscall) -> SyscallExit {
     match roxy_process::pop_signal_frame(&request.context) {
         Some(restored) => SyscallExit::RestoreContext(restored),
-        None => SyscallExit::Returned(Errno::Invalid.encode()),
+        None => SyscallExit::Returned(SyscallOutcome::Failed(Errno::Invalid.number())),
     }
 }

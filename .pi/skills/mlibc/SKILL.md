@@ -52,8 +52,10 @@ The chain for a typical syscall-backed operation:
    structs (`roxy_stat_result`, `roxy_clock_result`, `roxy_dirent`) with static_asserts pinning
    their layout.
 
-Error convention: negative result = `-errno`; helpers `syscall_error()` / `syscall_result()`
-convert.
+Error convention: the kernel returns the value in `rax` and the error code in `r10`, with `0` in
+`r10` meaning success, so a caller must check it before using the value. `roxy_syscall0..6` return a
+`roxy_syscall_result` holding both, and the helpers `syscall_error()` / `syscall_result()` convert
+that pair into the errno/out-parameter shape mlibc's sysdeps use.
 
 ## The syscall-number ABI contract
 

@@ -16,6 +16,7 @@ use x86_64::{
 
 use crate::{
     Architecture, CurrentArchitectureBackend, MAX_CPUS, RawSyscall, SyscallExit, SyscallHandler,
+    SyscallOutcome,
 };
 
 use super::{PerCpuStorage, cpu_map, float, init};
@@ -114,9 +115,13 @@ pub struct X86_64UserContext {
 }
 
 impl X86_64UserContext {
+    /// Seeds the context's return registers with `outcome`, as if a syscall had returned it.
     #[must_use]
-    pub const fn with_syscall_result(mut self, result: u64) -> Self {
-        self.rax = result;
+    pub const fn with_syscall_outcome(mut self, outcome: SyscallOutcome) -> Self {
+        let (value, error) = outcome.registers();
+
+        self.rax = value;
+        self.r10 = error;
         self
     }
 }
@@ -285,15 +290,12 @@ extern "C" fn dispatch(frame: *mut EntryFrame) -> u64 {
 
     // SAFETY: configure stores one permanent SyscallHandler function pointer.
     let handler: SyscallHandler = unsafe { transmute(address) };
-
-    // The naked epilogue restores rax from the frame, so every branch must write it there.
+    // The naked epilogue restores the whole frame to userspace, so every branch that returns to
+    // userspace must write the return registers there.
     match handler(request) {
-        SyscallExit::Returned(value) => frame.rax = value,
-        SyscallExit::Resume {
-            return_value,
-            resume,
-        } => {
-            frame.rax = return_value;
+        SyscallExit::Returned(outcome) => apply_outcome(frame, outcome),
+        SyscallExit::Resume { outcome, resume } => {
+            apply_outcome(frame, outcome);
             frame.user_instruction_pointer = resume.instruction_pointer;
             frame.user_stack_pointer = resume.stack_pointer;
             frame.rdi = resume.arguments[0];
@@ -323,6 +325,19 @@ extern "C" fn dispatch(frame: *mut EntryFrame) -> u64 {
     }
 
     0
+}
+
+/// Writes an outcome into the frame's return registers.
+///
+/// The register pair comes from [`SyscallOutcome::registers`], which owns the Roxy personality's
+/// return convention: the value in `rax` and the error code in `r10`, with `0` standing for success.
+/// The error register cannot be `rdi`, `rsi`, or `rdx`; the `Resume` arm below uses all three for
+/// the signal handler's arguments.
+fn apply_outcome(frame: &mut EntryFrame, outcome: SyscallOutcome) {
+    let (value, error) = outcome.registers();
+
+    frame.rax = value;
+    frame.r10 = error;
 }
 
 pub(super) unsafe fn resume_user(instruction_pointer: u64, stack_pointer: u64) -> ! {
