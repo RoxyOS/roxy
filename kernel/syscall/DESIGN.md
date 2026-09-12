@@ -43,6 +43,13 @@ signed `int`.
 
 ## Registry and dispatch
 
+`numbers.rs` owns the syscall numbers. They are `SYSCALL_BASE` plus each syscall's index, so the
+whole space sits above every number another personality uses for the syscalls this kernel provides,
+and the low range stays free for a Linux-compatible personality to serve unshifted. Dispatch
+separates the two cases a number it cannot resolve can be: one below the base is a foreign request,
+which is what a program with its own syscall layer sends, and one inside the space is an undefined
+syscall of our own. Both are reported through the centralized unsupported path and return `ENOSYS`.
+
 The static syscall table is validated for duplicate numbers before the architecture entry is
 configured. The architecture backend supplies a normalized `RawSyscall`. Most handlers receive six
 raw argument words; handlers such as fork may request the saved user context explicitly.

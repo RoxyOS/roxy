@@ -58,7 +58,26 @@ pub(super) fn dispatch(request: RawSyscall) -> SyscallExit {
     if let Ok(number) = SyscallNumber::try_from(request.number) {
         REGISTRY.dispatch(number, request)
     } else {
-        crate::unsupported::unsupported_argument("syscall", request.number, Errno::NoSys);
+        crate::unsupported::unsupported_argument(
+            unknown_syscall(request.number),
+            request.number,
+            Errno::NoSys,
+        );
         with_pending_signal(Errno::NoSys.encode(), &request.context)
+    }
+}
+
+/// Names the diagnostic for a syscall number the table does not resolve.
+///
+/// A number below [`crate::numbers::SYSCALL_BASE`] carries another personality's numbering, which
+/// is what a program with its own syscall layer — a language runtime issuing `syscall` directly
+/// with Linux's numbers — ends up sending, and it is reported apart from a number inside the space
+/// that this kernel simply does not define. Only the first says the caller was built against a
+/// different ABI.
+fn unknown_syscall(number: u64) -> &'static str {
+    if number < crate::numbers::SYSCALL_BASE {
+        "syscall.foreign"
+    } else {
+        "syscall"
     }
 }
