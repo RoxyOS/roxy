@@ -62,7 +62,7 @@ does not yet prefer a thread that does not block the signal (see Limits).
 
 ## Signals
 
-Each running process owns a queue of pending process-directed signals — `Vec<PendingSignal>`, where each entry pairs the `Signal` with the sender's pid and an ABI-neutral `SignalSource` (mapped to the Linux `si_code` only when the `siginfo_t` is serialized) so a later `siginfo_t` can be produced — a `SignalSet`
+Each running process owns a queue of pending process-directed signals — `Vec<PendingSignal>`, where each entry pairs the `Signal` with the sender's pid and an ABI-neutral `SignalSource` (mapped to an ABI `si_code` only when the information record is built) so a later record can be produced — a `SignalSet`
 signal mask keyed per thread (each thread has its own mask; the main thread's is the process mask),
 a per-thread targeted-pending map for `tgkill`/`SIGEV_THREAD_ID` signals, a `HashMap<Signal, SignalAction>` of configured dispositions, and a LIFO stack of
 outstanding signal-frame addresses. These are empty when a process is constructed. Absence from
@@ -83,14 +83,20 @@ to a user handler. Handler delivery writes a signal frame below the interrupted 
 address onto the process frame stack, adds the handler mask and the signal itself to the process
 mask, and returns a `ResumeInfo` that the architecture layer applies to the saved user context.
 The frame carries the trampoline entry as the handler return address, a snapshot of the
-interrupted context, the pre-delivery mask, and — for a handler installed with `SA_SIGINFO` — a
-`siginfo_t` and a `ucontext_t` laid out per the Linux ABI. Its layout is a kernel-internal contract
-between `roxy-process` and the kernel-injected trampoline. A plain handler observes only the
-signal number (its `RSI`/`RDX` are zeroed); an `SA_SIGINFO` handler is invoked as
-`(signo, siginfo_t *, ucontext_t *)` with `RSI`/`RDX` pointing at the structures inside its own
-frame. The `siginfo_t` carries the real `si_signo`, `si_code`, and sender `si_pid` recorded at
-queue time; the `ucontext_t` mirrors the interrupted general registers and the pre-delivery mask
-(FPU/SSE state stays zeroed, since Roxy does not save or restore it).
+interrupted context, the pre-delivery mask, and the information record an `SA_SIGINFO` handler
+reads. Its layout is a kernel-internal contract between `roxy-process` and the kernel-injected
+trampoline. A plain handler observes only the signal number (its `RSI`/`RDX` are zeroed); an
+`SA_SIGINFO` handler is invoked as `(signo, siginfo_t *, null)` with `RSI` pointing at the record
+inside its own frame. Its third argument is null because this ABI serves no machine context for a
+handler to inspect or redirect: the record that used to mirror the interrupted registers is gone,
+and serving one would mean defining that state here and placing it on the frame.
+
+The record is flat, one member per value, so every offset is a constant rather than an overlay
+`si_code` selects. It carries the real `si_signo`, `si_code`, and sender `si_pid` recorded at queue
+time, a timer's `si_value`, and — once a fault can raise a signal — `si_addr`. Its layout is
+Roxy's own and it is defined next to the frame that writes it, not in the syscall subsystem that
+also hands it to `sigtimedwait`; that subsystem's design records why it takes this record from
+below rather than defining its own.
 `pop_signal_frame` validates that the caller's stack pointer matches the recorded frame base
 plus the popped return-address slot (the handler's `ret` consumes the frame's leading trampoline
 address before the trampoline issues `sigreturn`), restores the context and mask, and is invoked

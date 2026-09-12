@@ -43,6 +43,14 @@ signed `int`.
 
 ## Registry and dispatch
 
+One record crosses the boundary the other way. The information record a signal handler reads, and
+that `sigtimedwait` returns, is built where the signal frame is — in `roxy-process`, which writes it
+onto the user stack — and this layer uses that type instead of a second copy of its layout. The
+frame writer cannot depend on this subsystem, so a copy is the only alternative, and one record with
+one definition is worth more than the rule's letter: what the rule protects against is a domain
+subsystem inventing its own view of a layout, and this record's only view is the one the kernel
+writes.
+
 `numbers.rs` owns the syscall numbers. They are `SYSCALL_BASE` plus each syscall's index, so the
 whole space sits above every number another personality uses for the syscalls this kernel provides,
 and the low range stays free for a Linux-compatible personality to serve unshifted. Dispatch
