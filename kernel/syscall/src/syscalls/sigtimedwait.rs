@@ -10,16 +10,7 @@ use crate::{
     syscall,
 };
 
-syscall!(SyscallNumber::SigtimedWait, handle(set: SignalSet => Fault, info: Nullable<Out<SiginfoAbi>> => Fault, timeout: Nullable<Timespec> => Fault, out_signal: Out<i32> => Fault));
-
-/// The userspace `siginfo_t` (128 bytes) written to `info` for the consumed signal.
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct SiginfoAbi {
-    bytes: [u8; 128],
-}
-
-const _: () = assert!(core::mem::size_of::<SiginfoAbi>() == 128);
+syscall!(SyscallNumber::SigtimedWait, handle(set: SignalSet => Fault, info: Nullable<Out<roxy_process::Siginfo>> => Fault, timeout: Nullable<Timespec> => Fault, out_signal: Out<i32> => Fault));
 
 /// Linux `sigtimedwait(2)`: suspends the calling thread until a signal in `set` is pending,
 /// then consumes and returns it, writing its `siginfo_t` to `info` when requested.
@@ -29,7 +20,7 @@ const _: () = assert!(core::mem::size_of::<SiginfoAbi>() == 128);
 /// returns `EAGAIN`.
 fn handle(
     set: SignalSet,
-    info: Nullable<Out<SiginfoAbi>>,
+    info: Nullable<Out<roxy_process::Siginfo>>,
     timeout: Nullable<Timespec>,
     out_signal: Out<i32>,
 ) -> SyscallResult {
@@ -62,11 +53,10 @@ fn handle(
         roxy_timer_wait::block_current(deadline).perform();
     };
 
-    // SAFETY: `i32` and `SiginfoAbi` are checked `repr(C)` records with every byte initialized.
+    // SAFETY: `i32` and `Siginfo` are checked `repr(C)` records with every byte initialized.
     unsafe { out_signal.write(&signo) }?;
     if let Some(info) = info {
-        let value = SiginfoAbi { bytes: siginfo };
-        unsafe { info.write(&value) }?;
+        unsafe { info.write(&siginfo) }?;
     }
 
     Ok(0)

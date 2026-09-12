@@ -17,61 +17,42 @@ use crate::signal::{PendingSignal, SignalSource};
 /// Must match `SyscallNumber::Sigreturn` in `roxy-syscall`; a kernel test pins both sides.
 pub const SIGRETURN_SYSCALL_NUMBER: u64 = 54;
 
-/// The `siginfo_t` written into a signal frame, laid out to match Roxy's userland
-/// `siginfo_t` (`sysdeps/roxy/include/abi-bits/signal.h`). Only the fields the kernel can produce
-/// are named; the fault/poll/sys members Roxy never raises stay zero.
+/// The information record written into a signal frame, laid out to match Roxy's userland
+/// `siginfo_t` (`sysdeps/roxy/include/abi-bits/signal.h`).
 ///
-/// `_pad` pushes `sifields` to offset 16, matching the alignment of the userland `__si_fields`
-/// union (its 8-byte-aligned members force it past the 12-byte header). `sifields` is a union
-/// because the region is a runtime-typed overlay: at offset 16..24 it is either `_kill`
-/// (`si_pid`/`si_uid`) or `_timer` (`si_tid`/`si_overrun`), and `si_value` follows at 24.
+/// The record is flat rather than a union overlay: a source sets the fields it has, and every
+/// member's offset is then a constant instead of an overlay that `si_code` selects. Members keep
+/// their POSIX names, so ported handlers compile unchanged. `si_overrun` and `si_value` keep the
+/// offsets the Linux-shaped record gave them, so a handler or test that assumed those keeps
+/// working; only the record's size changes.
+// The `si_` prefix is the ABI's member naming, not accidental repetition: userspace reads these
+// fields by these names, so they cannot be shortened.
+#[allow(clippy::struct_field_names)]
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub(super) struct Siginfo {
+pub struct Siginfo {
     si_signo: i32,
-    si_errno: i32,
     si_code: i32,
-    _pad: i32,
-    sifields: Sifields,
+    si_pid: i32,
+    si_uid: u32,
+    si_status: i32,
+    si_overrun: i32,
+    si_value: u64,
+    si_addr: u64,
 }
 
-/// The `siginfo_t` union at offset 16 (the userland `__si_fields` overlay). Only the `kill` and
-/// `timer` variants Roxy produces are named; `_pad` sizes the union to the 112-byte tail so the
-/// whole `siginfo_t` is 128 bytes.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(super) union Sifields {
-    kill: SifieldKill,
-    timer: SifieldTimer,
-    _pad: [u8; 112],
-}
+/// Size of the record as userspace sees it.
+///
+/// The frame layout and `sigtimedwait`'s output parameter both derive from this, so the record has
+/// one size rather than one per user.
+pub const SIGINFO_SIZE: usize = core::mem::size_of::<Siginfo>();
 
-/// The `_kill` variant: `si_pid`/`si_uid` at 16.
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct SifieldKill {
-    pid: i32,
-    uid: u32,
-}
-
-/// The `_timer` variant: `si_tid`/`si_overrun` at 16, `si_value` at 24.
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct SifieldTimer {
-    tid: i32,
-    overrun: i32,
-    value: u64,
-}
-
-const _: () = assert!(core::mem::size_of::<Siginfo>() == 128);
-const _: () = assert!(core::mem::offset_of!(Siginfo, si_code) == 8);
-const _: () = assert!(core::mem::offset_of!(Siginfo, sifields) == 16);
-const _: () = assert!(core::mem::offset_of!(SifieldKill, pid) == 0);
-const _: () = assert!(core::mem::offset_of!(SifieldTimer, value) == 8);
-// `si_value` sits at sifields (16) + timer.value's offset (8) = 24.
-const _: () = assert!(
-    core::mem::offset_of!(Siginfo, sifields) + core::mem::offset_of!(SifieldTimer, value) == 24
-);
+const _: () = assert!(SIGINFO_SIZE == 40);
+const _: () = assert!(core::mem::offset_of!(Siginfo, si_code) == 4);
+const _: () = assert!(core::mem::offset_of!(Siginfo, si_pid) == 8);
+const _: () = assert!(core::mem::offset_of!(Siginfo, si_overrun) == 20);
+const _: () = assert!(core::mem::offset_of!(Siginfo, si_value) == 24);
+const _: () = assert!(core::mem::offset_of!(Siginfo, si_addr) == 32);
 
 /// Linux `si_code` values, used only at this ABI-serialization boundary.
 const SI_USER: i32 = 0;
@@ -92,18 +73,19 @@ pub(super) fn build_siginfo(pending: PendingSignal) -> Siginfo {
     value.si_signo = i32::from(pending.signal.number());
     value.si_code = abi_si_code(pending.source);
 
-    if pending.source == SignalSource::Timer {
-        // Write the `timer` variant (the handler reads the same variant). `si_tid`/`si_overrun`
-        // stay zero (Roxy has no per-thread timer ids and reports no overrun); `si_value`
-        // publishes the timer's `sigval` payload.
-        value.sifields.timer.tid = 0;
-        value.sifields.timer.overrun = 0;
-        value.sifields.timer.value = pending.value.unwrap_or(0);
-    } else {
-        // Write the `kill` variant; `si_uid` stays zero.
-        value.sifields.kill.pid = i32::try_from(pending.sender_pid).expect("pid fits in i32");
-        value.sifields.kill.uid = 0;
+    match pending.source {
+        // `si_value` publishes the timer's `sigval` payload. Roxy has no per-thread timer ids and
+        // reports no overrun, so `si_overrun` stays zero.
+        SignalSource::Timer => value.si_value = pending.value.unwrap_or(0),
+        // `si_uid` stays zero: Roxy has no user model.
+        SignalSource::Process | SignalSource::Tkill | SignalSource::Kernel => {
+            value.si_pid = i32::try_from(pending.sender_pid).expect("pid fits in i32");
+        }
     }
+
+    // `si_addr` stays zero because no fault raises a signal yet, so there is no address to report.
+    // TODO(signal-fault-delivery): the page-fault and exception paths must queue a signal carrying
+    // the faulting address, which then fills `si_addr` and the fault-specific `si_code`s.
 
     value
 }

@@ -12,7 +12,7 @@ mod lifecycle;
 mod memory;
 mod signal;
 mod signal_frame;
-pub use signal_frame::SIGRETURN_SYSCALL_NUMBER;
+pub use signal_frame::{SIGRETURN_SYSCALL_NUMBER, Siginfo};
 mod setpgid;
 mod startup_stack;
 mod table;

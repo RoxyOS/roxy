@@ -5,7 +5,7 @@ use core::{mem::size_of, ptr, slice};
 use roxy_arch::UserContext;
 use roxy_signal::SignalSet;
 
-use super::{SIGRETURN_SYSCALL_NUMBER, build_siginfo};
+use super::{SIGINFO_SIZE, SIGRETURN_SYSCALL_NUMBER, build_siginfo};
 use crate::signal::PendingSignal;
 
 /// Base address of the one-page read-execute trampoline mapping.
@@ -19,8 +19,6 @@ pub(crate) const RETURN_ADDRESS_SIZE: usize = size_of::<u64>();
 const OLD_MASK_SIZE: usize = size_of::<u64>();
 pub(crate) const USER_CONTEXT_SIZE: usize = size_of::<UserContext>();
 
-/// Size of a Linux-compatible `siginfo_t` as consumed by `SA_SIGINFO` handlers.
-const SIGINFO_SIZE: usize = 128;
 /// Size of the `x86_64` `ucontext_t` passed as a handler's third argument.
 const UCONTEXT_SIZE: usize = 968;
 
