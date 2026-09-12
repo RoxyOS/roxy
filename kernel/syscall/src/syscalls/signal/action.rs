@@ -11,10 +11,7 @@ use crate::{
     syscall,
     unsupported::unsupported_argument,
 };
-
-use super::SignalSetAbi;
-
-/// `SA_SIGINFO`: invoke the handler with `(signo, siginfo_t *, ucontext_t *)`.
+/// `SA_SIGINFO`: invoke the handler with `(signo, siginfo_t *, null)`.
 const SA_SIGINFO: u64 = 4;
 /// `SA_RESTART`: an interrupted blocking syscall is re-executed after the handler returns.
 const SA_RESTART: u64 = 0x1000_0000;
@@ -25,10 +22,10 @@ struct SigactionAbi {
     handler: u64,
     flags: u64,
     restorer: u64,
-    mask: SignalSetAbi,
+    mask: SignalSet,
 }
 
-const _: () = assert!(mem::size_of::<SigactionAbi>() == 152);
+const _: () = assert!(mem::size_of::<SigactionAbi>() == 32);
 const _: () = assert!(mem::offset_of!(SigactionAbi, handler) == 0);
 const _: () = assert!(mem::offset_of!(SigactionAbi, flags) == 8);
 const _: () = assert!(mem::offset_of!(SigactionAbi, restorer) == 16);
@@ -41,7 +38,7 @@ impl SyscallArg for SigactionAbi {
             handler: 0,
             flags: 0,
             restorer: 0,
-            mask: SignalSetAbi { bits: [0; 16] },
+            mask: SignalSet::empty(),
         };
 
         // SAFETY: SigactionAbi has a checked C layout and is fully initialized before the copy.
@@ -93,7 +90,7 @@ fn handle(
 }
 
 fn decode(value: SigactionAbi) -> Result<SignalAction, Errno> {
-    // Only `SA_SIGINFO` (three-argument form with `siginfo_t`/`ucontext_t`) and `SA_RESTART`
+    // Only `SA_SIGINFO` (three-argument form with `siginfo_t` and a null third argument) and `SA_RESTART`
     // (re-execute an interrupted blocking syscall after the handler) are defined in the Roxy ABI
     // today; any other flag is rejected through the centralized diagnostic.
     let unknown = value.flags & !(SA_SIGINFO | SA_RESTART);
@@ -110,7 +107,7 @@ fn decode(value: SigactionAbi) -> Result<SignalAction, Errno> {
 
     // The kernel injects its own sigreturn trampoline, so a user-supplied restorer is never
     // required or consulted.
-    let mask = value.mask.to_set();
+    let mask = value.mask;
 
     Ok(match value.handler {
         0 => SignalAction::Default,
@@ -149,6 +146,6 @@ fn encode(action: SignalAction) -> SigactionAbi {
         handler,
         flags,
         restorer: 0,
-        mask: SignalSetAbi::from_set(mask),
+        mask,
     }
 }

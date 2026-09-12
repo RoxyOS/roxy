@@ -109,9 +109,9 @@ Process-group selectors, stopped or continued states, and resource usage remain 
 must use the centralized diagnostic path.
 
 `sigprocmask` decodes the Roxy `sigset_t` ABI and atomically blocks, unblocks, or replaces the
-current process's signal mask. The record is the 128-byte set every libc uses, but only its first
-word carries signals: the remaining words are reserved and ignored, because `sigfillset` fills the
-whole record and Linux never sees those bytes at all. A null input set queries without changing the
+current process's signal mask. The record is a single word, one bit per signal, which is all the
+signals this ABI numbers fit in; there is no reserved tail to ignore. A null input set queries
+without changing the
 mask, and a non-null
 old-set output receives the mask active before the operation. The output range is validated before
 state changes. The process subsystem removes `SIGKILL` and `SIGSTOP` from every installed mask.

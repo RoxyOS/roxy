@@ -6,7 +6,6 @@ use crate::{
     syscall,
 };
 
-use super::SignalSetAbi;
 use roxy_signal::SignalSet;
 
 #[derive(Clone, Copy)]
@@ -27,12 +26,12 @@ impl SyscallArg for SignalMaskHow {
     }
 }
 
-syscall!(SyscallNumber::Sigprocmask, handle(how: SignalMaskHow => Invalid, set: Nullable<SignalSet> => Fault, old_set: Nullable<Out<SignalSetAbi>> => Fault));
+syscall!(SyscallNumber::Sigprocmask, handle(how: SignalMaskHow => Invalid, set: Nullable<SignalSet> => Fault, old_set: Nullable<Out<SignalSet>> => Fault));
 
 fn handle(
     how: SignalMaskHow,
     set: Nullable<SignalSet>,
-    old_set: Nullable<Out<SignalSetAbi>>,
+    old_set: Nullable<Out<SignalSet>>,
 ) -> SyscallResult {
     let set = set.into_option();
     let old_set = old_set.into_option();
@@ -47,9 +46,8 @@ fn handle(
     };
 
     if let Some(old_set) = old_set {
-        let old_set_value = SignalSetAbi::from_set(old_signals);
-        // SAFETY: SignalSetAbi has a checked C layout and every byte is initialized.
-        unsafe { old_set.write(&old_set_value) }?;
+        // SAFETY: `SignalSet` is one word with every byte initialized.
+        unsafe { old_set.write(&old_signals) }?;
     }
 
     Ok(0)

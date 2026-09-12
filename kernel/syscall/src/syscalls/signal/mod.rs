@@ -19,42 +19,22 @@ pub(super) const MASK_SYSCALL: Syscall = mask::SYSCALL;
 pub(super) const SEND_SYSCALL: Syscall = send::SYSCALL;
 pub(super) const SIGRETURN_SYSCALL: Syscall = sigreturn::SYSCALL;
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(super) struct SignalSetAbi {
-    bits: [u64; 16],
-}
-
-const _: () = assert!(mem::size_of::<SignalSetAbi>() == 128);
-
-impl SignalSetAbi {
-    pub(super) const fn from_set(set: SignalSet) -> Self {
-        let mut bits = [0; 16];
-        bits[0] = set.bits();
-        Self { bits }
-    }
-
-    /// Decodes the set, keeping the first word and ignoring the reserved rest.
-    ///
-    /// The record is the 128-byte `sigset_t` layout every libc uses, but only its first word
-    /// carries signals: the remaining words are reserved. Callers do fill them — glibc's and
-    /// mlibc's `sigfillset` set every byte of the set — so rejecting a non-zero reserved word
-    /// would fail ordinary programs, and Linux never sees those bytes because its syscall reads a
-    /// single word. Only the first word is therefore interpreted.
-    pub(super) fn to_set(self) -> SignalSet {
-        SignalSet::from_bits_retain(self.bits[0])
-    }
-}
+/// The set crosses the ABI boundary as its own word: userspace's `sigset_t` is this one word, so the
+/// kernel's set and the record a caller passes are the same value rather than two views of one
+/// layout. Its size is what makes that safe.
+const _: () = assert!(mem::size_of::<SignalSet>() == 8);
+const _: () = assert!(mem::align_of::<SignalSet>() == 8);
 
 impl SyscallArg for SignalSet {
     fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
         let address = UserAddress::parse(raw, error)?;
-        let mut set = SignalSetAbi { bits: [0; 16] };
+        let mut set = SignalSet::empty();
 
-        // SAFETY: SignalSetAbi has a checked C layout and is fully initialized.
+        // SAFETY: `SignalSet` is one word whose every bit pattern is a valid set, and the read
+        // initializes all of it.
         unsafe { user_memory::read(address, &mut set) }?;
 
-        Ok(set.to_set())
+        Ok(set)
     }
 }
 
@@ -135,48 +115,9 @@ impl SyscallArg for Signal {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use roxy_signal::SignalSet;
     use roxy_test::kernel_test;
 
-    use super::SignalSetAbi;
     use crate::numbers::SyscallNumber;
-
-    kernel_test!("roxy-syscall::signal-set", round_trips_through_abi, {
-        let set = SignalSet::TERMINATE | SignalSet::INTERRUPT;
-
-        assert_eq!(SignalSetAbi::from_set(set).bits[0], set.bits());
-    });
-
-    kernel_test!(
-        "roxy-syscall::signal-set-reserved",
-        ignores_reserved_words,
-        {
-            // A `sigfillset` set: the reserved words are all ones, as glibc and mlibc fill them.
-            let set = SignalSetAbi {
-                bits: [
-                    0b1010,
-                    u64::MAX,
-                    u64::MAX,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                ],
-            };
-
-            assert_eq!(set.to_set(), SignalSet::from_bits_retain(0b1010));
-        }
-    );
-
     kernel_test!(
         "roxy-syscall::sigreturn-number",
         matches_process_trampoline,
