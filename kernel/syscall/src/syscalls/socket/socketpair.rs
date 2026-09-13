@@ -1,6 +1,6 @@
 use roxy_unix_socket::stream;
 
-use super::socket::{Domain, Protocol, SocketType};
+use super::{Domain, Protocol, SocketType};
 use crate::{SyscallResult, args::Out, errno::Errno, numbers::SyscallNumber, syscall};
 
 syscall!(SyscallNumber::Socketpair, handle(

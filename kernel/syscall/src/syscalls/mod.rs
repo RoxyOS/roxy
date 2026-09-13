@@ -39,7 +39,6 @@ pub(crate) mod signal;
 mod sigtimedwait;
 mod sleep;
 mod socket;
-mod socketpair;
 mod stat;
 mod tcb_set;
 mod tgkill;
@@ -117,7 +116,7 @@ pub(super) const SYSCALLS: [Syscall; 84] = [
     socket::GETSOCKOPT_SYSCALL,
     socket::RECVMSG_SYSCALL,
     socket::SENDMSG_SYSCALL,
-    socketpair::SYSCALL,
+    socket::SOCKETPAIR_SYSCALL,
     signal::SIGRETURN_SYSCALL,
     pipe::SYSCALL,
     dup2::SYSCALL,
