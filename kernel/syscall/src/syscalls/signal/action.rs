@@ -11,10 +11,16 @@ use crate::{
     syscall,
     unsupported::unsupported_argument,
 };
+/// Roxy numbers the `sigaction` flags from a base above Linux's own (its lowest are 1, 2, 4 and
+/// its highest fill bits 24-31), so a value below the base is another personality's numbering and
+/// every flag the header defines but this kernel cannot honour is its marker. See
+/// `abi-bits/signal.h`.
+const SA_BASE: u64 = 1 << 8;
+const SA_UNSUPPORTED: u64 = 0x80;
 /// `SA_SIGINFO`: invoke the handler with `(signo, siginfo_t *, null)`.
-const SA_SIGINFO: u64 = 4;
+const SA_SIGINFO: u64 = SA_BASE;
 /// `SA_RESTART`: an interrupted blocking syscall is re-executed after the handler returns.
-const SA_RESTART: u64 = 0x1000_0000;
+const SA_RESTART: u64 = SA_BASE << 1;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -90,9 +96,26 @@ fn handle(
 }
 
 fn decode(value: SigactionAbi) -> Result<SignalAction, Errno> {
-    // Only `SA_SIGINFO` (three-argument form with `siginfo_t` and a null third argument) and `SA_RESTART`
-    // (re-execute an interrupted blocking syscall after the handler) are defined in the Roxy ABI
-    // today; any other flag is rejected through the centralized diagnostic.
+    // The Roxy ABI defines `SA_SIGINFO` and `SA_RESTART`; the header gives every other flag it
+    // defines one marker, and a value below the base is another personality's numbering. All three
+    // cases are reported through the centralized diagnostic.
+    if value.flags == SA_UNSUPPORTED {
+        return Err(unsupported_argument(
+            "sigaction.flags.unsupported",
+            value.flags,
+            Errno::NotSupported,
+        ));
+    }
+
+    let foreign = value.flags & (SA_BASE - 1);
+    if foreign != 0 {
+        return Err(unsupported_argument(
+            "sigaction.flags.foreign",
+            foreign,
+            Errno::NotSupported,
+        ));
+    }
+
     let unknown = value.flags & !(SA_SIGINFO | SA_RESTART);
     if unknown != 0 {
         return Err(unsupported_argument(
