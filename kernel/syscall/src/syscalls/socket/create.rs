@@ -12,10 +12,19 @@ syscall!(SyscallNumber::Socket, handle(
 /// values of their own because an upstream `switch` names them as cases.
 const AF_BASE: u64 = 0x100;
 const AF_UNSUPPORTED: u64 = 0x80;
+/// `AF_INET` and `AF_INET6` keep values of their own because upstream mlibc's `switch` statements
+/// name them as cases — collapsing them onto the marker would be a duplicate case label, and that
+/// header is not this fork's to edit — but they are served no more than the marker is, so they are
+/// reported the same way.
+const AF_INET: u64 = AF_BASE + 1;
+const AF_INET6: u64 = AF_BASE + 2;
 
 const SOCK_BASE: u64 = 1 << 20;
 const SOCK_TYPE_MASK: u64 = (SOCK_BASE << 3) - SOCK_BASE;
 const SOCK_UNSUPPORTED: u64 = 1 << 12;
+/// `SOCK_DGRAM` takes a value of its own for the same reason `AF_INET` does, and is reported the
+/// same way.
+const SOCK_DGRAM: u64 = SOCK_BASE + 1;
 const SOCK_CLOEXEC: u64 = SOCK_BASE << 4;
 const SOCK_NONBLOCK: u64 = SOCK_BASE << 5;
 
@@ -38,7 +47,9 @@ impl SyscallArg for Domain {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
         match raw {
             AF_BASE => Ok(Self::Unix),
-            AF_UNSUPPORTED => Err(unsupported("socket.domain.unsupported", raw)),
+            AF_INET | AF_INET6 | AF_UNSUPPORTED => {
+                Err(unsupported("socket.domain.unsupported", raw))
+            }
             value if value < AF_BASE => Err(unsupported("socket.domain.foreign", value)),
             value => Err(unsupported("socket.domain", value)),
         }
@@ -47,7 +58,7 @@ impl SyscallArg for Domain {
 
 impl SyscallArg for SocketType {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
-        if raw == SOCK_UNSUPPORTED {
+        if raw == SOCK_UNSUPPORTED || raw == SOCK_DGRAM {
             return Err(unsupported("socket.type.unsupported", raw));
         }
 
