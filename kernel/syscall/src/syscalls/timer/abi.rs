@@ -16,17 +16,21 @@ use crate::{
 const TIMER_ABSTIME: u32 = 1;
 
 /// Linux-compatible `sigevent.sigev_notify` values, fixed by the Roxy personality.
-/// Roxy numbers notification types from a base above Linux's range, so a Linux-valued
-/// `sigev_notify` is reported as a foreign numbering instead of being silently honoured.
+/// Roxy numbers notification modes as independent bits from a base above Linux's range, mirroring
+/// the shape Linux's own set has (0, 1, 2, 4 — each its own bit). A combination of two modes is
+/// therefore not a mode and is reported, rather than being read as a third one; Linux's numbering
+/// below the base is another personality's.
+///
+/// These values are compared for equality everywhere; nothing tests them as a mask.
 const SIGEV_BASE: i32 = 1 << 8;
 const SIGEV_SIGNAL: i32 = SIGEV_BASE;
-const SIGEV_NONE: i32 = SIGEV_BASE + 1;
+const SIGEV_NONE: i32 = SIGEV_BASE << 1;
 /// `SIGEV_THREAD` is implemented entirely by the libc (which spawns a helper thread and
 /// translates it to `SIGEV_THREAD_ID`); the kernel never sees a raw one from a well-behaved
 /// libc.
 #[allow(dead_code)]
-const SIGEV_THREAD: i32 = SIGEV_BASE + 2;
-const SIGEV_THREAD_ID: i32 = SIGEV_BASE + 3;
+const SIGEV_THREAD: i32 = SIGEV_BASE << 2;
+const SIGEV_THREAD_ID: i32 = SIGEV_BASE << 3;
 
 /// The Roxy `itimerspec` record: two [`Timespec`] values (`it_interval`, `it_value`), layout per
 /// mlibc `bits/posix/posix_time.h`. Size 32, alignment 8.
@@ -166,6 +170,66 @@ pub(super) fn decode_event(event: Option<SigEvent>) -> Result<TimerEvent, Errno>
             Errno::Invalid,
         )),
     }
+}
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use roxy_signal::Signal;
+    use roxy_test::kernel_test;
+
+    use super::{
+        SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SigEvent, TimerEvent, decode_event,
+    };
+    use crate::errno::Errno;
+
+    fn event(notify: i32) -> SigEvent {
+        SigEvent {
+            sigev_value: 0,
+            sigev_notify: notify,
+            sigev_signo: i32::from(Signal::Alarm.number()),
+            sigev_notify_function: 0,
+            sigev_notify_attributes: 0,
+            sigev_notify_thread_id: 0,
+            _pad: [0; 4],
+        }
+    }
+
+    kernel_test!("roxy-syscall::sigev-modes", modes_are_independent_bits, {
+        assert_eq!(
+            decode_event(None),
+            Ok(TimerEvent::Signal {
+                signal: Signal::Alarm,
+                value: 0,
+            })
+        );
+        assert_eq!(decode_event(Some(event(SIGEV_NONE))), Ok(TimerEvent::None));
+        assert_eq!(
+            decode_event(Some(event(SIGEV_SIGNAL))),
+            Ok(TimerEvent::Signal {
+                signal: Signal::Alarm,
+                value: 0,
+            })
+        );
+
+        // A combination of two modes is not a mode of its own: it is reported instead of being
+        // read as whichever mode its bits happen to name.
+        assert_eq!(
+            decode_event(Some(event(SIGEV_NONE | SIGEV_THREAD))),
+            Err(Errno::Invalid)
+        );
+        assert_eq!(
+            decode_event(Some(event(SIGEV_THREAD | SIGEV_THREAD_ID))),
+            Err(Errno::Invalid)
+        );
+        // ... including one that would still hold `SIGEV_SIGNAL`'s bit.
+        assert_eq!(
+            decode_event(Some(event(SIGEV_SIGNAL | SIGEV_THREAD_ID))),
+            Err(Errno::Invalid)
+        );
+
+        // Linux's own numbering is another personality's.
+        assert_eq!(decode_event(Some(event(4))), Err(Errno::Invalid));
+    });
 }
 
 /// Maps a numeric signal to the matching [`Signal`].

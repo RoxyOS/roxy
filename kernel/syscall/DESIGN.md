@@ -290,7 +290,10 @@ The same rule covers every other value namespace this subsystem owns: the `lseek
 types, the `wait` option bits, and the `PROT_*` and `MAP_*` words. Each flag word gives every flag
 its own bit above a base, and each enumeration numbers from a base plus a small index; a value
 below the base is another personality's numbering, which the handler reports as foreign, and a
-value above it that no flag or arm defines is reported as an undefined request of our own. Bases
+value above it that no flag or arm defines is reported as an undefined request of our own.
+A selector whose modes are compared for equality may still give each mode its own bit, as
+`sigevent.sigev_notify` does: Linux's own set has that shape (0, 1, 2, 4), and consecutive indices
+would turn a combination of two modes into a third one that the handler would then honour. Bases
 are chosen per argument, not per family: a `dirfd` carries a descriptor plus one magic selector,
 which is negative so that no descriptor can hold it and which is not Linux's -100 so that Linux's
 selector is reported as another personality's, while the `AT_*` flags are a flag word with a base
