@@ -269,12 +269,13 @@ mod tests {
 
             process.queue_signal(pending(Signal::Terminate));
             process.queue_signal(pending(Signal::Interrupt));
+            process.set_thread_mask(
+                process.main_thread_id,
+                SignalSet::from_signal(Signal::Interrupt),
+            );
             assert_eq!(
-                process.set_thread_mask(
-                    process.main_thread_id,
-                    SignalSet::from_signal(Signal::Interrupt)
-                ),
-                SignalSet::empty()
+                process.masked_signals,
+                SignalSet::from_signal(Signal::Interrupt)
             );
 
             assert_eq!(
@@ -282,10 +283,10 @@ mod tests {
                 Some(pending(Signal::Terminate))
             );
             assert_eq!(process.take_latest_signal(), None);
-            assert_eq!(
-                process.set_thread_mask(process.main_thread_id, SignalSet::empty()),
-                SignalSet::from_signal(Signal::Interrupt)
-            );
+            assert!(!process.has_pending_signal());
+            process.set_thread_mask(process.main_thread_id, SignalSet::empty());
+            assert!(process.masked_signals.is_empty());
+            assert!(process.has_pending_signal());
             assert_eq!(
                 process.take_latest_signal(),
                 Some(pending(Signal::Interrupt))

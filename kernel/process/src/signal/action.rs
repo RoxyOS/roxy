@@ -86,7 +86,7 @@ impl Process {
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_memory::statistics;
-    use roxy_signal::{Signal, SignalSet};
+    use roxy_signal::Signal;
     use roxy_test::kernel_test;
     use roxy_thread::Thread;
     use roxy_vm::AddrSpace;
