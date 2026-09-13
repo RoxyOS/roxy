@@ -291,8 +291,10 @@ types, the `wait` option bits, and the `PROT_*` and `MAP_*` words. Each flag wor
 its own bit above a base, and each enumeration numbers from a base plus a small index; a value
 below the base is another personality's numbering, which the handler reports as foreign, and a
 value above it that no flag or arm defines is reported as an undefined request of our own. Bases
-are chosen per argument, not per family: `AT_FDCWD` is a `dirfd` while the `AT_*` flags are a flag
-word, so they are numbered independently and may share a value. A name only another personality
+are chosen per argument, not per family: a `dirfd` carries a descriptor plus one magic selector,
+which is negative so that no descriptor can hold it and which is not Linux's -100 so that Linux's
+selector is reported as another personality's, while the `AT_*` flags are a flag word with a base
+of its own. A name only another personality
 defines is removed from the Roxy headers instead of being mapped to ours: naming it is then a
 compile error, and passing its numeric value reaches the handler as an undefined bit and is
 reported. Two words cannot take a base above Linux's range at all — the `open` flag word and

@@ -18,10 +18,11 @@ pub(super) const SYNC_SYSCALL: Syscall = misc::SYNC_SYSCALL;
 pub(super) const FSYNC_SYSCALL: Syscall = misc::FSYNC_SYSCALL;
 pub(super) const FTRUNCATE_SYSCALL: Syscall = truncate::SYSCALL;
 
-/// Roxy numbers `dirfd` selectors from a base above Linux's range, so a Linux-valued selector —
-/// including its `AT_FDCWD` of -100 — is reported as a foreign numbering.
-const AT_BASE: i64 = 1 << 8;
-const AT_FDCWD: i64 = AT_BASE;
+/// Roxy's `dirfd` word is a descriptor plus one magic selector, not a numbered namespace: a
+/// descriptor is never negative, so the working directory is spelled as a negative value that no
+/// descriptor can hold. Linux's own selector (-100) and every other negative is another
+/// personality's numbering, which `require_cwd` reports as foreign.
+const AT_FDCWD: i64 = -0x200;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct DirectoryFd(i64);
@@ -82,4 +83,37 @@ fn map_vfs_error(error: VfsError) -> Errno {
 
 fn unsupported(operation: &str, argument: impl core::fmt::Display) -> Errno {
     crate::unsupported::unsupported_argument(operation, argument, Errno::NotSupported)
+}
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use roxy_test::kernel_test;
+
+    use super::{AT_FDCWD, DirectoryFd};
+    use crate::errno::Errno;
+
+    kernel_test!(
+        "roxy-syscall::at-fdcwd",
+        only_the_magic_selector_names_the_cwd,
+        {
+            assert_eq!(
+                DirectoryFd(AT_FDCWD).require_cwd("mkdirat.dirfd", "mkdirat.dirfd.foreign"),
+                Ok(())
+            );
+
+            // A descriptor stays a descriptor whatever its number: 0x100 is what a base-based
+            // numbering would have read as the working directory, and doing so would act on the wrong
+            // directory while reporting success.
+            assert_eq!(
+                DirectoryFd(0x100).require_cwd("mkdirat.dirfd", "mkdirat.dirfd.foreign"),
+                Err(Errno::NotSupported)
+            );
+
+            // Linux spells the working directory as -100, which is another personality's numbering.
+            assert_eq!(
+                DirectoryFd(-100).require_cwd("mkdirat.dirfd", "mkdirat.dirfd.foreign"),
+                Err(Errno::NotSupported)
+            );
+        }
+    );
 }
