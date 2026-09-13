@@ -163,3 +163,19 @@ The gap is marked with `TODO(missing-capability: no owned poll event word)` in
 `kernel/syscall/src/syscalls/poll/mod.rs`. Widening the field, or taking the event list as a record
 Roxy defines, would give the word a base above Linux's range and let `poll` report an undefined or
 foreign bit through the same path as every other flag word in this subsystem.
+
+## The timer clock and flag words keep Linux's numbering
+
+`timer_create` takes a `clockid_t` and `timer_settime` a flag word, and Roxy numbers the values it
+owns from a base above Linux's range. These two cannot: `CLOCK_REALTIME`, `CLOCK_MONOTONIC`, and
+`TIMER_ABSTIME` are defined by upstream mlibc's `options/ansi/include/time.h`, which this fork does
+not modify. The kernel therefore keeps Linux's numbering, and it reports a value it cannot serve
+without being able to say whether it came from Linux or from a caller asking for something of ours
+that does not exist. `timerfd`'s `TFD_TIMER_ABSTIME` has the same shape.
+
+The kernel reports every value it cannot serve through the centralized diagnostic rather than
+accepting it silently; only the origin of the value is lost. The gaps are marked with
+`TODO(missing-capability: no owned numbering for the timer clock word)` and
+`TODO(missing-capability: no owned numbering for the timer flags word)` in
+`kernel/syscall/src/syscalls/timer/abi.rs`. Roxy-owned headers carrying those ids, or a `clockid_t`
+the personality defines itself, would let the handlers separate the two cases.

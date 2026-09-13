@@ -300,10 +300,11 @@ selector is reported as another personality's, while the `AT_*` flags are a flag
 of its own. A name only another personality
 defines is removed from the Roxy headers instead of being mapped to ours: naming it is then a
 compile error, and passing its numeric value reaches the handler as an undefined bit and is
-reported. Two words cannot take a base above Linux's range at all — the `open` flag word and
-`pollfd.events`, whose widths are upstream mlibc's `int` and `short` — so they keep Linux's
-numbering, which leaves their handlers unable to tell a Linux value from one of ours; `ISSUES.md`
-records that and what closing it would take.
+reported. Two kinds of word cannot take a base at all and keep Linux's numbering, which leaves
+their handlers unable to tell a Linux value from one of ours: words whose width is upstream
+mlibc's — the `open` flag word and `pollfd.events`, an `int` and a `short` — and words upstream
+mlibc's headers define — the timer clock and its `TIMER_ABSTIME` flag in
+`options/ansi/include/time.h`. `ISSUES.md` records them and what closing each would take.
 
 `socketpair` is syscall 48 and accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero. It asks
 `roxy-unix-socket` to create the connected files, then owns descriptor insertion and the checked

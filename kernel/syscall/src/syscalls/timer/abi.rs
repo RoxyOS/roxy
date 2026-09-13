@@ -164,21 +164,28 @@ pub(super) fn decode_event(event: Option<SigEvent>) -> Result<TimerEvent, Errno>
                 thread_id,
             })
         }
-        _ => Err(crate::unsupported::unsupported_argument(
+        // Anything below the Roxy base is another personality's numbering: Linux numbers its own
+        // modes from 0.
+        value if value < SIGEV_BASE => Err(crate::unsupported::unsupported_argument(
+            "timer_create.sigev_notify.foreign",
+            value,
+            Errno::Invalid,
+        )),
+        value => Err(crate::unsupported::unsupported_argument(
             "timer_create.sigev_notify",
-            notify,
+            value,
             Errno::Invalid,
         )),
     }
 }
-
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_signal::Signal;
     use roxy_test::kernel_test;
 
     use super::{
-        SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SigEvent, TimerEvent, decode_event,
+        SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SigEvent, TIMER_ABSTIME,
+        TimerEvent, decode_event, is_absolute,
     };
     use crate::errno::Errno;
 
@@ -227,9 +234,20 @@ mod tests {
             Err(Errno::Invalid)
         );
 
-        // Linux's own numbering is another personality's.
+        // Linux's own numbering is another personality's: its `SIGEV_THREAD_ID` of 4 is below the
+        // base.
         assert_eq!(decode_event(Some(event(4))), Err(Errno::Invalid));
     });
+
+    kernel_test!(
+        "roxy-syscall::timer-setflags",
+        unsupported_bits_are_reported,
+        {
+            assert_eq!(is_absolute(0), Ok(false));
+            assert_eq!(is_absolute(TIMER_ABSTIME), Ok(true));
+            assert_eq!(is_absolute(TIMER_ABSTIME << 1), Err(Errno::Invalid));
+        }
+    );
 }
 
 /// Maps a numeric signal to the matching [`Signal`].
@@ -265,7 +283,13 @@ pub(super) fn deadline_from(clock: TimerClock, value: Duration, absolute: bool) 
     }
 }
 
-/// The `timer_create`/`timer_settime` clock id, matching `clock_get`'s Linux-compatible ids.
+/// The `timer_create`/`timer_settime` clock id.
+///
+/// mlibc's upstream `options/ansi/include/time.h` owns `CLOCK_*`, so this word keeps Linux's
+/// numbering and the handler cannot tell a Linux value from one of ours.
+///
+/// TODO(missing-capability: no owned numbering for the timer clock word): take the clock ids from
+/// a Roxy-owned header, so another personality's value is reported as foreign.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ClockId {
     Realtime,
@@ -337,11 +361,22 @@ pub(super) fn encode_timer_id(id: u32) -> TimerResult {
     TimerResult { id: u64::from(id) }
 }
 
-/// The `TIMER_ABSTIME` flag word for `timer_settime`.
-pub(super) const fn is_absolute(flags: u32) -> Result<bool, Errno> {
-    if flags & !TIMER_ABSTIME == 0 {
-        Ok(flags & TIMER_ABSTIME != 0)
-    } else {
-        Err(Errno::Invalid)
+/// The `TIMER_ABSTIME` flag word for `timer_settime`, whose bits other than `TIMER_ABSTIME` report
+/// through the centralized diagnostic.
+///
+/// The word is upstream mlibc's — `options/ansi/include/time.h` defines `TIMER_ABSTIME` — so it
+/// keeps Linux's numbering and this function cannot tell a Linux value from one of ours.
+///
+/// TODO(missing-capability: no owned numbering for the timer flags word): take the word from a
+/// Roxy-owned header, so another personality's value is reported as foreign.
+pub(super) fn is_absolute(flags: u32) -> Result<bool, Errno> {
+    if flags & !TIMER_ABSTIME != 0 {
+        return Err(crate::unsupported::unsupported_argument(
+            "timer_settime.flags",
+            flags,
+            Errno::Invalid,
+        ));
     }
+
+    Ok(flags & TIMER_ABSTIME != 0)
 }
