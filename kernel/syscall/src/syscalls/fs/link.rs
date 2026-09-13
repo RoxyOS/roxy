@@ -23,7 +23,7 @@ mod readlinkat {
     syscall!(SyscallNumber::Readlinkat, handle(dirfd: DirectoryFd => Invalid, path: Path => Fault, buffer: UserAddress => Fault, size: usize => Fault));
 
     fn handle(dirfd: DirectoryFd, path: Path, buffer: UserAddress, size: usize) -> SyscallResult {
-        dirfd.require_cwd("readlinkat.dirfd")?;
+        dirfd.require_cwd("readlinkat.dirfd", "readlinkat.dirfd.foreign")?;
 
         if size == 0 {
             return Err(Errno::Invalid);
@@ -59,8 +59,8 @@ mod linkat {
         if flags != 0 {
             return Err(unsupported("linkat.flags", flags));
         }
-        old_dirfd.require_cwd("linkat.old_dirfd")?;
-        new_dirfd.require_cwd("linkat.new_dirfd")?;
+        old_dirfd.require_cwd("linkat.old_dirfd", "linkat.old_dirfd.foreign")?;
+        new_dirfd.require_cwd("linkat.new_dirfd", "linkat.new_dirfd.foreign")?;
 
         roxy_vfs::hard_link(old_path.into_inner(), new_path.into_inner()).map_err(map_vfs_error)?;
 
@@ -74,7 +74,7 @@ mod symlinkat {
     syscall!(SyscallNumber::Symlinkat, handle(target: CString => Fault, dirfd: DirectoryFd => Invalid, link: Path => Fault));
 
     fn handle(target: CString, dirfd: DirectoryFd, link: Path) -> SyscallResult {
-        dirfd.require_cwd("symlinkat.dirfd")?;
+        dirfd.require_cwd("symlinkat.dirfd", "symlinkat.dirfd.foreign")?;
 
         roxy_vfs::symlink(target.into_inner(), link.into_inner()).map_err(map_vfs_error)?;
 
@@ -93,8 +93,8 @@ mod renameat {
         new_dirfd: DirectoryFd,
         new_path: Path,
     ) -> SyscallResult {
-        old_dirfd.require_cwd("renameat.old_dirfd")?;
-        new_dirfd.require_cwd("renameat.new_dirfd")?;
+        old_dirfd.require_cwd("renameat.old_dirfd", "renameat.old_dirfd.foreign")?;
+        new_dirfd.require_cwd("renameat.new_dirfd", "renameat.new_dirfd.foreign")?;
 
         roxy_vfs::rename(old_path.into_inner(), new_path.into_inner()).map_err(map_vfs_error)?;
 

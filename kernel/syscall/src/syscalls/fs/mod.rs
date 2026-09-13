@@ -27,11 +27,19 @@ const AT_FDCWD: i64 = AT_BASE;
 struct DirectoryFd(i64);
 
 impl DirectoryFd {
-    fn require_cwd(self, operation: &str) -> Result<(), Errno> {
-        if self.0 != AT_FDCWD {
-            return Err(unsupported(operation, self.0));
+    /// Accepts only the working-directory selector, reporting the caller's value through the
+    /// centralized diagnostic otherwise. `operation` names the argument for a descriptor Roxy
+    /// cannot serve yet and `foreign` for a negative selector, which is another personality's
+    /// numbering: Linux spells the working directory as -100.
+    fn require_cwd(self, operation: &str, foreign: &str) -> Result<(), Errno> {
+        if self.0 == AT_FDCWD {
+            return Ok(());
         }
-        Ok(())
+
+        Err(unsupported(
+            if self.0 < 0 { foreign } else { operation },
+            self.0,
+        ))
     }
 }
 
