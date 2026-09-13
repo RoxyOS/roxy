@@ -6,10 +6,18 @@ syscall!(SyscallNumber::Socket, handle(
     protocol: Protocol => Invalid
 ));
 
-const TYPE_MASK: u64 = 0xf;
-const TYPE_STREAM: u64 = 1;
-const FLAG_CLOEXEC: u64 = 0o2_000_000;
-const FLAG_NONBLOCK: u64 = 0o4000;
+/// The Roxy socket words follow `abi-bits/socket.h`: each is numbered from a base above its whole
+/// Linux range, every member Roxy defines but cannot serve is the family's marker, and a value
+/// below the base is another personality's numbering. `AF_INET`, `AF_INET6`, and `SOCK_DGRAM` keep
+/// values of their own because an upstream `switch` names them as cases.
+const AF_BASE: u64 = 0x100;
+const AF_UNSUPPORTED: u64 = 0x80;
+
+const SOCK_BASE: u64 = 1 << 20;
+const SOCK_TYPE_MASK: u64 = (SOCK_BASE << 3) - SOCK_BASE;
+const SOCK_UNSUPPORTED: u64 = 1 << 12;
+const SOCK_CLOEXEC: u64 = SOCK_BASE << 4;
+const SOCK_NONBLOCK: u64 = SOCK_BASE << 5;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Domain {
@@ -29,26 +37,34 @@ enum Protocol {
 impl SyscallArg for Domain {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
         match raw {
-            1 => Ok(Self::Unix),
-            _ => Err(unsupported("socket.domain", raw)),
+            AF_BASE => Ok(Self::Unix),
+            AF_UNSUPPORTED => Err(unsupported("socket.domain.unsupported", raw)),
+            value if value < AF_BASE => Err(unsupported("socket.domain.foreign", value)),
+            value => Err(unsupported("socket.domain", value)),
         }
     }
 }
 
 impl SyscallArg for SocketType {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
-        if raw & !(TYPE_MASK | FLAG_CLOEXEC | FLAG_NONBLOCK) != 0 {
-            return Err(unsupported("socket.flags", raw));
+        if raw == SOCK_UNSUPPORTED {
+            return Err(unsupported("socket.type.unsupported", raw));
         }
 
         // Descriptor flags are rejected with `EINVAL` rather than `ENOTSUP` because callers
         // such as libxcb retry without them exactly when `socket()` fails with `EINVAL`.
-        if raw & (FLAG_CLOEXEC | FLAG_NONBLOCK) != 0 {
+        if raw & (SOCK_CLOEXEC | SOCK_NONBLOCK) != 0 {
             return Err(unsupported("socket.descriptor-flags", raw));
         }
 
-        match raw & TYPE_MASK {
-            TYPE_STREAM => Ok(Self::Stream),
+        let foreign = raw & (SOCK_BASE - 1);
+
+        if foreign != 0 {
+            return Err(unsupported("socket.type.foreign", foreign));
+        }
+
+        match raw & SOCK_TYPE_MASK {
+            SOCK_BASE => Ok(Self::Stream),
             _ => Err(unsupported("socket.type", raw)),
         }
     }

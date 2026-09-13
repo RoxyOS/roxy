@@ -10,15 +10,38 @@ use crate::{
     syscall,
 };
 
+/// The Roxy socket-option words, numbered from bases above their Linux ranges; see
+/// `abi-bits/socket.h`. Linux's levels are its `IPPROTO_*` values (maximum 263) and its `SO_*`
+/// stop at 83, so both markers sit in unused space.
+const SOL_BASE: u64 = 1 << 10;
+const SOL_UNSUPPORTED: u64 = 1 << 9;
+const SO_BASE: u64 = 0x100;
+const SO_UNSUPPORTED: u64 = 0x80;
+const SO_TYPE: u64 = SO_BASE;
+const SO_ERROR: u64 = SO_BASE << 1;
+
 impl SyscallArg for SockoptLevel {
     fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
-        Self::from_raw(raw).ok_or_else(|| unsupported("getsockopt.level", raw, error))
+        match raw {
+            SOL_BASE => Ok(Self::Socket),
+            SOL_UNSUPPORTED => Err(unsupported("getsockopt.level.unsupported", raw, error)),
+            value if value < SOL_BASE => Err(unsupported("getsockopt.level.foreign", value, error)),
+            value => Err(unsupported("getsockopt.level", value, error)),
+        }
     }
 }
 
 impl SyscallArg for SockoptName {
     fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
-        Self::from_raw(raw).ok_or_else(|| unsupported("getsockopt.optname", raw, error))
+        match raw {
+            SO_TYPE => Ok(Self::Type),
+            SO_ERROR => Ok(Self::Error),
+            SO_UNSUPPORTED => Err(unsupported("getsockopt.optname.unsupported", raw, error)),
+            value if value < SO_BASE => {
+                Err(unsupported("getsockopt.optname.foreign", value, error))
+            }
+            value => Err(unsupported("getsockopt.optname", value, error)),
+        }
     }
 }
 

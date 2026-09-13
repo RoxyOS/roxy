@@ -89,12 +89,18 @@ impl ParsedMsgHdr {
 
 // ── Flags ──────────────────────────────────────────────────────────────────
 
+/// The Roxy message-flag word, numbered from a base above Linux's range, whose bits fill 0-15 and
+/// 26 (`MSG_ZEROCOPY`); every flag Roxy defines but cannot serve is the header's marker. See
+/// `abi-bits/socket.h`.
+const MSG_BASE: u32 = 1 << 27;
+const MSG_UNSUPPORTED: u32 = 1 << 16;
+
 bitflags! {
     /// Flags recognised by `recvmsg`/`sendmsg` (`MSG_*` constants).
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub(crate) struct MsgFlags: u32 {
-        const DONTWAIT = 0x40;
-        const NOSIGNAL = 0x4000;
+        const DONTWAIT = MSG_BASE;
+        const NOSIGNAL = MSG_BASE << 1;
     }
 }
 
@@ -104,6 +110,18 @@ impl SyscallArg for MsgFlags {
         // bits to obtain the true value.
         #[allow(clippy::cast_possible_truncation)]
         let raw = raw as u32;
+        if raw == MSG_UNSUPPORTED {
+            return Err(unsupported("msg.flags.unsupported", u64::from(raw)));
+        }
+
+        // Anything below the Roxy base is another personality's numbering: Linux numbers its own
+        // flags from bit 0.
+        let foreign = raw & (MSG_BASE - 1);
+
+        if foreign != 0 {
+            return Err(unsupported("msg.flags.foreign", u64::from(foreign)));
+        }
+
         let unknown = raw & !Self::all().bits();
 
         if unknown != 0 {

@@ -29,17 +29,6 @@ pub enum SockoptLevel {
     Socket,
 }
 
-impl SockoptLevel {
-    /// Decodes the raw `level` argument of `getsockopt(2)` (`SOL_SOCKET`=1).
-    #[must_use]
-    pub const fn from_raw(raw: u64) -> Option<Self> {
-        match raw {
-            1 => Some(Self::Socket),
-            _ => None,
-        }
-    }
-}
-
 /// A socket option name at the [`SockoptLevel::Socket`] level.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SockoptName {
@@ -47,18 +36,6 @@ pub enum SockoptName {
     Type,
     /// The pending socket error (`SO_ERROR`).
     Error,
-}
-
-impl SockoptName {
-    /// Decodes the raw `optname` argument of `getsockopt(2)` (`SO_TYPE`=3, `SO_ERROR`=4).
-    #[must_use]
-    pub const fn from_raw(raw: u64) -> Option<Self> {
-        match raw {
-            3 => Some(Self::Type),
-            4 => Some(Self::Error),
-            _ => None,
-        }
-    }
 }
 
 /// Socket-specific operations exposed by file objects that can act as sockets.
