@@ -75,7 +75,10 @@ fn classify_family(family: u64) -> FamilyVerdict {
         return FamilyVerdict::Unsupported;
     }
 
-    if family & (u64::from(AF_UNIX) - 1) != 0 {
+    // The word is an enumeration numbered from the base, so its own values sit at or above it and
+    // a range test is what separates another personality's numbering from ours: Linux's families
+    // are below the base, while a value above it that no family defines stays ours to report.
+    if family < u64::from(AF_UNIX) {
         return FamilyVerdict::Foreign;
     }
 

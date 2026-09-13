@@ -58,10 +58,18 @@ impl SyscallArg for SocketType {
             return Err(unsupported("socket.descriptor-flags", raw));
         }
 
-        let foreign = raw & (SOCK_BASE - 1);
+        // Anything below the base is another personality's numbering — Linux puts its type in bits
+        // 0-3 and its descriptor flags in bits 11 and 19 — and anything this word does not define,
+        // above the type field or beside it, is a request of ours that no flag names. Both are
+        // reported; neither may pass through unread.
+        if raw < SOCK_BASE {
+            return Err(unsupported("socket.type.foreign", raw));
+        }
 
-        if foreign != 0 {
-            return Err(unsupported("socket.type.foreign", foreign));
+        let unknown = raw & !(SOCK_TYPE_MASK | SOCK_CLOEXEC | SOCK_NONBLOCK);
+
+        if unknown != 0 {
+            return Err(unsupported("socket.type.unknown", unknown));
         }
 
         match raw & SOCK_TYPE_MASK {
@@ -127,22 +135,26 @@ mod tests {
         }
     );
 
-    kernel_test!("roxy-syscall::socket-family", classifies_the_family_word, {
-        assert_eq!(classify_family(u64::from(AF_UNIX)), FamilyVerdict::Served);
-        assert_eq!(
-            classify_family(u64::from(AF_UNSUPPORTED)),
-            FamilyVerdict::Unsupported
-        );
-        assert_eq!(
-            classify_family(u64::from(AF_INET)),
-            FamilyVerdict::Unsupported
-        );
-        assert_eq!(classify_family(1), FamilyVerdict::Foreign);
-        assert_eq!(
-            classify_family(u64::from(AF_UNIX) + 4),
-            FamilyVerdict::Undefined
-        );
-    });
+    kernel_test!(
+        "roxy-syscall::socket-arguments",
+        classifies_the_family_word,
+        {
+            assert_eq!(classify_family(u64::from(AF_UNIX)), FamilyVerdict::Served);
+            assert_eq!(
+                classify_family(u64::from(AF_UNSUPPORTED)),
+                FamilyVerdict::Unsupported
+            );
+            assert_eq!(
+                classify_family(u64::from(AF_INET)),
+                FamilyVerdict::Unsupported
+            );
+            assert_eq!(classify_family(1), FamilyVerdict::Foreign);
+            assert_eq!(
+                classify_family(u64::from(AF_UNIX) + 4),
+                FamilyVerdict::Undefined
+            );
+        }
+    );
 
     kernel_test!(
         "roxy-syscall::socket-arguments",
