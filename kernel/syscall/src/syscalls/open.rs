@@ -112,6 +112,11 @@ impl OpenRequest {
 }
 
 impl SyscallArg for OpenFlags {
+    // The word is upstream mlibc's `int` and Linux already uses its bits up to 25, so no base
+    // above Linux's range fits beside the eight flags Roxy supports: the word keeps Linux's
+    // numbering and this handler cannot tell a Linux value from one of ours.
+    // TODO(missing-capability: no owned numbering for the open flag word): widen the word, or take
+    // the flags as a record Roxy defines, so a foreign value can be reported as such.
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
         let unknown = raw & !Self::all().bits();
 

@@ -13,12 +13,14 @@ use crate::{
 pub(super) const MKDIRAT_SYSCALL: Syscall = mkdirat::SYSCALL;
 pub(super) const UNLINKAT_SYSCALL: Syscall = unlinkat::SYSCALL;
 
-const AT_REMOVEDIR: u64 = 0x200;
+/// Roxy numbers `AT_*` flags from a base above Linux's range, so a Linux-valued flag is reported
+/// as a foreign numbering instead of being silently honoured.
+const AT_FLAGS_BASE: u64 = 1 << 9;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     struct UnlinkFlags: u64 {
-        const REMOVE_DIR = AT_REMOVEDIR;
+        const REMOVE_DIR = AT_FLAGS_BASE << 1;
     }
 }
 
@@ -27,7 +29,11 @@ impl SyscallArg for UnlinkFlags {
         let unknown = raw & !Self::all().bits();
 
         if unknown != 0 {
-            return Err(Errno::Invalid);
+            return Err(crate::unsupported::unsupported_argument(
+                "unlinkat.flags.unknown",
+                unknown,
+                Errno::Invalid,
+            ));
         }
 
         Ok(Self::from_bits_retain(raw))

@@ -36,16 +36,20 @@ mod tests {
     use super::MemoryProtection;
 
     kernel_test!("roxy-syscall::vm-protect-modes", protection_modes, {
+        let read = MemoryProtection::READ.bits();
+        let write = MemoryProtection::WRITE.bits();
+        let execute = MemoryProtection::EXECUTE.bits();
+
         assert_eq!(
-            MemoryProtection::parse_permissions(0x1),
+            MemoryProtection::parse_permissions(read),
             Ok(Permissions::ReadOnly)
         );
         assert_eq!(
-            MemoryProtection::parse_permissions(0x3),
+            MemoryProtection::parse_permissions(read | write),
             Ok(Permissions::ReadWrite)
         );
         assert_eq!(
-            MemoryProtection::parse_permissions(0x5),
+            MemoryProtection::parse_permissions(read | execute),
             Ok(Permissions::ReadExecute)
         );
     });

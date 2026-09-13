@@ -63,6 +63,13 @@ struct PollFdAbi {
     // Which fd do you wanna poll
     fd: i32,
     // What event do you wanna poll
+    //
+    // The field is upstream mlibc's `short` and Linux already uses its bits up to 13, so no base
+    // above Linux's range fits: the word keeps Linux's numbering, and `poll` neither tells a Linux
+    // value from one of ours nor reports the bits it cannot serve.
+    // TODO(missing-capability: no owned poll event word): widen the field, or take the event list
+    // as a record Roxy defines, so an undefined or foreign bit is reported like every other flag
+    // word in this subsystem.
     events: i16,
     // What event happened (Filled by kernel)
     revents: i16,

@@ -16,14 +16,17 @@ use crate::{
 const TIMER_ABSTIME: u32 = 1;
 
 /// Linux-compatible `sigevent.sigev_notify` values, fixed by the Roxy personality.
-const SIGEV_SIGNAL: i32 = 0;
-const SIGEV_NONE: i32 = 1;
+/// Roxy numbers notification types from a base above Linux's range, so a Linux-valued
+/// `sigev_notify` is reported as a foreign numbering instead of being silently honoured.
+const SIGEV_BASE: i32 = 1 << 8;
+const SIGEV_SIGNAL: i32 = SIGEV_BASE;
+const SIGEV_NONE: i32 = SIGEV_BASE + 1;
 /// `SIGEV_THREAD` is implemented entirely by the libc (which spawns a helper thread and
 /// translates it to `SIGEV_THREAD_ID`); the kernel never sees a raw one from a well-behaved
 /// libc.
 #[allow(dead_code)]
-const SIGEV_THREAD: i32 = 2;
-const SIGEV_THREAD_ID: i32 = 4;
+const SIGEV_THREAD: i32 = SIGEV_BASE + 2;
+const SIGEV_THREAD_ID: i32 = SIGEV_BASE + 3;
 
 /// The Roxy `itimerspec` record: two [`Timespec`] values (`it_interval`, `it_value`), layout per
 /// mlibc `bits/posix/posix_time.h`. Size 32, alignment 8.

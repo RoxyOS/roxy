@@ -18,7 +18,10 @@ pub(super) const SYNC_SYSCALL: Syscall = misc::SYNC_SYSCALL;
 pub(super) const FSYNC_SYSCALL: Syscall = misc::FSYNC_SYSCALL;
 pub(super) const FTRUNCATE_SYSCALL: Syscall = truncate::SYSCALL;
 
-const AT_FDCWD: i64 = -100;
+/// Roxy numbers `dirfd` selectors from a base above Linux's range, so a Linux-valued selector —
+/// including its `AT_FDCWD` of -100 — is reported as a foreign numbering.
+const AT_BASE: i64 = 1 << 8;
+const AT_FDCWD: i64 = AT_BASE;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct DirectoryFd(i64);
@@ -28,7 +31,6 @@ impl DirectoryFd {
         if self.0 != AT_FDCWD {
             return Err(unsupported(operation, self.0));
         }
-
         Ok(())
     }
 }

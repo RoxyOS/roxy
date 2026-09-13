@@ -285,6 +285,21 @@ bit above `ACCESS_BASE`, and a word below the base is another personality's numb
 handler reports as foreign. The rights themselves stay ABI-neutral: the handler decodes the word
 into the VFS's `AccessMode` list, and the VFS never sees the encoding.
 
+The same rule covers every other value namespace this subsystem owns: the `lseek` whences, the
+`AT_FDCWD` selector and `AT_*` flags, the `sigprocmask` operations, the `sigevent` notification
+types, the `wait` option bits, and the `PROT_*` and `MAP_*` words. Each flag word gives every flag
+its own bit above a base, and each enumeration numbers from a base plus a small index; a value
+below the base is another personality's numbering, which the handler reports as foreign, and a
+value above it that no flag or arm defines is reported as an undefined request of our own. Bases
+are chosen per argument, not per family: `AT_FDCWD` is a `dirfd` while the `AT_*` flags are a flag
+word, so they are numbered independently and may share a value. A name only another personality
+defines is removed from the Roxy headers instead of being mapped to ours: naming it is then a
+compile error, and passing its numeric value reaches the handler as an undefined bit and is
+reported. Two words cannot take a base above Linux's range at all — the `open` flag word and
+`pollfd.events`, whose widths are upstream mlibc's `int` and `short` — so they keep Linux's
+numbering, which leaves their handlers unable to tell a Linux value from one of ours; `ISSUES.md`
+records that and what closing it would take.
+
 `socketpair` is syscall 48 and accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero. It asks
 `roxy-unix-socket` to create the connected files, then owns descriptor insertion and the checked
 copy of the descriptor pair to userspace.

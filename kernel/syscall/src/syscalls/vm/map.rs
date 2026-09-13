@@ -92,13 +92,17 @@ struct VmMapArguments {
     offset: u64,
 }
 
+/// Roxy numbers `mmap` flags from a base above Linux's whole flag range, whose highest is
+/// `MAP_FIXED_NOREPLACE` at bit 20, so no Linux bit can alias one of ours.
+const MAP_FLAGS_BASE: u64 = 1 << 21;
+
 bitflags! {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     struct MapFlags: u64 {
-        const SHARED = 0x1;
-        const PRIVATE = 0x2;
-        const FIXED = 0x10;
-        const ANONYMOUS = 0x20;
+        const SHARED = MAP_FLAGS_BASE;
+        const PRIVATE = MAP_FLAGS_BASE << 1;
+        const FIXED = MAP_FLAGS_BASE << 2;
+        const ANONYMOUS = MAP_FLAGS_BASE << 3;
     }
 }
 
@@ -144,6 +148,13 @@ impl VmMapArguments {
 
 impl SyscallArg for MapFlags {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
+        // Anything below the Roxy base is another personality's numbering.
+        let foreign = raw & (MAP_FLAGS_BASE - 1);
+
+        if foreign != 0 {
+            return Err(unsupported("vm_map.flags.foreign", foreign));
+        }
+
         let flags = Self::from_bits_retain(raw);
         let unknown = raw & !Self::all().bits();
 

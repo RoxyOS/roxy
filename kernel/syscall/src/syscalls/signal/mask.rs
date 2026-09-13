@@ -8,6 +8,14 @@ use crate::{
 
 use roxy_signal::SignalSet;
 
+/// Roxy numbers mask operations from a base above Linux's range, so a Linux-valued `how` is
+/// reported as a foreign numbering instead of being silently honoured.
+const MASK_HOW_BASE: u64 = 1 << 8;
+
+const MASK_BLOCK: u64 = MASK_HOW_BASE;
+const MASK_UNBLOCK: u64 = MASK_HOW_BASE + 1;
+const MASK_SETMASK: u64 = MASK_HOW_BASE + 2;
+
 #[derive(Clone, Copy)]
 enum SignalMaskHow {
     Block,
@@ -16,12 +24,21 @@ enum SignalMaskHow {
 }
 
 impl SyscallArg for SignalMaskHow {
-    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
         match raw {
-            0 => Ok(Self::Block),
-            1 => Ok(Self::Unblock),
-            2 => Ok(Self::SetMask),
-            _ => Err(error),
+            MASK_BLOCK => Ok(Self::Block),
+            MASK_UNBLOCK => Ok(Self::Unblock),
+            MASK_SETMASK => Ok(Self::SetMask),
+            value if value < MASK_HOW_BASE => Err(crate::unsupported::unsupported_argument(
+                "sigprocmask.how.foreign",
+                value,
+                Errno::Invalid,
+            )),
+            value => Err(crate::unsupported::unsupported_argument(
+                "sigprocmask.how",
+                value,
+                Errno::Invalid,
+            )),
         }
     }
 }

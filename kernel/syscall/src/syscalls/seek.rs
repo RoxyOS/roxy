@@ -5,14 +5,20 @@ use crate::{SyscallResult, args::SyscallArg, errno::Errno, numbers::SyscallNumbe
 
 syscall!(SyscallNumber::Seek, handle(fd: Fd => BadFd, offset: i64, whence: SeekWhence => Invalid));
 
+/// Roxy numbers `whence` from a base above Linux's range, so a Linux-valued `whence` is
+/// reported as a foreign numbering instead of being silently honoured.
+const SEEK_BASE: u64 = 1 << 8;
+
+const SEEK_SET: u64 = SEEK_BASE;
+const SEEK_CURRENT: u64 = SEEK_BASE + 1;
+const SEEK_END: u64 = SEEK_BASE + 2;
+
 #[repr(u64)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SeekWhence {
-    Set = 0,
-    Current = 1,
-    End = 2,
-    Data = 3,
-    Hole = 4,
+    Set = SEEK_SET,
+    Current = SEEK_CURRENT,
+    End = SEEK_END,
 }
 
 impl SeekWhence {
@@ -23,24 +29,26 @@ impl SeekWhence {
                 .map_err(|_| Errno::Invalid),
             Self::Current => Ok(SeekFrom::Current(offset)),
             Self::End => Ok(SeekFrom::End(offset)),
-            Self::Data | Self::Hole => Err(crate::unsupported::unsupported_argument(
-                "seek.whence",
-                self as u64,
-                Errno::NotSupported,
-            )),
         }
     }
 }
 
 impl SyscallArg for SeekWhence {
-    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
         match raw {
-            0 => Ok(Self::Set),
-            1 => Ok(Self::Current),
-            2 => Ok(Self::End),
-            3 => Ok(Self::Data),
-            4 => Ok(Self::Hole),
-            _ => Err(error),
+            SEEK_SET => Ok(Self::Set),
+            SEEK_CURRENT => Ok(Self::Current),
+            SEEK_END => Ok(Self::End),
+            value if value < SEEK_BASE => Err(crate::unsupported::unsupported_argument(
+                "seek.whence.foreign",
+                value,
+                Errno::Invalid,
+            )),
+            value => Err(crate::unsupported::unsupported_argument(
+                "seek.whence",
+                value,
+                Errno::Invalid,
+            )),
         }
     }
 }

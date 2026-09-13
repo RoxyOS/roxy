@@ -134,3 +134,32 @@ terminal and, for user programs, in the terminal's own buffered state).
 The gap is marked with `TODO(missing-capability: console-text-model)` in
 `kernel/fbterm/src/screen.rs`. A console that owns a cell grid and a redraw path could repaint its
 own content on release, the way a Linux VT restores its text buffer, instead of clearing.
+
+## The `open` flag word keeps Linux's numbering
+
+Roxy numbers the flags it owns from a base above Linux's range, so a handler can tell another
+personality's value from one of its own. The `open` flag word cannot: it is upstream mlibc's
+`int`, Linux already uses its bits up to 25, and Roxy supports eight flags plus the two-bit access
+mode, so no base above Linux's range fits beside them. The word therefore keeps Linux's numbering,
+and `open.flags` reports an undefined bit as unsupported without being able to say whether it came
+from Linux or from a caller asking for something of ours that does not exist.
+
+The kernel reports the undefined bit rather than accepting it silently, which keeps the caller's
+request visible; only the origin of the value is lost. The gap is marked with
+`TODO(missing-capability: no owned numbering for the open flag word)` in
+`kernel/syscall/src/syscalls/open.rs`. A wider word, or a request record Roxy defines itself, would
+let the handler separate the two cases.
+
+## `poll` ignores undefined event bits
+
+`pollfd.events` is upstream mlibc's `short` and Linux already uses its bits up to 13, so the field
+has no room for a base above Linux's range and keeps Linux's numbering. On top of that, `poll`
+never inspects the requested bits at all: it reads the mask, answers from the descriptors it names,
+and ignores everything else. A caller that asks for an event Roxy cannot report therefore waits
+for something that will never wake it, and no diagnostic says so, which is the case the
+centralized unsupported path exists to make visible.
+
+The gap is marked with `TODO(missing-capability: no owned poll event word)` in
+`kernel/syscall/src/syscalls/poll/mod.rs`. Widening the field, or taking the event list as a record
+Roxy defines, would give the word a base above Linux's range and let `poll` report an undefined or
+foreign bit through the same path as every other flag word in this subsystem.

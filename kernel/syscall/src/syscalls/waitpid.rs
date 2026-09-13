@@ -11,9 +11,13 @@ use crate::{
 
 syscall!(SyscallNumber::Waitpid, handle(target: WaitTarget => Invalid, status: Nullable<Out<u32>> => Fault, options: WaitOptions => Invalid, rusage: u64));
 
-const WNOHANG: u64 = 1;
-const WUNTRACED: u64 = 2;
-const WCONTINUED: u64 = 8;
+/// Roxy numbers `waitpid` option bits from a base above Linux's *whole* option range, whose
+/// highest is `WNOWAIT` at bit 24, so no Linux bit can alias one of ours.
+const WAIT_OPTIONS_BASE: u64 = 1 << 25;
+
+const WNOHANG: u64 = WAIT_OPTIONS_BASE;
+const WUNTRACED: u64 = WAIT_OPTIONS_BASE << 1;
+const WCONTINUED: u64 = WAIT_OPTIONS_BASE << 2;
 
 /// Linux `waitpid` option bits, validated against the `WNOHANG`/`WUNTRACED`/`WCONTINUED`
 /// constants above.
@@ -108,6 +112,17 @@ impl SyscallArg for WaitTarget {
 
 impl SyscallArg for WaitOptions {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
+        // Anything below the Roxy base is another personality's numbering: Linux numbers its
+        // option bits from 0, so a Linux-valued word lands entirely in the foreign zone.
+        let foreign = raw & (WAIT_OPTIONS_BASE - 1);
+        if foreign != 0 {
+            return Err(unsupported_argument(
+                "waitpid.options.foreign",
+                foreign,
+                Errno::NotSupported,
+            ));
+        }
+
         let unknown = raw & !(WNOHANG | WUNTRACED | WCONTINUED);
         if unknown != 0 {
             return Err(unsupported_argument(
