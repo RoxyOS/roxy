@@ -301,9 +301,15 @@ undefined request of ours. The marker is recognised as a bit, so a caller that O
 supported value is still read as asking for something Roxy cannot serve. Three names keep values of
 their own instead: upstream mlibc's switches name `AF_INET`, `AF_INET6`, and `SOCK_DGRAM` as cases,
 and duplicate case labels would not compile, so they cannot collapse onto the marker — they are
-reported as unsupported all the same. Because two arguments carry `socket`'s family word — the
-`socket` domain and the `sockaddr_un` record — one classifier (`classify_family`) judges both, so
-the two can neither drift apart in value nor disagree in diagnosis. Bases
+reported as unsupported all the same. A word may have more than one carrier — `socket`'s family is
+judged for both the `socket` domain and the `sockaddr_un` record, and the domain, type, and
+protocol are shared with `socketpair` — so the judgement lives with the word, not with one syscall,
+and its carriers cannot drift apart. Note the trade-off the marker's bit test accepts: a value from
+another personality that happens to set the marker's bit is reported as unsupported rather than as
+foreign. Linux cannot do so — its families stop at 46, its `SO_*` at 83, its `IPPROTO_*` at 263,
+its message flags fill bits 0-15 and 26, its socket types bits 0-3, 11, and 19, and its signal
+flags bits 1, 2, 4, and 24-31 — while `fcntl`, whose marker can collide, compares for equality
+instead. Bases
 are chosen per argument, not per family: a `dirfd` carries a descriptor plus one magic selector,
 which is negative so that no descriptor can hold it and which is not Linux's -100 so that Linux's
 selector is reported as another personality's, while the `AT_*` flags are a flag word with a base

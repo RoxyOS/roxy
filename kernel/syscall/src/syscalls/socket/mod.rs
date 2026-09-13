@@ -35,6 +35,11 @@ pub(super) const SENDMSG_SYSCALL: crate::Syscall = sendmsg::SYSCALL;
 
 pub(super) use super::iovec::map_file_error;
 
+/// The socket argument words live with the `socket` syscall and are shared with `socketpair`, which
+/// takes the same domain, type, and protocol; re-exported so the sibling module can judge them the
+/// same way instead of keeping a copy that drifts.
+pub(in crate::syscalls) use create::{Domain, Protocol, SocketType};
+
 /// The Roxy `AF_*` values this subsystem judges, in one place and in the family field's own width,
 /// because two arguments carry the family: the `socket(2)` domain and the `sockaddr_un.sun_family`
 /// field. Numbered from a base above Linux's family range (`PF_MAX` 46), with the header's marker

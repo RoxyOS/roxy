@@ -18,18 +18,21 @@ const SOCK_DGRAM: u64 = SOCK_BASE + 1;
 const SOCK_CLOEXEC: u64 = SOCK_BASE << 4;
 const SOCK_NONBLOCK: u64 = SOCK_BASE << 5;
 
+/// The socket argument words. `socketpair` takes the same domain, type, and protocol, so both
+/// syscalls judge them here rather than in a copy of their own: one judgement means the two cannot
+/// drift apart in value or in diagnosis.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Domain {
+pub(in crate::syscalls) enum Domain {
     Unix,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SocketType {
+pub(in crate::syscalls) enum SocketType {
     Stream,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Protocol {
+pub(in crate::syscalls) enum Protocol {
     Default,
 }
 

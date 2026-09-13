@@ -1,12 +1,7 @@
 use roxy_unix_socket::stream;
 
-use crate::{
-    SyscallResult,
-    args::{Out, SyscallArg},
-    errno::Errno,
-    numbers::SyscallNumber,
-    syscall,
-};
+use super::socket::{Domain, Protocol, SocketType};
+use crate::{SyscallResult, args::Out, errno::Errno, numbers::SyscallNumber, syscall};
 
 syscall!(SyscallNumber::Socketpair, handle(
     domain: Domain => Invalid,
@@ -14,48 +9,6 @@ syscall!(SyscallNumber::Socketpair, handle(
     protocol: Protocol => Invalid,
     output: Out<[i32; 2]> => Fault
 ));
-
-#[derive(Clone, Copy)]
-enum Domain {
-    Unix,
-}
-
-#[derive(Clone, Copy)]
-enum SocketType {
-    Stream,
-}
-
-#[derive(Clone, Copy)]
-enum Protocol {
-    Default,
-}
-
-impl SyscallArg for Domain {
-    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
-        match raw {
-            1 => Ok(Self::Unix),
-            _ => Err(unsupported("socketpair.domain", raw)),
-        }
-    }
-}
-
-impl SyscallArg for SocketType {
-    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
-        match raw {
-            1 => Ok(Self::Stream),
-            _ => Err(unsupported("socketpair.type", raw)),
-        }
-    }
-}
-
-impl SyscallArg for Protocol {
-    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
-        match raw {
-            0 => Ok(Self::Default),
-            _ => Err(unsupported("socketpair.protocol", raw)),
-        }
-    }
-}
 
 fn handle(
     domain: Domain,
@@ -96,8 +49,4 @@ fn handle(
 fn close_pair(first: roxy_fd::Fd, second: roxy_fd::Fd) {
     roxy_process::close_file(first).expect("new socket descriptor must remain open");
     roxy_process::close_file(second).expect("new socket descriptor must remain open");
-}
-
-fn unsupported(operation: &str, argument: u64) -> Errno {
-    crate::unsupported::unsupported_argument(operation, argument, Errno::NotSupported)
 }
