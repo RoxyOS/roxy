@@ -123,8 +123,19 @@ The mlibc recipe pins a commit and has `clean_workdirs=no` — the local clone l
 1. Commit in `distro/sources/mlibc-workdir` as one cohesive change per commit, subject form
    `roxy: <imperative summary>`. Do not amend/squash/rewrite fork history; never force-push the
    canonical fork.
-2. Push to the canonical `RoxyOS/mlibc` fork; verify the exact commit SHA is reachable before
-   touching the recipe.
+2. Push to the canonical `RoxyOS/mlibc` fork. The workdir is usually on a detached HEAD, where
+   `git push origin master` pushes the *local* `master` — still the previous commit — and prints
+   `Everything up-to-date`, a silent no-op. Read the branch first:
+
+   ```sh
+   git checkout master                       # or: git switch master
+   git merge --ff-only <new-sha>
+   git push origin master
+   git rev-parse HEAD origin/master          # both must print the new SHA
+   ```
+
+   Verify the exact commit SHA is reachable before touching the recipe. `Everything up-to-date`
+   is not evidence that the commit went out.
 3. Update `distro/recipes/mlibc/recipe` only after the commit is published: pin the immutable
    SHA and update `version` for the publication date. The version must represent this new
    upstream publication, not remain at the previous recipe version.
@@ -147,6 +158,11 @@ The mlibc recipe pins a commit and has `clean_workdirs=no` — the local clone l
 
 ## Gotchas
 
+- **A detached workdir turns the push into a no-op**: from a detached HEAD, `git push origin
+  master` pushes the local `master`, which still points at the previous commit, and reports
+  `Everything up-to-date` — indistinguishable from a successful push unless you compare SHAs.
+  Check out `master`, fast-forward it to the new commit, push, and confirm `git rev-parse HEAD`
+  equals `git rev-parse origin/master` before touching the recipe.
 - **Syscall ABI must match the kernel exactly**: numbers, arg order, and result struct layouts
   (that's why `syscall.h` has static_asserts — don't drop them).
 - mlibc build needs network at source-prep (`meson subprojects download` for `freestnd-c-hdrs`,
