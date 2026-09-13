@@ -22,20 +22,6 @@ pub enum ShutdownHow {
     RdWr,
 }
 
-impl ShutdownHow {
-    /// Decodes the raw `how` argument of the `shutdown(2)` ABI (`SHUT_RD`=0, `SHUT_WR`=1,
-    /// `SHUT_RDWR`=2).
-    #[must_use]
-    pub const fn from_raw(raw: u64) -> Option<Self> {
-        match raw {
-            0 => Some(Self::Rd),
-            1 => Some(Self::Wr),
-            2 => Some(Self::RdWr),
-            _ => None,
-        }
-    }
-}
-
 /// The protocol level of a `getsockopt` request (`SOL_SOCKET`).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SockoptLevel {
