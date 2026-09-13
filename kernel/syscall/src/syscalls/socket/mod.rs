@@ -35,12 +35,52 @@ pub(super) const SENDMSG_SYSCALL: crate::Syscall = sendmsg::SYSCALL;
 
 pub(super) use super::iovec::map_file_error;
 
-/// Roxy's `AF_UNIX`, numbered from a base above Linux's family range (`PF_MAX` 46) so that a Linux
-/// family is reported as another personality's numbering; the marker is the header's value for a
-/// family Roxy defines but cannot serve. See `abi-bits/socket.h`.
-const FAMILY_UNIX: u16 = 0x100;
-const FAMILY_UNSUPPORTED: u16 = 0x80;
+/// The Roxy `AF_*` values this subsystem judges, in one place and in the family field's own width,
+/// because two arguments carry the family: the `socket(2)` domain and the `sockaddr_un.sun_family`
+/// field. Numbered from a base above Linux's family range (`PF_MAX` 46), with the header's marker
+/// for a family Roxy defines but cannot serve. See `abi-bits/socket.h`.
+const AF_UNIX: u16 = 0x100;
+const AF_UNSUPPORTED: u16 = 0x80;
+const AF_INET: u16 = AF_UNIX + 1;
+const AF_INET6: u16 = AF_UNIX + 2;
 const FAMILY_LENGTH: usize = size_of::<u16>();
+
+/// How a family word relates to what this subsystem serves.
+///
+/// The four cases are what the diagnostic has to tell apart: a family this kernel serves, one the
+/// header defines but this kernel cannot serve, another personality's numbering, and a value of
+/// our own numbering that no family defines. The errno is the same for the last three, so the
+/// classification is also the unit a test can observe.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FamilyVerdict {
+    Served,
+    Unsupported,
+    Foreign,
+    Undefined,
+}
+
+fn classify_family(family: u64) -> FamilyVerdict {
+    if family == u64::from(AF_UNIX) {
+        return FamilyVerdict::Served;
+    }
+
+    // `AF_INET` and `AF_INET6` keep values of their own instead of the marker, because upstream
+    // mlibc switches on both and duplicate case labels would not compile; they are served no more
+    // than the marker is. The marker is a bit, so a caller that ORs it into a supported value is
+    // still read as asking for something Roxy cannot serve.
+    if family & u64::from(AF_UNSUPPORTED) != 0
+        || family == u64::from(AF_INET)
+        || family == u64::from(AF_INET6)
+    {
+        return FamilyVerdict::Unsupported;
+    }
+
+    if family & (u64::from(AF_UNIX) - 1) != 0 {
+        return FamilyVerdict::Foreign;
+    }
+
+    FamilyVerdict::Undefined
+}
 const PATH_MAX: usize = 108;
 
 /// The filesystem `sockaddr_un` record.
@@ -84,11 +124,11 @@ fn decode_socket_path(address: UserAddress, length: u64) -> Result<Vec<u8>, Errn
     let mut family = 0u16;
     unsafe { user_memory::read(address, &mut family) }?;
 
-    match family {
-        FAMILY_UNIX => {}
-        FAMILY_UNSUPPORTED => return Err(unsupported("socket.family.unsupported", family)),
-        value if value < FAMILY_UNIX => return Err(unsupported("socket.family.foreign", value)),
-        value => return Err(unsupported("socket.family", value)),
+    match classify_family(u64::from(family)) {
+        FamilyVerdict::Served => {}
+        FamilyVerdict::Unsupported => return Err(unsupported("socket.family.unsupported", family)),
+        FamilyVerdict::Foreign => return Err(unsupported("socket.family.foreign", family)),
+        FamilyVerdict::Undefined => return Err(unsupported("socket.family", family)),
     }
 
     // The path is an embedded byte string rather than a structured field, so it is copied as a
@@ -147,7 +187,7 @@ fn encode_socket_path(
 
     // SAFETY: u16 has a stable layout and every bit pattern is valid; the family field lies within
     // the validated writable range.
-    let family = FAMILY_UNIX;
+    let family = AF_UNIX;
     unsafe { user_memory::write(address, &family) }?;
 
     if let Some(path) = path {

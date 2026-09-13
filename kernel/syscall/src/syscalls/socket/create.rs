@@ -1,3 +1,4 @@
+use super::{FamilyVerdict, classify_family};
 use crate::{SyscallResult, args::SyscallArg, errno::Errno, numbers::SyscallNumber, syscall};
 
 syscall!(SyscallNumber::Socket, handle(
@@ -6,24 +7,13 @@ syscall!(SyscallNumber::Socket, handle(
     protocol: Protocol => Invalid
 ));
 
-/// The Roxy socket words follow `abi-bits/socket.h`: each is numbered from a base above its whole
-/// Linux range, every member Roxy defines but cannot serve is the family's marker, and a value
-/// below the base is another personality's numbering. `AF_INET`, `AF_INET6`, and `SOCK_DGRAM` keep
-/// values of their own because an upstream `switch` names them as cases.
-const AF_BASE: u64 = 0x100;
-const AF_UNSUPPORTED: u64 = 0x80;
-/// `AF_INET` and `AF_INET6` keep values of their own because upstream mlibc's `switch` statements
-/// name them as cases — collapsing them onto the marker would be a duplicate case label, and that
-/// header is not this fork's to edit — but they are served no more than the marker is, so they are
-/// reported the same way.
-const AF_INET: u64 = AF_BASE + 1;
-const AF_INET6: u64 = AF_BASE + 2;
-
+/// The Roxy socket-type word follows `abi-bits/socket.h`: `SOCK_STREAM` is the first value of a
+/// three-bit type field at the base, the two supported flags sit above the field, and a value below
+/// the base is another personality's numbering. `SOCK_DGRAM` keeps a value of its own because
+/// upstream mlibc's `switch` names it as a case, and is reported as unsupported all the same.
 const SOCK_BASE: u64 = 1 << 20;
 const SOCK_TYPE_MASK: u64 = (SOCK_BASE << 3) - SOCK_BASE;
 const SOCK_UNSUPPORTED: u64 = 1 << 12;
-/// `SOCK_DGRAM` takes a value of its own for the same reason `AF_INET` does, and is reported the
-/// same way.
 const SOCK_DGRAM: u64 = SOCK_BASE + 1;
 const SOCK_CLOEXEC: u64 = SOCK_BASE << 4;
 const SOCK_NONBLOCK: u64 = SOCK_BASE << 5;
@@ -45,20 +35,20 @@ enum Protocol {
 
 impl SyscallArg for Domain {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
-        match raw {
-            AF_BASE => Ok(Self::Unix),
-            AF_INET | AF_INET6 | AF_UNSUPPORTED => {
-                Err(unsupported("socket.domain.unsupported", raw))
-            }
-            value if value < AF_BASE => Err(unsupported("socket.domain.foreign", value)),
-            value => Err(unsupported("socket.domain", value)),
+        match classify_family(raw) {
+            FamilyVerdict::Served => Ok(Self::Unix),
+            FamilyVerdict::Unsupported => Err(unsupported("socket.domain.unsupported", raw)),
+            FamilyVerdict::Foreign => Err(unsupported("socket.domain.foreign", raw)),
+            FamilyVerdict::Undefined => Err(unsupported("socket.domain", raw)),
         }
     }
 }
 
 impl SyscallArg for SocketType {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
-        if raw == SOCK_UNSUPPORTED || raw == SOCK_DGRAM {
+        // The marker is a bit, so a caller that ORs it into a supported value is still recognised
+        // as asking for something Roxy cannot serve rather than as passing a foreign number.
+        if raw & SOCK_UNSUPPORTED != 0 || raw == SOCK_DGRAM {
             return Err(unsupported("socket.type.unsupported", raw));
         }
 
@@ -113,7 +103,11 @@ fn unsupported(operation: &str, argument: u64) -> Errno {
 mod tests {
     use roxy_test::kernel_test;
 
-    use super::{Domain, Protocol, SocketType};
+    use super::super::{AF_INET, AF_UNIX, AF_UNSUPPORTED, FamilyVerdict, classify_family};
+    use super::{
+        Domain, Protocol, SOCK_BASE, SOCK_CLOEXEC, SOCK_DGRAM, SOCK_NONBLOCK, SOCK_UNSUPPORTED,
+        SocketType,
+    };
     use crate::args::SyscallArg;
     use crate::errno::Errno;
 
@@ -121,19 +115,71 @@ mod tests {
         "roxy-syscall::socket-arguments",
         parses_supported_arguments,
         {
-            assert_eq!(Domain::parse(1, Errno::Invalid), Ok(Domain::Unix));
-            assert_eq!(SocketType::parse(1, Errno::Invalid), Ok(SocketType::Stream));
+            assert_eq!(
+                Domain::parse(u64::from(AF_UNIX), Errno::Invalid),
+                Ok(Domain::Unix)
+            );
+            assert_eq!(
+                SocketType::parse(SOCK_BASE, Errno::Invalid),
+                Ok(SocketType::Stream)
+            );
             assert_eq!(Protocol::parse(0, Errno::Invalid), Ok(Protocol::Default));
         }
     );
+
+    kernel_test!("roxy-syscall::socket-family", classifies_the_family_word, {
+        assert_eq!(classify_family(u64::from(AF_UNIX)), FamilyVerdict::Served);
+        assert_eq!(
+            classify_family(u64::from(AF_UNSUPPORTED)),
+            FamilyVerdict::Unsupported
+        );
+        assert_eq!(
+            classify_family(u64::from(AF_INET)),
+            FamilyVerdict::Unsupported
+        );
+        assert_eq!(classify_family(1), FamilyVerdict::Foreign);
+        assert_eq!(
+            classify_family(u64::from(AF_UNIX) + 4),
+            FamilyVerdict::Undefined
+        );
+    });
 
     kernel_test!(
         "roxy-syscall::socket-arguments",
         rejects_unsupported_arguments,
         {
-            assert_eq!(Domain::parse(2, Errno::Invalid), Err(Errno::Invalid));
+            // Anything below the bases is another personality's numbering: Linux spells the Unix
+            // family 1 and the stream type 1.
+            assert_eq!(Domain::parse(1, Errno::Invalid), Err(Errno::Invalid));
+            assert_eq!(SocketType::parse(1, Errno::Invalid), Err(Errno::Invalid));
             assert_eq!(Protocol::parse(6, Errno::Invalid), Err(Errno::Invalid));
-            assert_eq!(SocketType::parse(2, Errno::Invalid), Err(Errno::Invalid));
+
+            // The marker, and the three names that keep values of their own, are what the header
+            // offers a caller who wants something Roxy does not serve; each is refused whether it
+            // arrives alone or ORed into a supported value.
+            assert_eq!(
+                Domain::parse(u64::from(AF_UNSUPPORTED), Errno::Invalid),
+                Err(Errno::Invalid)
+            );
+            assert_eq!(
+                Domain::parse(u64::from(AF_INET), Errno::Invalid),
+                Err(Errno::Invalid)
+            );
+            assert_eq!(
+                Domain::parse(
+                    u64::from(AF_UNSUPPORTED) | u64::from(AF_UNIX),
+                    Errno::Invalid
+                ),
+                Err(Errno::Invalid)
+            );
+            assert_eq!(
+                SocketType::parse(SOCK_UNSUPPORTED | SOCK_BASE, Errno::Invalid),
+                Err(Errno::Invalid)
+            );
+            assert_eq!(
+                SocketType::parse(SOCK_DGRAM, Errno::Invalid),
+                Err(Errno::Invalid)
+            );
         }
     );
 
@@ -141,9 +187,9 @@ mod tests {
         "roxy-syscall::socket-arguments",
         rejects_descriptor_flags,
         {
-            let cloexec = 1 | 0o2_000_000;
-            let nonblocking = 1 | 0o4000;
-            let unknown_flag = 1 | (1 << 20);
+            let cloexec = SOCK_BASE | SOCK_CLOEXEC;
+            let nonblocking = SOCK_BASE | SOCK_NONBLOCK;
+            let unknown_flag = SOCK_BASE | (1 << 30);
 
             assert_eq!(
                 SocketType::parse(cloexec, Errno::Invalid),

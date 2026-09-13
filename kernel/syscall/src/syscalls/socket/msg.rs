@@ -110,7 +110,9 @@ impl SyscallArg for MsgFlags {
         // bits to obtain the true value.
         #[allow(clippy::cast_possible_truncation)]
         let raw = raw as u32;
-        if raw == MSG_UNSUPPORTED {
+        // The marker is a bit, so a caller that ORs it into a supported flag is still recognised as
+        // asking for something Roxy cannot serve rather than as passing a foreign number.
+        if raw & MSG_UNSUPPORTED != 0 {
             return Err(unsupported("msg.flags.unsupported", u64::from(raw)));
         }
 

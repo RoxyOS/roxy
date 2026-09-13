@@ -293,7 +293,17 @@ below the base is another personality's numbering, which the handler reports as 
 value above it that no flag or arm defines is reported as an undefined request of our own.
 A selector whose modes are compared for equality may still give each mode its own bit, as
 `sigevent.sigev_notify` does: Linux's own set has that shape (0, 1, 2, 4), and consecutive indices
-would turn a combination of two modes into a third one that the handler would then honour. Bases
+would turn a combination of two modes into a third one that the handler would then honour.
+A word also carries one `*_UNSUPPORTED` marker, which every member the header defines but this
+kernel cannot serve is given: the names stay, so ported sources compile, while passing one reaches
+the handler as the marker and is reported as unsupported rather than as a foreign number or as an
+undefined request of ours. The marker is recognised as a bit, so a caller that ORs it into a
+supported value is still read as asking for something Roxy cannot serve. Three names keep values of
+their own instead: upstream mlibc's switches name `AF_INET`, `AF_INET6`, and `SOCK_DGRAM` as cases,
+and duplicate case labels would not compile, so they cannot collapse onto the marker — they are
+reported as unsupported all the same. Because two arguments carry `socket`'s family word — the
+`socket` domain and the `sockaddr_un` record — one classifier (`classify_family`) judges both, so
+the two can neither drift apart in value nor disagree in diagnosis. Bases
 are chosen per argument, not per family: a `dirfd` carries a descriptor plus one magic selector,
 which is negative so that no descriptor can hold it and which is not Linux's -100 so that Linux's
 selector is reported as another personality's, while the `AT_*` flags are a flag word with a base

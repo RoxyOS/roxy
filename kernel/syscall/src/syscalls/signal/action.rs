@@ -13,7 +13,8 @@ use crate::{
 };
 /// Roxy numbers the `sigaction` flags from a base above Linux's own (its lowest are 1, 2, 4 and
 /// its highest fill bits 24-31), so a value below the base is another personality's numbering and
-/// every flag the header defines but this kernel cannot honour is its marker. See
+/// every flag the header defines but this kernel cannot honour is its marker — which is checked as
+/// a bit, so a caller that ORs it into a supported flag is still recognised. See
 /// `abi-bits/signal.h`.
 const SA_BASE: u64 = 1 << 8;
 const SA_UNSUPPORTED: u64 = 0x80;
@@ -99,7 +100,7 @@ fn decode(value: SigactionAbi) -> Result<SignalAction, Errno> {
     // The Roxy ABI defines `SA_SIGINFO` and `SA_RESTART`; the header gives every other flag it
     // defines one marker, and a value below the base is another personality's numbering. All three
     // cases are reported through the centralized diagnostic.
-    if value.flags == SA_UNSUPPORTED {
+    if value.flags & SA_UNSUPPORTED != 0 {
         return Err(unsupported_argument(
             "sigaction.flags.unsupported",
             value.flags,

@@ -22,10 +22,18 @@ const SO_ERROR: u64 = SO_BASE << 1;
 
 impl SyscallArg for SockoptLevel {
     fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        // The marker is a bit, so a caller that ORs it into a supported value is still recognised
+        // as asking for something Roxy cannot serve rather than as passing a foreign number.
+        if raw & SOL_UNSUPPORTED != 0 {
+            return Err(unsupported("getsockopt.level.unsupported", raw, error));
+        }
+
+        if raw < SOL_BASE {
+            return Err(unsupported("getsockopt.level.foreign", raw, error));
+        }
+
         match raw {
             SOL_BASE => Ok(Self::Socket),
-            SOL_UNSUPPORTED => Err(unsupported("getsockopt.level.unsupported", raw, error)),
-            value if value < SOL_BASE => Err(unsupported("getsockopt.level.foreign", value, error)),
             value => Err(unsupported("getsockopt.level", value, error)),
         }
     }
@@ -33,13 +41,17 @@ impl SyscallArg for SockoptLevel {
 
 impl SyscallArg for SockoptName {
     fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        if raw & SO_UNSUPPORTED != 0 {
+            return Err(unsupported("getsockopt.optname.unsupported", raw, error));
+        }
+
+        if raw < SO_BASE {
+            return Err(unsupported("getsockopt.optname.foreign", raw, error));
+        }
+
         match raw {
             SO_TYPE => Ok(Self::Type),
             SO_ERROR => Ok(Self::Error),
-            SO_UNSUPPORTED => Err(unsupported("getsockopt.optname.unsupported", raw, error)),
-            value if value < SO_BASE => {
-                Err(unsupported("getsockopt.optname.foreign", value, error))
-            }
             value => Err(unsupported("getsockopt.optname", value, error)),
         }
     }
