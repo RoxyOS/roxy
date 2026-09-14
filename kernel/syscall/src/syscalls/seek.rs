@@ -81,26 +81,51 @@ mod tests {
     use roxy_fd::SeekFrom;
     use roxy_test::kernel_test;
 
-    use super::SeekWhence;
+    use super::{SEEK_CURRENT, SEEK_END, SEEK_SET, SeekWhence};
     use crate::{args::SyscallArg, errno::Errno};
 
     kernel_test!("roxy-syscall::seek-positions", parses_standard_positions, {
         assert_eq!(
-            SeekWhence::parse(0, Errno::Invalid).unwrap().position(7),
+            SeekWhence::parse(SEEK_SET, Errno::Invalid)
+                .unwrap()
+                .position(7),
             Ok(SeekFrom::Start(7))
         );
         assert_eq!(
-            SeekWhence::parse(1, Errno::Invalid).unwrap().position(-2),
+            SeekWhence::parse(SEEK_CURRENT, Errno::Invalid)
+                .unwrap()
+                .position(-2),
             Ok(SeekFrom::Current(-2))
         );
         assert_eq!(
-            SeekWhence::parse(2, Errno::Invalid).unwrap().position(3),
+            SeekWhence::parse(SEEK_END, Errno::Invalid)
+                .unwrap()
+                .position(3),
             Ok(SeekFrom::End(3))
         );
         assert_eq!(
-            SeekWhence::parse(0, Errno::Invalid).unwrap().position(-1),
+            SeekWhence::parse(SEEK_SET, Errno::Invalid)
+                .unwrap()
+                .position(-1),
             Err(Errno::Invalid)
         );
-        assert_eq!(SeekWhence::parse(5, Errno::Invalid), Err(Errno::Invalid));
     });
+
+    kernel_test!(
+        "roxy-syscall::seek-whence",
+        separates_foreign_from_undefined,
+        {
+            // Linux numbers `SEEK_SET`, `SEEK_CUR`, and `SEEK_END` from zero, so every one of them
+            // is below the Roxy base and is another personality's numbering.
+            assert_eq!(SeekWhence::parse(0, Errno::Invalid), Err(Errno::Invalid));
+            assert_eq!(SeekWhence::parse(1, Errno::Invalid), Err(Errno::Invalid));
+            assert_eq!(SeekWhence::parse(2, Errno::Invalid), Err(Errno::Invalid));
+
+            // A value above the base that no position names is a request of ours.
+            assert_eq!(
+                SeekWhence::parse(SEEK_END + 1, Errno::Invalid),
+                Err(Errno::Invalid)
+            );
+        }
+    );
 }

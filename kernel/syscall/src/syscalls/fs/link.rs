@@ -1,6 +1,6 @@
 use roxy_memory::UserAddress;
 
-use super::{DirectoryFd, map_vfs_error, unsupported};
+use super::{AtFlags, DirectoryFd, map_vfs_error};
 use crate::{
     Syscall, SyscallResult,
     args::{CString, Path, Slice},
@@ -43,22 +43,20 @@ mod readlinkat {
 }
 
 mod linkat {
-    use super::{
-        DirectoryFd, Path, SyscallNumber, SyscallResult, map_vfs_error, syscall, unsupported,
-    };
+    use super::{AtFlags, DirectoryFd, Path, SyscallNumber, SyscallResult, map_vfs_error, syscall};
 
-    syscall!(SyscallNumber::Linkat, handle(old_dirfd: DirectoryFd => Invalid, old_path: Path => Fault, new_dirfd: DirectoryFd => Invalid, new_path: Path => Fault, flags: u64));
+    syscall!(SyscallNumber::Linkat, handle(old_dirfd: DirectoryFd => Invalid, old_path: Path => Fault, new_dirfd: DirectoryFd => Invalid, new_path: Path => Fault, flags: AtFlags => Invalid));
 
     fn handle(
         old_dirfd: DirectoryFd,
         old_path: Path,
         new_dirfd: DirectoryFd,
         new_path: Path,
-        flags: u64,
+        flags: AtFlags,
     ) -> SyscallResult {
-        if flags != 0 {
-            return Err(unsupported("linkat.flags", flags));
-        }
+        // The VFS links the source entry itself: it does not resolve a final symbolic link, so
+        // `AT_SYMLINK_FOLLOW` is a flag of the word this carrier cannot serve.
+        flags.require_only(AtFlags::empty(), "linkat.flags")?;
         old_dirfd.require_cwd("linkat.old_dirfd", "linkat.old_dirfd.foreign")?;
         new_dirfd.require_cwd("linkat.new_dirfd", "linkat.new_dirfd.foreign")?;
 

@@ -92,17 +92,31 @@ Path-based `stat` and `open` copy the userspace byte string before passing it to
 interface. The VFS leaves absolute paths independent of cwd and obtains the process-owned cwd
 through its registered provider only for relative paths. Syscall handlers do not duplicate path
 normalization or process-state lookup. `open` records `O_CLOEXEC` as a close-on-exec descriptor
-flag, which `execve` honors by closing those descriptors when replacing the image. Path-based
-`stat` accepts `AT_SYMLINK_NOFOLLOW` and uses the VFS link-metadata operation to report the final
-symbolic link instead of its target.
+flag, which `execve` honors by closing those descriptors when replacing the image.
+
+`stat` carries three targets — a path, a descriptor, and a directory selector plus a path — and a
+flag word. It reports a path through the VFS metadata operation, choosing link metadata when
+`AT_SYMLINK_NOFOLLOW` is set so the final symbolic link is reported instead of its target, and a
+descriptor through the FD object boundary. The directory-selector target is served only for
+`AT_FDCWD`, so `fstatat` against the working directory works while descriptor-relative resolution is
+reported as unsupported. Neither a target the word does not name nor a flag a target does not serve
+passes through unread: the descriptor target is told nothing about the path its descriptor was
+opened through, so it rejects every flag rather than dropping it.
 
 Filesystem mutation syscalls use the shared `Path` argument type, which copies the userspace
-string and rejects an empty path during argument parsing. The `mkdirat`, `unlinkat`, `readlinkat`,
-`linkat`, `symlinkat`, and `renameat` handlers currently accept only `AT_FDCWD`; descriptor-relative
-resolution remains unsupported and is reported through the centralized diagnostic path. `sync`
-delegates to the global VFS, while `fsync` resolves an open file and dispatches synchronization
-through the FD object boundary. `ftruncate` accepts a descriptor and a nonnegative Roxy `off_t`
-length, dispatches the length change through that boundary, and leaves the shared offset unchanged.
+string and rejects an empty path during argument parsing. The `dirfd` selector those handlers and
+`stat` carry, and the `AT_*` flag word they narrow, are one word each, owned by the `fs` module
+alongside the `*at` handlers so that a carrier cannot read the word by a numbering of its own;
+`stat` reaches both across the module boundary instead of keeping a copy. Each carrier then narrows
+the word to the flags it serves through the same check, which is also what keeps a flag Roxy defines
+but cannot serve distinct from another personality's numbering: `unlinkat` serves `AT_REMOVEDIR`, and
+`linkat` serves none of them, because the VFS links the source entry itself rather than resolving a
+final symbolic link. The `mkdirat`, `unlinkat`, `readlinkat`, `linkat`, `symlinkat`, and `renameat`
+handlers currently accept only `AT_FDCWD`; descriptor-relative resolution remains unsupported and is
+reported through the centralized diagnostic path. `sync` delegates to the global VFS, while `fsync`
+resolves an open file and dispatches synchronization through the FD object boundary. `ftruncate`
+accepts a descriptor and a nonnegative Roxy `off_t` length, dispatches the length change through that
+boundary, and leaves the shared offset unchanged.
 
 Process-identity queries delegate to the process subsystem. `getpid` returns the stable process ID
 owned by the current thread's process and does not expose scheduler thread IDs through the ABI.
