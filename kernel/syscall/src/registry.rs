@@ -35,7 +35,11 @@ mod tests {
     use roxy_test::kernel_test;
 
     use super::{REGISTRY, Registry, RegistryError};
-    use crate::{Syscall, errno::Errno, numbers::SyscallNumber};
+    use crate::{
+        Syscall,
+        errno::Errno,
+        numbers::{SYSCALL_BASE, SyscallNumber},
+    };
 
     const DUPLICATES: [Syscall; 2] = [
         Syscall::new(SyscallNumber::Exit, return_first_argument),
@@ -338,6 +342,36 @@ mod tests {
                 .any(|syscall| syscall.number == SyscallNumber::Sigreturn)
         );
     });
+
+    kernel_test!(
+        "roxy-syscall::every-number-registered",
+        registers_every_number,
+        {
+            // The enum numbers the syscalls from the base with no gaps, so the first number it does
+            // not define is its cardinality. Every number below that must have a handler: a number
+            // the table leaves out is reported as an unknown syscall instead of being dispatched,
+            // which a renumbering or a removal can otherwise introduce without any other check.
+            let mut count: usize = 0;
+            while SyscallNumber::try_from(SYSCALL_BASE + count as u64).is_ok() {
+                count += 1;
+            }
+
+            assert_eq!(REGISTRY.syscalls.len(), count);
+
+            for index in 0..count as u64 {
+                let number =
+                    SyscallNumber::try_from(SYSCALL_BASE + index).expect("contiguous numbers");
+
+                assert!(
+                    REGISTRY
+                        .syscalls
+                        .iter()
+                        .any(|syscall| syscall.number == number),
+                    "syscall {index} has no registered handler"
+                );
+            }
+        }
+    );
 
     kernel_test!("roxy-syscall::duplicate-number", duplicate_number, {
         let registry = Registry::new(&DUPLICATES);

@@ -5,12 +5,12 @@ use crate::{
     syscall,
 };
 
-use super::{PollEntriesAddress, poll};
+use super::{PollRequestsAddress, poll};
 
-syscall!(SyscallNumber::Ppoll, handle(entries: PollEntriesAddress => Fault, count: usize => Invalid, timeout: Nullable<Timespec> => Fault, signal_mask: Nullable<SignalSet> => Fault));
+syscall!(SyscallNumber::Ppoll, handle(requests: PollRequestsAddress => Fault, count: usize => Invalid, timeout: Nullable<Timespec> => Fault, signal_mask: Nullable<SignalSet> => Fault));
 
 fn handle(
-    entries: PollEntriesAddress,
+    requests: PollRequestsAddress,
     count: usize,
     timeout: Nullable<Timespec>,
     signal_mask: Nullable<SignalSet>,
@@ -25,7 +25,7 @@ fn handle(
         Nullable::Value(signal_mask) => Some(roxy_process::replace_masked_signals(signal_mask)),
     };
 
-    let result = poll(entries, count, timeout);
+    let result = poll(requests, count, timeout);
 
     if let Some(old_mask) = old_mask {
         let _ = roxy_process::replace_masked_signals(old_mask);

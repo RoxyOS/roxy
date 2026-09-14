@@ -3,8 +3,8 @@
 ## Purpose and scope
 
 `roxy-poll` owns registrations for one blocked readiness wait. It provides a token-checked listener,
-per-source wait queues, and RAII cancellation of registrations. It does not decode userspace
-`pollfd` layouts, define descriptor readiness, own a timer queue, or decide which event masks are
+per-source wait queues, and RAII cancellation of registrations. It does not decode the userspace
+request layout, define descriptor readiness, own a timer queue, or decide which event masks are
 reported.
 
 ## Ownership and flow

@@ -56,7 +56,7 @@ mod writev;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 85] = [
+pub(super) const SYSCALLS: [Syscall; 84] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -95,7 +95,6 @@ pub(super) const SYSCALLS: [Syscall; 85] = [
     sleep::SYSCALL,
     signal::SEND_SYSCALL,
     poll::PPOLL_SYSCALL,
-    poll::PSELECT_SYSCALL,
     uname::SYSCALL,
     fs::MKDIRAT_SYSCALL,
     fs::UNLINKAT_SYSCALL,

@@ -80,7 +80,7 @@ syscall. It therefore returns at most 4096 bytes even when userspace requests mo
 require additional data must issue another read. This uniform short-read policy keeps file-type
 semantics, including terminal line boundaries, inside the owning file implementation.
 
-`writev` (syscall 71) gathers data from a userspace `iovec` array and writes it through the
+`writev` (syscall 70) gathers data from a userspace `iovec` array and writes it through the
 addressed descriptor, honoring the file's own nonblocking flag. The `struct iovec` record and the
 gather/write helper live in the shared `syscalls::iovec` module, which both this syscall and the
 `recvmsg`/`sendmsg` handlers reuse, so the record layout and its 16-byte size assertion exist in
@@ -152,7 +152,7 @@ process image. `SA_SIGINFO` switches the handler to the three-argument form and 
 accepted; all other flags use the centralized diagnostic path.
 `SIGKILL` and `SIGSTOP` cannot be ignored.
 
-`sigreturn` (syscall 54) is a registry handler with a dedicated `Handler::Exit` variant whose
+`sigreturn` (syscall 53) is a registry handler with a dedicated `Handler::Exit` variant whose
 function returns `SyscallExit` directly, replacing the syscall-return contract itself. It asks
 `roxy-process` to pop and validate the most recent signal frame against the caller's stack
 pointer, and returns a full context restoration. Because its handler returns `SyscallExit`, it
@@ -188,28 +188,33 @@ syscall layer owns its six 65-byte, null-terminated ABI fields; it does not expo
 identity strings to ABI-neutral kernel subsystems. Hostname configuration and runtime kernel build
 metadata are not yet supported.
 
-`poll` decodes the userspace `pollfd` array inside this subsystem and queries each descriptor's
-ABI-neutral readiness through `roxy-fd`. For a nonzero timeout it rechecks in a loop: with
+`poll` decodes the Roxy `poll` request array inside this subsystem and queries each descriptor's
+ABI-neutral readiness through `roxy-fd`. A record carries the descriptor to ask about, the
+conditions the caller waits for, and the conditions the kernel observed. Both condition words are
+Roxy's own, one bit per named condition, so a request for a condition this kernel does not serve
+arrives as an undefined bit and is reported before any readiness is queried rather than waited for;
+an entry whose descriptor is negative reports nothing. `ERROR` and `HANGUP` are reported whether or
+not they were requested, so no request can name them, and `INVALID_DESCRIPTOR` stands in for a
+descriptor that is not open. For a nonzero timeout it rechecks in a loop: with
 interrupts disabled, it registers one `roxy-poll` listener with each source before re-checking
 readiness, adds a cancelable monotonic timer registration when finite, and blocks against the
 listener's wake latch when still unready. When the latch shows an owed wake the block is skipped
 and the thread keeps running to re-query readiness. The register-first order plus the latch close
 the SMP lost-wakeup windows; a notification or deadline wake always causes a fresh readiness query
-before results are encoded. It reports TTY and regular-file readiness and returns `POLLNVAL` for invalid
-descriptors. No-descriptor finite polls are sleeps; an infinite no-descriptor poll remains blocked.
-Signals and temporary signal-mask replacement remain unsupported.
+before results are encoded. It reports TTY and regular-file readiness. No-descriptor finite polls
+are sleeps; an infinite no-descriptor poll remains blocked. Signals and temporary signal-mask
+replacement remain unsupported.
 
-`ppoll` shares `poll`'s descriptor readiness and timer-wait implementation, but decodes its
+`ppoll` shares `poll`'s request record, descriptor readiness, and timer-wait implementation, but
+decodes its
 relative timeout from the Roxy mlibc `timespec` ABI at nanosecond precision. A null timeout waits
 indefinitely. A non-null signal mask temporarily replaces the current process mask for the
 duration of the wait, then restores the old mask before returning to userspace. An unmasked pending
 signal wakes the waiting thread, returns `EINTR`, and is processed before that restoration.
 
-`pselect` adapts the Roxy mlibc 1024-bit `fd_set` ABI to the same poll readiness and timer-wait
-path. It combines requested read, write, and exceptional events for each descriptor, then replaces
-each non-null input set with its ready descriptors. A non-null signal mask has the same temporary
-replacement and `EINTR` behavior as `ppoll`. Roxy mlibc's standard `select` wrapper uses this
-`pselect` sysdep after translating its timeout to `timespec`.
+`select` and `pselect` are not kernel interfaces. The kernel serves no `fd_set` bit array and no
+syscall of its own for them; Roxy mlibc renders both on top of `ppoll`, translating the three
+descriptor sets into one request array and reporting the returned conditions back through them.
 
 `sleep` copies a Roxy x86_64 `timespec` request and validates nonnegative seconds with
 nanoseconds in the half-open range `[0, 1_000_000_000)`. It converts the relative duration into a
@@ -335,17 +340,16 @@ selector is reported as another personality's, while the `AT_*` flags are a flag
 of its own. A name only another personality
 defines is removed from the Roxy headers instead of being mapped to ours: naming it is then a
 compile error, and passing its numeric value reaches the handler as an undefined bit and is
-reported. Two kinds of word cannot take a base at all and keep Linux's numbering, which leaves
-their handlers unable to tell a Linux value from one of ours: words whose width is upstream
-mlibc's — the `open` flag word and `pollfd.events`, an `int` and a `short` — and words upstream
-mlibc's headers define — the timer clock and its `TIMER_ABSTIME` flag in
-`options/ansi/include/time.h`. `ISSUES.md` records them and what closing each would take.
+reported. Two words cannot take a base at all and keep Linux's numbering, which leaves their
+handlers unable to tell a Linux value from one of ours: the `open` flag word, whose width is
+upstream mlibc's `int`, and the timer clock with its `TIMER_ABSTIME` flag, which upstream mlibc's
+`options/ansi/include/time.h` defines. `ISSUES.md` records them and what closing each would take.
 
-`socketpair` is syscall 48 and accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero. It asks
+`socketpair` is syscall 47 and accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero. It asks
 `roxy-unix-socket` to create the connected files, then owns descriptor insertion and the checked
 copy of the descriptor pair to userspace.
 
-The addressed socket family adds syscalls 49-53: `socket`, `bind`, `listen`, `accept`, and
+The addressed socket family adds syscalls 48-52: `socket`, `bind`, `listen`, `accept`, and
 `connect`. `socket` accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero; `SOCK_CLOEXEC` and
 `SOCK_NONBLOCK` and all other types, domains, and protocols emit the centralized unsupported
 diagnostic. Callers that tolerate rejection, such as libxcb's `SOCK_CLOEXEC` fallback, receive
@@ -364,7 +368,7 @@ diagnostic when they reach this ABI boundary.
 
 ## Clocks
 
-`clock_get` (syscall 8) and `clock_getres` (syscall 83) share one `roxy_clock_result` record and one
+`clock_get` (syscall 8) and `clock_getres` (syscall 82) share one `roxy_clock_result` record and one
 clock set, so both the record layout and the identifiers live in the `syscalls::clock` module and
 neither handler carries its own copy. Both accept `CLOCK_REALTIME` and `CLOCK_MONOTONIC`;
 `clock_get` reports the reading, `clock_getres` the interval in which that clock advances, which
@@ -374,7 +378,7 @@ first falls back to `CLOCK_MONOTONIC` instead of failing.
 
 ### `TTYNAME`
 
-`ROXY_SYS_TTYNAME(fd, buf, size)` (72) writes the NUL-terminated openable pathname of the terminal
+`ROXY_SYS_TTYNAME(fd, buf, size)` (71) writes the NUL-terminated openable pathname of the terminal
 backing `fd` into a user buffer. The name is owned by the terminal object — the descriptor layer's
 ABI-neutral `File::terminal_path` — not synthesized here, so each terminal reports its own path
 (`/dev/tty0` for the console). Errors: `ENOTTY` when `fd` is not a terminal or is a terminal with
@@ -385,7 +389,7 @@ string like `getcwd`.
 
 ## Pseudo-terminals
 
-`ROXY_SYS_OPENPTY(fds)` (84) allocates a pseudo-terminal pair and writes its two descriptors into
+`ROXY_SYS_OPENPTY(fds)` (83) allocates a pseudo-terminal pair and writes its two descriptors into
 the caller's `[i32; 2]` record — `fds[0]` the master, `fds[1]` the slave. The pair comes from
 `roxy-pty::open_pair`, which returns both ends as descriptor-layer `File` objects; this handler owns
 descriptor insertion and the checked copy to userspace, exactly as `socketpair` does. When one

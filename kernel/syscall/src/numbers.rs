@@ -47,54 +47,53 @@ pub(crate) enum SyscallNumber {
     Sleep = SYSCALL_BASE + 34,
     SendSignal = SYSCALL_BASE + 35,
     Ppoll = SYSCALL_BASE + 36,
-    Pselect = SYSCALL_BASE + 37,
-    Uname = SYSCALL_BASE + 38,
-    Mkdirat = SYSCALL_BASE + 39,
-    Unlinkat = SYSCALL_BASE + 40,
-    Readlinkat = SYSCALL_BASE + 41,
-    Linkat = SYSCALL_BASE + 42,
-    Symlinkat = SYSCALL_BASE + 43,
-    Renameat = SYSCALL_BASE + 44,
-    Sync = SYSCALL_BASE + 45,
-    Fsync = SYSCALL_BASE + 46,
-    Ftruncate = SYSCALL_BASE + 47,
-    Socketpair = SYSCALL_BASE + 48,
-    Socket = SYSCALL_BASE + 49,
-    Bind = SYSCALL_BASE + 50,
-    Listen = SYSCALL_BASE + 51,
-    Accept = SYSCALL_BASE + 52,
-    Connect = SYSCALL_BASE + 53,
-    Sigreturn = SYSCALL_BASE + 54,
-    Pipe = SYSCALL_BASE + 55,
-    Dup2 = SYSCALL_BASE + 56,
-    Fcntl = SYSCALL_BASE + 57,
-    Umask = SYSCALL_BASE + 58,
-    Chmod = SYSCALL_BASE + 59,
-    Fchmod = SYSCALL_BASE + 60,
-    Sockname = SYSCALL_BASE + 61,
-    Peername = SYSCALL_BASE + 62,
-    Shutdown = SYSCALL_BASE + 63,
-    GetSockopt = SYSCALL_BASE + 64,
-    Access = SYSCALL_BASE + 65,
-    RecvMsg = SYSCALL_BASE + 66,
-    SendMsg = SYSCALL_BASE + 67,
-    SetPgid = SYSCALL_BASE + 68,
-    GetPgid = SYSCALL_BASE + 69,
-    SetSid = SYSCALL_BASE + 70,
-    Writev = SYSCALL_BASE + 71,
-    Ttyname = SYSCALL_BASE + 72,
-    TimerCreate = SYSCALL_BASE + 73,
-    TimerSettime = SYSCALL_BASE + 74,
-    TimerGettime = SYSCALL_BASE + 75,
-    TimerGetoverrun = SYSCALL_BASE + 76,
-    TimerDelete = SYSCALL_BASE + 77,
-    ThreadCreate = SYSCALL_BASE + 78,
-    ThreadExit = SYSCALL_BASE + 79,
-    GetTid = SYSCALL_BASE + 80,
-    SigtimedWait = SYSCALL_BASE + 81,
-    Tgkill = SYSCALL_BASE + 82,
-    ClockGetres = SYSCALL_BASE + 83,
-    Openpty = SYSCALL_BASE + 84,
+    Uname = SYSCALL_BASE + 37,
+    Mkdirat = SYSCALL_BASE + 38,
+    Unlinkat = SYSCALL_BASE + 39,
+    Readlinkat = SYSCALL_BASE + 40,
+    Linkat = SYSCALL_BASE + 41,
+    Symlinkat = SYSCALL_BASE + 42,
+    Renameat = SYSCALL_BASE + 43,
+    Sync = SYSCALL_BASE + 44,
+    Fsync = SYSCALL_BASE + 45,
+    Ftruncate = SYSCALL_BASE + 46,
+    Socketpair = SYSCALL_BASE + 47,
+    Socket = SYSCALL_BASE + 48,
+    Bind = SYSCALL_BASE + 49,
+    Listen = SYSCALL_BASE + 50,
+    Accept = SYSCALL_BASE + 51,
+    Connect = SYSCALL_BASE + 52,
+    Sigreturn = SYSCALL_BASE + 53,
+    Pipe = SYSCALL_BASE + 54,
+    Dup2 = SYSCALL_BASE + 55,
+    Fcntl = SYSCALL_BASE + 56,
+    Umask = SYSCALL_BASE + 57,
+    Chmod = SYSCALL_BASE + 58,
+    Fchmod = SYSCALL_BASE + 59,
+    Sockname = SYSCALL_BASE + 60,
+    Peername = SYSCALL_BASE + 61,
+    Shutdown = SYSCALL_BASE + 62,
+    GetSockopt = SYSCALL_BASE + 63,
+    Access = SYSCALL_BASE + 64,
+    RecvMsg = SYSCALL_BASE + 65,
+    SendMsg = SYSCALL_BASE + 66,
+    SetPgid = SYSCALL_BASE + 67,
+    GetPgid = SYSCALL_BASE + 68,
+    SetSid = SYSCALL_BASE + 69,
+    Writev = SYSCALL_BASE + 70,
+    Ttyname = SYSCALL_BASE + 71,
+    TimerCreate = SYSCALL_BASE + 72,
+    TimerSettime = SYSCALL_BASE + 73,
+    TimerGettime = SYSCALL_BASE + 74,
+    TimerGetoverrun = SYSCALL_BASE + 75,
+    TimerDelete = SYSCALL_BASE + 76,
+    ThreadCreate = SYSCALL_BASE + 77,
+    ThreadExit = SYSCALL_BASE + 78,
+    GetTid = SYSCALL_BASE + 79,
+    SigtimedWait = SYSCALL_BASE + 80,
+    Tgkill = SYSCALL_BASE + 81,
+    ClockGetres = SYSCALL_BASE + 82,
+    Openpty = SYSCALL_BASE + 83,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -143,54 +142,53 @@ impl TryFrom<u64> for SyscallNumber {
             34 => Ok(Self::Sleep),
             35 => Ok(Self::SendSignal),
             36 => Ok(Self::Ppoll),
-            37 => Ok(Self::Pselect),
-            38 => Ok(Self::Uname),
-            39 => Ok(Self::Mkdirat),
-            40 => Ok(Self::Unlinkat),
-            41 => Ok(Self::Readlinkat),
-            42 => Ok(Self::Linkat),
-            43 => Ok(Self::Symlinkat),
-            44 => Ok(Self::Renameat),
-            45 => Ok(Self::Sync),
-            46 => Ok(Self::Fsync),
-            47 => Ok(Self::Ftruncate),
-            48 => Ok(Self::Socketpair),
-            49 => Ok(Self::Socket),
-            50 => Ok(Self::Bind),
-            51 => Ok(Self::Listen),
-            52 => Ok(Self::Accept),
-            53 => Ok(Self::Connect),
-            54 => Ok(Self::Sigreturn),
-            55 => Ok(Self::Pipe),
-            56 => Ok(Self::Dup2),
-            57 => Ok(Self::Fcntl),
-            58 => Ok(Self::Umask),
-            59 => Ok(Self::Chmod),
-            60 => Ok(Self::Fchmod),
-            61 => Ok(Self::Sockname),
-            62 => Ok(Self::Peername),
-            63 => Ok(Self::Shutdown),
-            64 => Ok(Self::GetSockopt),
-            65 => Ok(Self::Access),
-            66 => Ok(Self::RecvMsg),
-            67 => Ok(Self::SendMsg),
-            68 => Ok(Self::SetPgid),
-            69 => Ok(Self::GetPgid),
-            70 => Ok(Self::SetSid),
-            71 => Ok(Self::Writev),
-            72 => Ok(Self::Ttyname),
-            73 => Ok(Self::TimerCreate),
-            74 => Ok(Self::TimerSettime),
-            75 => Ok(Self::TimerGettime),
-            76 => Ok(Self::TimerGetoverrun),
-            77 => Ok(Self::TimerDelete),
-            78 => Ok(Self::ThreadCreate),
-            79 => Ok(Self::ThreadExit),
-            80 => Ok(Self::GetTid),
-            81 => Ok(Self::SigtimedWait),
-            82 => Ok(Self::Tgkill),
-            83 => Ok(Self::ClockGetres),
-            84 => Ok(Self::Openpty),
+            37 => Ok(Self::Uname),
+            38 => Ok(Self::Mkdirat),
+            39 => Ok(Self::Unlinkat),
+            40 => Ok(Self::Readlinkat),
+            41 => Ok(Self::Linkat),
+            42 => Ok(Self::Symlinkat),
+            43 => Ok(Self::Renameat),
+            44 => Ok(Self::Sync),
+            45 => Ok(Self::Fsync),
+            46 => Ok(Self::Ftruncate),
+            47 => Ok(Self::Socketpair),
+            48 => Ok(Self::Socket),
+            49 => Ok(Self::Bind),
+            50 => Ok(Self::Listen),
+            51 => Ok(Self::Accept),
+            52 => Ok(Self::Connect),
+            53 => Ok(Self::Sigreturn),
+            54 => Ok(Self::Pipe),
+            55 => Ok(Self::Dup2),
+            56 => Ok(Self::Fcntl),
+            57 => Ok(Self::Umask),
+            58 => Ok(Self::Chmod),
+            59 => Ok(Self::Fchmod),
+            60 => Ok(Self::Sockname),
+            61 => Ok(Self::Peername),
+            62 => Ok(Self::Shutdown),
+            63 => Ok(Self::GetSockopt),
+            64 => Ok(Self::Access),
+            65 => Ok(Self::RecvMsg),
+            66 => Ok(Self::SendMsg),
+            67 => Ok(Self::SetPgid),
+            68 => Ok(Self::GetPgid),
+            69 => Ok(Self::SetSid),
+            70 => Ok(Self::Writev),
+            71 => Ok(Self::Ttyname),
+            72 => Ok(Self::TimerCreate),
+            73 => Ok(Self::TimerSettime),
+            74 => Ok(Self::TimerGettime),
+            75 => Ok(Self::TimerGetoverrun),
+            76 => Ok(Self::TimerDelete),
+            77 => Ok(Self::ThreadCreate),
+            78 => Ok(Self::ThreadExit),
+            79 => Ok(Self::GetTid),
+            80 => Ok(Self::SigtimedWait),
+            81 => Ok(Self::Tgkill),
+            82 => Ok(Self::ClockGetres),
+            83 => Ok(Self::Openpty),
             _ => Err(()),
         }
     }
@@ -352,197 +350,193 @@ mod tests {
         );
         assert_eq!(
             SyscallNumber::try_from(SYSCALL_BASE + 37),
-            Ok(SyscallNumber::Pselect)
-        );
-        assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 38),
             Ok(SyscallNumber::Uname)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 39),
+            SyscallNumber::try_from(SYSCALL_BASE + 38),
             Ok(SyscallNumber::Mkdirat)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 40),
+            SyscallNumber::try_from(SYSCALL_BASE + 39),
             Ok(SyscallNumber::Unlinkat)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 41),
+            SyscallNumber::try_from(SYSCALL_BASE + 40),
             Ok(SyscallNumber::Readlinkat)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 42),
+            SyscallNumber::try_from(SYSCALL_BASE + 41),
             Ok(SyscallNumber::Linkat)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 43),
+            SyscallNumber::try_from(SYSCALL_BASE + 42),
             Ok(SyscallNumber::Symlinkat)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 44),
+            SyscallNumber::try_from(SYSCALL_BASE + 43),
             Ok(SyscallNumber::Renameat)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 45),
+            SyscallNumber::try_from(SYSCALL_BASE + 44),
             Ok(SyscallNumber::Sync)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 46),
+            SyscallNumber::try_from(SYSCALL_BASE + 45),
             Ok(SyscallNumber::Fsync)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 47),
+            SyscallNumber::try_from(SYSCALL_BASE + 46),
             Ok(SyscallNumber::Ftruncate)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 48),
+            SyscallNumber::try_from(SYSCALL_BASE + 47),
             Ok(SyscallNumber::Socketpair)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 49),
+            SyscallNumber::try_from(SYSCALL_BASE + 48),
             Ok(SyscallNumber::Socket)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 50),
+            SyscallNumber::try_from(SYSCALL_BASE + 49),
             Ok(SyscallNumber::Bind)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 51),
+            SyscallNumber::try_from(SYSCALL_BASE + 50),
             Ok(SyscallNumber::Listen)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 52),
+            SyscallNumber::try_from(SYSCALL_BASE + 51),
             Ok(SyscallNumber::Accept)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 53),
+            SyscallNumber::try_from(SYSCALL_BASE + 52),
             Ok(SyscallNumber::Connect)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 54),
+            SyscallNumber::try_from(SYSCALL_BASE + 53),
             Ok(SyscallNumber::Sigreturn)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 55),
+            SyscallNumber::try_from(SYSCALL_BASE + 54),
             Ok(SyscallNumber::Pipe)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 56),
+            SyscallNumber::try_from(SYSCALL_BASE + 55),
             Ok(SyscallNumber::Dup2)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 57),
+            SyscallNumber::try_from(SYSCALL_BASE + 56),
             Ok(SyscallNumber::Fcntl)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 58),
+            SyscallNumber::try_from(SYSCALL_BASE + 57),
             Ok(SyscallNumber::Umask)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 59),
+            SyscallNumber::try_from(SYSCALL_BASE + 58),
             Ok(SyscallNumber::Chmod)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 60),
+            SyscallNumber::try_from(SYSCALL_BASE + 59),
             Ok(SyscallNumber::Fchmod)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 61),
+            SyscallNumber::try_from(SYSCALL_BASE + 60),
             Ok(SyscallNumber::Sockname)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 62),
+            SyscallNumber::try_from(SYSCALL_BASE + 61),
             Ok(SyscallNumber::Peername)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 63),
+            SyscallNumber::try_from(SYSCALL_BASE + 62),
             Ok(SyscallNumber::Shutdown)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 64),
+            SyscallNumber::try_from(SYSCALL_BASE + 63),
             Ok(SyscallNumber::GetSockopt)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 65),
+            SyscallNumber::try_from(SYSCALL_BASE + 64),
             Ok(SyscallNumber::Access)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 66),
+            SyscallNumber::try_from(SYSCALL_BASE + 65),
             Ok(SyscallNumber::RecvMsg)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 67),
+            SyscallNumber::try_from(SYSCALL_BASE + 66),
             Ok(SyscallNumber::SendMsg)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 68),
+            SyscallNumber::try_from(SYSCALL_BASE + 67),
             Ok(SyscallNumber::SetPgid)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 69),
+            SyscallNumber::try_from(SYSCALL_BASE + 68),
             Ok(SyscallNumber::GetPgid)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 70),
+            SyscallNumber::try_from(SYSCALL_BASE + 69),
             Ok(SyscallNumber::SetSid)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 71),
+            SyscallNumber::try_from(SYSCALL_BASE + 70),
             Ok(SyscallNumber::Writev)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 72),
+            SyscallNumber::try_from(SYSCALL_BASE + 71),
             Ok(SyscallNumber::Ttyname)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 73),
+            SyscallNumber::try_from(SYSCALL_BASE + 72),
             Ok(SyscallNumber::TimerCreate)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 74),
+            SyscallNumber::try_from(SYSCALL_BASE + 73),
             Ok(SyscallNumber::TimerSettime)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 75),
+            SyscallNumber::try_from(SYSCALL_BASE + 74),
             Ok(SyscallNumber::TimerGettime)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 76),
+            SyscallNumber::try_from(SYSCALL_BASE + 75),
             Ok(SyscallNumber::TimerGetoverrun)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 77),
+            SyscallNumber::try_from(SYSCALL_BASE + 76),
             Ok(SyscallNumber::TimerDelete)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 78),
+            SyscallNumber::try_from(SYSCALL_BASE + 77),
             Ok(SyscallNumber::ThreadCreate)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 79),
+            SyscallNumber::try_from(SYSCALL_BASE + 78),
             Ok(SyscallNumber::ThreadExit)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 80),
+            SyscallNumber::try_from(SYSCALL_BASE + 79),
             Ok(SyscallNumber::GetTid)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 81),
+            SyscallNumber::try_from(SYSCALL_BASE + 80),
             Ok(SyscallNumber::SigtimedWait)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 82),
+            SyscallNumber::try_from(SYSCALL_BASE + 81),
             Ok(SyscallNumber::Tgkill)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 83),
+            SyscallNumber::try_from(SYSCALL_BASE + 82),
             Ok(SyscallNumber::ClockGetres)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 84),
+            SyscallNumber::try_from(SYSCALL_BASE + 83),
             Ok(SyscallNumber::Openpty)
         );
-        assert!(SyscallNumber::try_from(SYSCALL_BASE + 85).is_err());
+        assert!(SyscallNumber::try_from(SYSCALL_BASE + 84).is_err());
 
         // Below the base is another personality's numbering, which the dispatcher reports as
         // foreign. Linux x86_64's `read` is 0, `write` is 1, and `exit_group` is 231.

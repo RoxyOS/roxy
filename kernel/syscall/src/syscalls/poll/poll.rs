@@ -2,12 +2,12 @@ use core::time::Duration;
 
 use crate::{SyscallResult, args::SyscallArg, errno::Errno, numbers::SyscallNumber, syscall};
 
-use super::{PollEntriesAddress, poll};
+use super::{PollRequestsAddress, poll};
 
-syscall!(SyscallNumber::Poll, handle(entries: PollEntriesAddress => Fault, count: usize => Invalid, timeout: PollTimeout => Invalid));
+syscall!(SyscallNumber::Poll, handle(requests: PollRequestsAddress => Fault, count: usize => Invalid, timeout: PollTimeout => Invalid));
 
-fn handle(entries: PollEntriesAddress, count: usize, timeout: PollTimeout) -> SyscallResult {
-    poll(entries, count, timeout.0)
+fn handle(requests: PollRequestsAddress, count: usize, timeout: PollTimeout) -> SyscallResult {
+    poll(requests, count, timeout.0)
 }
 
 /// A millisecond timeout that treats `-1` as blocking indefinitely.

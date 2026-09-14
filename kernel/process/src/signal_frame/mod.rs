@@ -15,7 +15,7 @@ use crate::signal::{PendingSignal, SignalSource};
 /// Syscall number of `sigreturn` in the Roxy ABI.
 ///
 /// Must match `SyscallNumber::Sigreturn` in `roxy-syscall`; a kernel test pins both sides.
-pub const SIGRETURN_SYSCALL_NUMBER: u64 = 54;
+pub const SIGRETURN_SYSCALL_NUMBER: u64 = 53;
 
 /// The information record written into a signal frame, laid out to match Roxy's userland
 /// `siginfo_t` (`sysdeps/roxy/include/abi-bits/signal.h`).

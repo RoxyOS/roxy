@@ -156,20 +156,6 @@ request visible; only the origin of the value is lost. The gap is marked with
 `kernel/syscall/src/syscalls/open.rs`. A wider word, or a request record Roxy defines itself, would
 let the handler separate the two cases.
 
-## `poll` ignores undefined event bits
-
-`pollfd.events` is upstream mlibc's `short` and Linux already uses its bits up to 13, so the field
-has no room for a base above Linux's range and keeps Linux's numbering. On top of that, `poll`
-never inspects the requested bits at all: it reads the mask, answers from the descriptors it names,
-and ignores everything else. A caller that asks for an event Roxy cannot report therefore waits
-for something that will never wake it, and no diagnostic says so, which is the case the
-centralized unsupported path exists to make visible.
-
-The gap is marked with `TODO(missing-capability: no owned poll event word)` in
-`kernel/syscall/src/syscalls/poll/mod.rs`. Widening the field, or taking the event list as a record
-Roxy defines, would give the word a base above Linux's range and let `poll` report an undefined or
-foreign bit through the same path as every other flag word in this subsystem.
-
 ## The timer clock and flag words keep Linux's numbering
 
 `timer_create` takes a `clockid_t` and `timer_settime` a flag word, and Roxy numbers the values it
