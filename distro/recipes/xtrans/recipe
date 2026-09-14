@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=1.6.0
-revision=4
+revision=5
 
 tarball_url="https://www.x.org/releases/individual/lib/xtrans-${version}.tar.xz"
 tarball_sha256="faafea166bf2451a173d9d593352940ec6404145c5d1da5c213423ce4d359e92"

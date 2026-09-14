@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=0.5
-revision=4
+revision=5
 
 tarball_url="https://www.x.org/releases/individual/lib/libpthread-stubs-${version}.tar.xz"
 tarball_sha256="59da566decceba7c2a7970a4a03b48d9905f1262ff94410a649224e33d2442bc"

@@ -3,7 +3,7 @@
 major=5.3
 patches=15
 version=${major}.${patches}
-revision=9
+revision=10
 
 # ftpmirror.gnu.org redirects to a mirror that does not carry bash-5.3.tar.gz (404), so fetch
 # from the canonical host.
