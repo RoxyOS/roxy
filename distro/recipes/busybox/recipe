@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 version=1.38.0
-revision=5
+revision=6
 
 tarball_url="https://busybox.net/downloads/busybox-${version}.tar.bz2"
 tarball_sha256="34f9ea6ff8636f2c9241153b9114eefa9e65674a45318ae1ef95bb5f31c53bb2"

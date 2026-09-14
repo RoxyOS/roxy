@@ -1,0 +1,77 @@
+diff --git busybox-clean/include/libbb.h busybox-workdir/include/libbb.h
+index aa25be7..5b7c97a 100644
+--- busybox-clean/include/libbb.h
++++ busybox-workdir/include/libbb.h
+@@ -775,9 +775,12 @@ enum {
+ int FAST_FUNC ioloop_run(ioloop_state_t *io);
+ 
+ 
+-/* Useful for having small structure members/global variables */
+-typedef int8_t socktype_t;
+-typedef int8_t family_t;
++/* Useful for having small structure members/global variables. The width is platform-dependent
++ * (see BB_SOCKWORD_TYPE in platform.h) and the assertions are written against it, so the members
++ * stay as small as the platform's SOCK_ and AF_ numbering allows.
++ */
++typedef BB_SOCKWORD_TYPE socktype_t;
++typedef BB_SOCKWORD_TYPE family_t;
+ struct BUG_too_small {
+ 	char BUG_socktype_t_too_small[(0
+ 			| SOCK_STREAM
+@@ -785,7 +788,7 @@ struct BUG_too_small {
+ 			| SOCK_RDM
+ 			| SOCK_SEQPACKET
+ 			| SOCK_RAW
+-			) <= 127 ? 1 : -1];
++			) <= BB_SOCKWORD_MAX ? 1 : -1];
+ 	char BUG_family_t_too_small[(0
+ 			| AF_UNSPEC
+ 			| AF_INET
+@@ -799,7 +802,7 @@ struct BUG_too_small {
+ #endif
+ 			/* | AF_DECnet */
+ 			/* | AF_IPX */
+-			) <= 127 ? 1 : -1];
++			) <= BB_SOCKWORD_MAX ? 1 : -1];
+ };
+ 
+ 
+diff --git busybox-clean/include/platform.h busybox-workdir/include/platform.h
+index 3414b97..6b9f87a 100644
+--- busybox-clean/include/platform.h
++++ busybox-workdir/include/platform.h
+@@ -295,6 +295,21 @@ typedef int smallint;
+ typedef unsigned smalluint;
+ #endif
+ 
++/* ---- Size of the SOCK_ and AF_ storage -------------------- */
++
++/* Platforms number their socket types and address families differently: Linux's fit in a signed
++ * byte, while Roxy starts each word above the whole range the other personality's numbering uses
++ * (mlibc abi-bits/socket.h), which needs an int. The check in libbb.h is written against these,
++ * so a platform whose words no longer fit fails the build instead of truncating them silently.
++ */
++#if defined(__roxy__)
++# define BB_SOCKWORD_TYPE int
++# define BB_SOCKWORD_MAX  INT_MAX
++#else
++# define BB_SOCKWORD_TYPE int8_t
++# define BB_SOCKWORD_MAX  127
++#endif
++
+ /* ISO C Standard:  7.16  Boolean type and values  <stdbool.h> */
+ #if (defined __digital__ && defined __unix__)
+ /* old system without (proper) C99 support */
+diff --git busybox-clean/networking/inetd.c busybox-workdir/networking/inetd.c
+index 6220a08..9fc0f92 100644
+--- busybox-clean/networking/inetd.c
++++ busybox-workdir/networking/inetd.c
+@@ -774,7 +774,7 @@ static NOINLINE servtab_t *parse_one_line(void)
+ 	}
+ 
+ 	{
+-		static const int8_t SOCK_xxx[] ALIGN1 = {
++		static const socktype_t SOCK_xxx[] ALIGN1 = {
+ 			-1,
+ 			SOCK_STREAM, SOCK_DGRAM, SOCK_RDM,
+ 			SOCK_SEQPACKET, SOCK_RAW
