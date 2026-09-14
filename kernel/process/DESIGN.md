@@ -108,7 +108,8 @@ model.
 `execve` reverts all dispositions to `Default` and clears outstanding signal frames because
 handler addresses point into the replaced image; the mask and pending set survive. The
 terminating default action exits the current thread with a signal-derived `ExitStatus`; normal
-`waitpid` reaping then observes the corresponding low-byte signal status. Delivery applies at
+`waitpid` reaping then reports that status as the Roxy wait record, which the libc renders as the
+POSIX wait-status word its `WIFEXITED`/`WTERMSIG` macros decode. Delivery applies at
 most one signal per userspace return boundary because termination does not return; remaining
 pending signals are delivered at subsequent boundaries.
 

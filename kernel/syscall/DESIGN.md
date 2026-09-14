@@ -123,12 +123,17 @@ owned by the current thread's process and does not expose scheduler thread IDs t
 `getppid` returns the recorded fork parent while that process remains in the process table and
 returns `0` for directly spawned or orphaned processes.
 
-`waitpid` accepts a direct child PID or `-1` for any child, with optional `WNOHANG`. It validates a
-non-null status output before entering the process wait so `EFAULT` never consumes a zombie. Normal
-exit codes use the Linux wait-status layout expected by mlibc. A successful wait returns the reaped
-PID, a pending nonblocking wait returns zero, and absence of a matching child returns `ECHILD`.
-Process-group selectors, stopped or continued states, and resource usage remain unsupported and
-must use the centralized diagnostic path.
+`waitpid` accepts a direct child PID or `-1` for any child, with optional `WNOHANG`, `WUNTRACED`,
+and `WCONTINUED`. It validates a non-null status output before entering the process wait so
+`EFAULT` never consumes a zombie. The status it writes is Roxy's own flat record — a kind word
+naming the state change and a code carrying the exit code or signal number — rather than the POSIX
+wait-status word that `WIFEXITED` and its neighbours decode. The kernel already holds the change as
+typed values (`WaitResult`, `ExitStatus`), so encoding that word is the libc's job at this
+boundary, where the POSIX bit layout stops. A successful wait returns the reaped PID, a pending
+nonblocking wait returns zero without writing the record, and absence of a matching child returns
+`ECHILD`. The record's kind distinguishes a normal exit, a signal-terminated child, a stopped
+child, and a child resumed by `SIGCONT`. Process-group selectors and resource usage remain
+unsupported and must use the centralized diagnostic path.
 
 `sigprocmask` decodes the Roxy `sigset_t` ABI and atomically blocks, unblocks, or replaces the
 current process's signal mask. The record is a single word, one bit per signal, which is all the

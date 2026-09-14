@@ -24,7 +24,8 @@ ABI-specific signal numbers and mask records into `Signal` and `SignalSet`.
 ## Limits
 
 The initial signal set includes the conventional process, fault, timer, child, and terminal signal
-identities. Core-dump, stop, continue, and terminal job-control default actions map to
-`Unsupported` and are rejected when sent. Realtime signals, process groups, and userspace signal
-ABI records are not implemented. Per-process dispositions remain process-owned rather than part
-of this crate's signal policy.
+identities, plus the realtime signals. Stop and continue are supported: a stop signal suspends the
+process until `SIGCONT` resumes it, and the resumption stays visible to a parent waiting with
+`WCONTINUED`. There is no core-dump action. Process groups and their signalling live in
+`roxy-process`, and userspace signal ABI records live in the syscall subsystem; this crate holds
+only signal identity, default-action policy, and the mask type.

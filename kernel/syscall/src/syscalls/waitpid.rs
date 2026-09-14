@@ -1,4 +1,7 @@
-use roxy_process::{ProcessId, WaitError, WaitResult, WaitTarget};
+use core::mem::{align_of, offset_of, size_of};
+
+use roxy_process::{ExitStatus, ProcessId, WaitError, WaitResult, WaitTarget};
+use roxy_signal::Signal;
 
 use crate::{
     SyscallResult,
@@ -9,7 +12,72 @@ use crate::{
     unsupported::unsupported_argument,
 };
 
-syscall!(SyscallNumber::Waitpid, handle(target: WaitTarget => Invalid, status: Nullable<Out<u32>> => Fault, options: WaitOptions => Invalid, rusage: u64));
+syscall!(SyscallNumber::Waitpid, handle(target: WaitTarget => Invalid, status: Nullable<Out<WaitStatusAbi>> => Fault, options: WaitOptions => Invalid, rusage: u64));
+
+/// Kind word of [`WaitStatusAbi`]: which state change the record reports.
+///
+/// The kernel produces this word and only the libc reads it, so it needs no base above another
+/// personality's numbering the way a userspace-supplied word does. Zero is reserved instead, so an
+/// all-zero record is never a valid status.
+const WAIT_KIND_EXITED: u32 = 1;
+const WAIT_KIND_SIGNALED: u32 = 2;
+const WAIT_KIND_STOPPED: u32 = 3;
+const WAIT_KIND_CONTINUED: u32 = 4;
+
+/// Fixed-layout `waitpid` status record copied across the userspace syscall ABI.
+///
+/// A flat record rather than the POSIX wait-status word `WIFEXITED` and its neighbours decode:
+/// the kernel already holds the state change as typed values, and one member per value keeps every
+/// offset constant instead of an overlay the kind selects. Encoding the word is the libc's job, so
+/// its bit layout stops at this boundary. The record is mirrored by
+/// `sysdeps/roxy/include/roxy/syscall.h` in the Roxy mlibc fork.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct WaitStatusAbi {
+    kind: u32,
+    /// The exit code for [`WAIT_KIND_EXITED`], the signal number for [`WAIT_KIND_SIGNALED`] and
+    /// [`WAIT_KIND_STOPPED`], and zero otherwise.
+    code: u32,
+}
+
+const _: () = assert!(size_of::<WaitStatusAbi>() == 8);
+const _: () = assert!(align_of::<WaitStatusAbi>() == 4);
+const _: () = assert!(offset_of!(WaitStatusAbi, kind) == 0);
+const _: () = assert!(offset_of!(WaitStatusAbi, code) == 4);
+
+impl WaitStatusAbi {
+    /// Reports a child that returned an exit code.
+    const fn exited(code: u8) -> Self {
+        Self {
+            kind: WAIT_KIND_EXITED,
+            code: code as u32,
+        }
+    }
+
+    /// Reports a child terminated by a signal.
+    const fn signaled(signal: Signal) -> Self {
+        Self {
+            kind: WAIT_KIND_SIGNALED,
+            code: signal.number() as u32,
+        }
+    }
+
+    /// Reports the signal that stopped a child.
+    const fn stopped(signal: Signal) -> Self {
+        Self {
+            kind: WAIT_KIND_STOPPED,
+            code: signal.number() as u32,
+        }
+    }
+
+    /// Reports a child resumed by `SIGCONT`, which carries no signal of its own.
+    const fn continued() -> Self {
+        Self {
+            kind: WAIT_KIND_CONTINUED,
+            code: 0,
+        }
+    }
+}
 
 /// Roxy numbers `waitpid` option bits from a base above Linux's *whole* option range, whose
 /// highest is `WNOWAIT` at bit 24, so no Linux bit can alias one of ours.
@@ -30,7 +98,7 @@ struct WaitOptions {
 
 fn handle(
     target: WaitTarget,
-    status: Nullable<Out<u32>>,
+    status: Nullable<Out<WaitStatusAbi>>,
     options: WaitOptions,
     rusage: u64,
 ) -> SyscallResult {
@@ -54,41 +122,41 @@ fn handle(
         wcontinued: options.wcontinued,
     };
 
-    match roxy_process::wait_current(target, wait_options).map_err(map_wait_error)? {
-        WaitResult::Exited {
-            process_id,
-            status: exit_status,
-        } => {
-            if let Some(output) = status {
-                let encoded = encode_status(exit_status);
+    let result = roxy_process::wait_current(target, wait_options).map_err(map_wait_error)?;
+    let Some((process_id, record)) = status_record(result) else {
+        // A non-blocking wait that observed no state change writes nothing; the caller sees the
+        // zero return and must not read the output slot.
+        return Ok(0);
+    };
 
-                // SAFETY: u32 has no padding and encoded is initialized.
-                unsafe { output.write(&encoded) }?;
-            }
+    if let Some(output) = status {
+        // SAFETY: WaitStatusAbi's checked repr(C) layout consists of initialized integer fields
+        // without implicit padding.
+        unsafe { output.write(&record) }?;
+    }
 
-            Ok(process_id.as_u64())
+    Ok(process_id.as_u64())
+}
+
+/// The state change one wait result reports, or `None` when no child changed state.
+///
+/// The kernel reports the change itself; `Pending` carries none, and run-to-completion of the
+/// operation leaves no other case.
+fn status_record(result: WaitResult) -> Option<(ProcessId, WaitStatusAbi)> {
+    match result {
+        WaitResult::Exited { process_id, status } => {
+            let record = match status {
+                ExitStatus::Exited(code) => WaitStatusAbi::exited(code),
+                ExitStatus::Signaled(signal) => WaitStatusAbi::signaled(signal),
+            };
+
+            Some((process_id, record))
         }
         WaitResult::Stopped { process_id, signal } => {
-            if let Some(output) = status {
-                let encoded = encode_stopped_status(signal);
-
-                // SAFETY: u32 has no padding and encoded is initialized.
-                unsafe { output.write(&encoded) }?;
-            }
-
-            Ok(process_id.as_u64())
+            Some((process_id, WaitStatusAbi::stopped(signal)))
         }
-        WaitResult::Continued { process_id } => {
-            if let Some(output) = status {
-                let encoded = encode_continued_status();
-
-                // SAFETY: u32 has no padding and encoded is initialized.
-                unsafe { output.write(&encoded) }?;
-            }
-
-            Ok(process_id.as_u64())
-        }
-        WaitResult::Pending => Ok(0),
+        WaitResult::Continued { process_id } => Some((process_id, WaitStatusAbi::continued())),
+        WaitResult::Pending => None,
     }
 }
 
@@ -140,25 +208,6 @@ impl SyscallArg for WaitOptions {
     }
 }
 
-fn encode_status(status: roxy_process::ExitStatus) -> u32 {
-    match status {
-        roxy_process::ExitStatus::Exited(code) => u32::from(code) << 8,
-        roxy_process::ExitStatus::Signaled(signal) => u32::from(signal.number()),
-    }
-}
-
-/// Encodes a stopped child's status: low byte `0x7f` with the stopping signal in bits 8-15
-/// (`WIFSTOPPED` + `WSTOPSIG`).
-fn encode_stopped_status(signal: roxy_signal::Signal) -> u32 {
-    0x7f | (u32::from(signal.number()) << 8)
-}
-
-/// Encodes a continued child's status: the all-ones `0xffff` pattern that `WIFCONTINUED`
-/// recognizes.
-const fn encode_continued_status() -> u32 {
-    0xffff
-}
-
 const fn map_wait_error(error: WaitError) -> Errno {
     match error {
         WaitError::NoChild => Errno::Child,
@@ -167,28 +216,108 @@ const fn map_wait_error(error: WaitError) -> Errno {
 
 #[cfg(feature = "kernel-test")]
 mod tests {
+    use roxy_process::{ExitStatus, ProcessId, WaitResult};
+    use roxy_signal::Signal;
     use roxy_test::kernel_test;
 
-    use roxy_process::ExitStatus;
-    use roxy_signal::Signal;
-
-    use super::{encode_status, encode_stopped_status};
+    use super::{
+        WAIT_KIND_CONTINUED, WAIT_KIND_EXITED, WAIT_KIND_SIGNALED, WAIT_KIND_STOPPED,
+        WaitStatusAbi, status_record,
+    };
 
     kernel_test!("roxy-syscall::waitpid-status", waitpid_status, {
-        assert_eq!(encode_status(ExitStatus::exited(0)), 0);
-        assert_eq!(encode_status(ExitStatus::exited(23)), 0x1700);
-        assert_eq!(
-            encode_status(ExitStatus::exited(u64::from(u8::MAX))),
-            0xff00
-        );
-        assert_eq!(encode_status(ExitStatus::signaled(Signal::Terminate)), 15);
-    });
+        let process_id = ProcessId::new(7).unwrap();
 
-    kernel_test!("roxy-syscall::waitpid-stopped-status", waitpid_stopped, {
         assert_eq!(
-            encode_stopped_status(Signal::TerminalStop),
-            0x7f | (20 << 8)
+            status_record(WaitResult::Exited {
+                process_id,
+                status: ExitStatus::exited(0),
+            }),
+            Some((
+                process_id,
+                WaitStatusAbi {
+                    kind: WAIT_KIND_EXITED,
+                    code: 0
+                }
+            ))
         );
-        assert_eq!(encode_stopped_status(Signal::Stop), 0x7f | (19 << 8));
+        assert_eq!(
+            status_record(WaitResult::Exited {
+                process_id,
+                status: ExitStatus::exited(23),
+            }),
+            Some((
+                process_id,
+                WaitStatusAbi {
+                    kind: WAIT_KIND_EXITED,
+                    code: 23
+                }
+            ))
+        );
+        assert_eq!(
+            status_record(WaitResult::Exited {
+                process_id,
+                status: ExitStatus::exited(u64::from(u8::MAX)),
+            }),
+            Some((
+                process_id,
+                WaitStatusAbi {
+                    kind: WAIT_KIND_EXITED,
+                    code: 255
+                }
+            ))
+        );
+        assert_eq!(
+            status_record(WaitResult::Exited {
+                process_id,
+                status: ExitStatus::signaled(Signal::Terminate),
+            }),
+            Some((
+                process_id,
+                WaitStatusAbi {
+                    kind: WAIT_KIND_SIGNALED,
+                    code: 15
+                }
+            ))
+        );
+        assert_eq!(
+            status_record(WaitResult::Stopped {
+                process_id,
+                signal: Signal::TerminalStop,
+            }),
+            Some((
+                process_id,
+                WaitStatusAbi {
+                    kind: WAIT_KIND_STOPPED,
+                    code: 20
+                }
+            ))
+        );
+        assert_eq!(
+            status_record(WaitResult::Stopped {
+                process_id,
+                signal: Signal::Stop,
+            }),
+            Some((
+                process_id,
+                WaitStatusAbi {
+                    kind: WAIT_KIND_STOPPED,
+                    code: 19
+                }
+            ))
+        );
+        assert_eq!(
+            status_record(WaitResult::Continued { process_id }),
+            Some((
+                process_id,
+                WaitStatusAbi {
+                    kind: WAIT_KIND_CONTINUED,
+                    code: 0
+                }
+            ))
+        );
+
+        // No state change means no record: the output slot is left alone.
+        assert_eq!(status_record(WaitResult::Pending), None);
     });
 }
