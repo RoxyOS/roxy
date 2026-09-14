@@ -13,6 +13,11 @@ The long-term architecture permits multiple Unix-like ABI personalities, includi
 and Solaris-compatible interfaces, while the current implementation exposes only the Roxy ABI.
 Every personality-specific record layout, `#[repr(C)]` type, padding field, size or offset
 assertion, request number, and raw userspace pointer interpretation is private to this subsystem.
+A record's fields carry the width their C type has, and any C alignment padding inside the record is
+a named field the decoder initializes, so the layout has no implicit gaps and no field's bits
+include bytes a caller does not own. A record with explicit padding is safe to copy whole; the
+alternative — a wider Rust field spanning the C padding — reads bytes the caller never initialized,
+and the size and offset assertions still pass because only the width is wrong.
 
 Handlers decode those representations into ABI-neutral kernel types before calling another
 subsystem and encode returned domain values only at the userspace copy boundary. Process, FD, TTY,
