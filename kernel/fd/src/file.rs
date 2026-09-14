@@ -32,8 +32,7 @@ pub trait File: Send {
     fn is_terminal(&self) -> bool;
 
     /// Returns this terminal's openable device pathname, when this object is a terminal whose
-    /// controlling device is reachable through the device filesystem (for example `/dev/tty0` or
-    /// `/dev/pts/0`).
+    /// controlling device is reachable through the device filesystem (for example `/dev/tty0`).
     ///
     /// `ttyname` consumers reopen the returned path, so it must actually resolve to a device node.
     /// Non-terminal objects (or terminals without a device path) return `None`.

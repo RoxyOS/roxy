@@ -21,8 +21,7 @@ pub trait FileHandle: Send {
     }
 
     /// Returns this terminal's openable device pathname, when the handle is a terminal whose
-    /// controlling device is reachable through the device filesystem (for example `/dev/tty0` or
-    /// `/dev/pts/0`).
+    /// controlling device is reachable through the device filesystem (for example `/dev/tty0`).
     ///
     /// A `ttyname` consumer reopens the returned path, so it must resolve to a registered device
     /// node. Non-terminal handles return `None`.

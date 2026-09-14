@@ -39,11 +39,8 @@ pub(super) const BLOCK_SIZE: u64 = 0x100;
 /// Terminal requests: `TCGETS` through `TCFLSH`.
 pub(super) const TERMINAL_BASE: u64 = SPACE_BASE;
 
-/// Pseudo-terminal requests: `TIOCGPTN` and `TIOCSPTLCK`.
-pub(super) const PTY_BASE: u64 = TERMINAL_BASE + BLOCK_SIZE;
-
 /// Framebuffer requests: the `ROXY_FRAMEBUFFER_*` family.
-pub(super) const FRAMEBUFFER_BASE: u64 = PTY_BASE + BLOCK_SIZE;
+pub(super) const FRAMEBUFFER_BASE: u64 = TERMINAL_BASE + BLOCK_SIZE;
 
 /// Requests that act on the open file description itself rather than on a device: `FIONBIO`.
 pub(super) const DESCRIPTION_BASE: u64 = FRAMEBUFFER_BASE + BLOCK_SIZE;
@@ -72,14 +69,14 @@ mod tests {
     use roxy_test::kernel_test;
 
     use super::{
-        BLOCK_SIZE, DESCRIPTION_BASE, FRAMEBUFFER_BASE, PTY_BASE, SPACE_BASE, SPACE_END,
-        TERMINAL_BASE, in_space,
+        BLOCK_SIZE, DESCRIPTION_BASE, FRAMEBUFFER_BASE, SPACE_BASE, SPACE_END, TERMINAL_BASE,
+        in_space,
     };
-    use crate::syscalls::ioctl::{execute, framebuffer, pty, terminal};
+    use crate::syscalls::ioctl::{execute, framebuffer, terminal};
 
     /// Every request the kernel supports, grouped by the block that owns it. A new request must be
     /// added here, and the array below grown, for the check to cover it.
-    const BLOCKS: [(u64, &[u64]); 4] = [
+    const BLOCKS: [(u64, &[u64]); 3] = [
         (
             TERMINAL_BASE,
             &[
@@ -95,7 +92,6 @@ mod tests {
                 terminal::TCFLSH,
             ],
         ),
-        (PTY_BASE, &[pty::TIOCGPTN, pty::TIOCSPTLCK]),
         (
             FRAMEBUFFER_BASE,
             &[
@@ -111,7 +107,7 @@ mod tests {
         "roxy-syscall::ioctl-request-space",
         requests_stay_in_their_block,
         {
-            let mut seen = [0u64; 16];
+            let mut seen = [0u64; 14];
             let mut count = 0;
 
             for (base, requests) in BLOCKS {
@@ -147,12 +143,11 @@ mod tests {
             assert!(!in_space(SPACE_BASE - 1));
             assert!(!in_space(SPACE_END));
 
-            // Plain Linux requests. `0x0301` is Linux's `HDIO_GETGEO`, which the previous base
-            // placed inside the framebuffer block; `0x5401` is `TCGETS`.
+            // Plain Linux requests. `0x0301` is Linux's `HDIO_GETGEO`; `0x5401` is `TCGETS`.
             assert!(!in_space(0x0301));
             assert!(!in_space(0x5401));
 
-            // An encoded Linux request: `TIOCGPTN`, with a direction bit and a size field.
+            // An encoded Linux request (`_IOR('T', 0x30)`), with a direction bit and a size field.
             assert!(!in_space(0x8004_5430));
         }
     );

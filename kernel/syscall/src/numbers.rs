@@ -94,6 +94,7 @@ pub(crate) enum SyscallNumber {
     SigtimedWait = SYSCALL_BASE + 81,
     Tgkill = SYSCALL_BASE + 82,
     ClockGetres = SYSCALL_BASE + 83,
+    Openpty = SYSCALL_BASE + 84,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -189,6 +190,7 @@ impl TryFrom<u64> for SyscallNumber {
             81 => Ok(Self::SigtimedWait),
             82 => Ok(Self::Tgkill),
             83 => Ok(Self::ClockGetres),
+            84 => Ok(Self::Openpty),
             _ => Err(()),
         }
     }
@@ -536,7 +538,11 @@ mod tests {
             SyscallNumber::try_from(SYSCALL_BASE + 83),
             Ok(SyscallNumber::ClockGetres)
         );
-        assert!(SyscallNumber::try_from(SYSCALL_BASE + 84).is_err());
+        assert_eq!(
+            SyscallNumber::try_from(SYSCALL_BASE + 84),
+            Ok(SyscallNumber::Openpty)
+        );
+        assert!(SyscallNumber::try_from(SYSCALL_BASE + 85).is_err());
 
         // Below the base is another personality's numbering, which the dispatcher reports as
         // foreign. Linux x86_64's `read` is 0, `write` is 1, and `exit_group` is 231.

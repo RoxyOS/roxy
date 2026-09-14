@@ -859,7 +859,6 @@ version = "0.1.0"
 dependencies = [
  "linkme",
  "roxy-arch",
- "roxy-devfs",
  "roxy-fd",
  "roxy-poll",
  "roxy-process",
@@ -867,7 +866,6 @@ dependencies = [
  "roxy-tty-core",
  "roxy-tty-types",
  "roxy-utils",
- "spin 0.12.2",
 ]
 
 [[package]]
@@ -919,6 +917,7 @@ dependencies = [
  "roxy-poll",
  "roxy-posix-timer",
  "roxy-process",
+ "roxy-pty",
  "roxy-signal",
  "roxy-test",
  "roxy-thread",

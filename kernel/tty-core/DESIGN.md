@@ -69,8 +69,7 @@ path treats any partial delivery as an I/O error, as before.
 `TIOCGPGRP`/`TIOCSPGRP` (with `SIGTTOU` for background callers), and `TIOCSCTTY`. `TCSAFLUSH`
 discards the readable buffer, the discipline's partial line, and the input source's pending input
 via `TerminalInputSource::discard_pending_input`. Unsupported fields are rejected with
-`IoctlError::Unsupported`; pty master ioctls (`PtyGetNumber`, `PtySetLock`) are out of scope here
-and reported `NotTty`. Other device ioctls (framebuffer, pty master) are likewise `NotTty`.
+`IoctlError::Unsupported`. Other device ioctls (framebuffer, pty master) are likewise `NotTty`.
 
 ### Session and hangup semantics
 

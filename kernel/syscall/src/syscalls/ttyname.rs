@@ -13,8 +13,8 @@ syscall!(
 /// Writes the device pathname of the terminal backing `fd` into `output`.
 ///
 /// The path is owned by the terminal object itself (`File::terminal_path`), so this resolves
-/// per terminal: the console answers `/dev/tty0`, a pty slave answers `/dev/pts/N`, and anything
-/// that is not a terminal fails with `ENOTTY`.
+/// per terminal: the console answers `/dev/tty0`, and anything that is not a terminal, or is a
+/// terminal with no device-filesystem name (a pty slave), fails with `ENOTTY`.
 fn handle(fd: Fd, output: UserAddress, size: usize) -> SyscallResult {
     let file = roxy_process::current_open_file(fd).map_err(map_process_error)?;
     let Some(path) = file.terminal_path() else {
@@ -62,7 +62,7 @@ mod tests {
         {
             assert_eq!(encode(b"/dev/tty0", 10).unwrap(), b"/dev/tty0\0");
             // Exactly the required size is accepted.
-            assert_eq!(encode(b"/dev/pts/3", 10).unwrap().len(), 10);
+            assert_eq!(encode(b"/dev/tty0", 10).unwrap().len(), 10);
             // One byte short of the terminator is an error.
             assert_eq!(encode(b"/dev/tty0", 9), Err(Errno::Range));
         }

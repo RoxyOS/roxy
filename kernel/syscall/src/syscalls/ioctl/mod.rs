@@ -2,7 +2,6 @@ mod execute;
 mod framebuffer;
 mod framebuffer_abi;
 mod numbers;
-mod pty;
 mod terminal;
 mod terminal_abi;
 

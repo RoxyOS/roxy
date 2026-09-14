@@ -21,10 +21,6 @@ pub enum IoctlRequest<'a> {
     SetControllingTerminal {
         force: bool,
     },
-    /// Reads the allocated pty slave number from a pty master (`TIOCGPTN`).
-    PtyGetNumber(&'a mut u32),
-    /// Sets whether the pty slave device is locked (`TIOCSPTLCK`).
-    PtySetLock(bool),
     FbGetInfo(&'a mut FbInfo),
     /// Takes exclusive control of the framebuffer's visible frame for the calling process.
     FbTakeControl,

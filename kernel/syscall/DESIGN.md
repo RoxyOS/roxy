@@ -358,7 +358,21 @@ first falls back to `CLOCK_MONOTONIC` instead of failing.
 `ROXY_SYS_TTYNAME(fd, buf, size)` (72) writes the NUL-terminated openable pathname of the terminal
 backing `fd` into a user buffer. The name is owned by the terminal object — the descriptor layer's
 ABI-neutral `File::terminal_path` — not synthesized here, so each terminal reports its own path
-(`/dev/tty0` for the console, `/dev/pts/N` for a pty slave). Errors: `ENOTTY` when `fd` is not a
-terminal, `ERANGE` when the buffer cannot hold the name plus its terminator, `EBADF` for an invalid
+(`/dev/tty0` for the console). Errors: `ENOTTY` when `fd` is not a terminal or is a terminal with
+no device-filesystem name (a pty slave), `ERANGE` when the buffer cannot hold the name plus its
+terminator, `EBADF` for an invalid
 descriptor. No structured ABI record is involved; the payload is a plain null-terminated byte
 string like `getcwd`.
+
+## Pseudo-terminals
+
+`ROXY_SYS_OPENPTY(fds)` (84) allocates a pseudo-terminal pair and writes its two descriptors into
+the caller's `[i32; 2]` record — `fds[0]` the master, `fds[1]` the slave. The pair comes from
+`roxy-pty::open_pair`, which returns both ends as descriptor-layer `File` objects; this handler owns
+descriptor insertion and the checked copy to userspace, exactly as `socketpair` does. When one
+descriptor was inserted but the other cannot be (an overflow, or a failed copy), both are closed
+before returning, so a failed call never leaks a half-pair. A pair has no device-filesystem name:
+the slave is usable only through the returned descriptor, and a caller that needs it in a child
+passes it across `fork` and makes it the child's controlling terminal with `TIOCSCTTY` — what
+libc's `openpty`/`login_tty` sequence does. Errors: `EFAULT` when the output record is not
+writable, `EOVERFLOW` when a descriptor does not fit the ABI's `int`.

@@ -3,23 +3,25 @@
 extern crate alloc;
 
 mod pair;
-mod registry;
 
-use alloc::sync::Arc;
+use alloc::{boxed::Box, sync::Arc};
 
-use spin::Once;
+use roxy_fd::OpenFile;
 
-pub use pair::{PtyMaster, PtyPair, PtySlave};
-pub use registry::PtyRegistry;
+use pair::{PtyMaster, PtyPair, PtySlave};
 
-pub(crate) static REGISTRY: Once<Arc<PtyRegistry>> = Once::new();
-
-/// The process-wide pty registry, which is also the `/dev/ptmx` factory and the `/dev/pts/N`
-/// dynamic device resolver.
+/// Allocates a pseudo-terminal pair and returns its master and slave as open file descriptions.
 ///
-/// kernel-main registers this object both under `ptmx` and as the dynamic resolver of `roxy-devfs`,
-/// so opening `/dev/ptmx` allocates a fresh pair and opening `/dev/pts/N` reaches its slave.
+/// The pair has no device-filesystem name: the slave is reachable only through the returned
+/// descriptor, so a caller that needs it in a child process passes the descriptor across `fork`
+/// rather than reopening a path. The master carries no terminal semantics; the slave owns the line
+/// discipline and termios, and becomes a session's controlling terminal through `TIOCSCTTY`.
 #[must_use]
-pub fn registry() -> Arc<PtyRegistry> {
-    REGISTRY.call_once(|| Arc::new(PtyRegistry::new())).clone()
+pub fn open_pair() -> (Arc<OpenFile>, Arc<OpenFile>) {
+    let pair = PtyPair::new();
+
+    (
+        OpenFile::new(Box::new(PtyMaster::new(pair.clone()))),
+        OpenFile::new(Box::new(PtySlave::new(pair))),
+    )
 }

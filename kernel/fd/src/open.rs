@@ -37,7 +37,7 @@ impl OpenFile {
     }
 
     /// Returns this terminal's openable device pathname, if the underlying object is a terminal
-    /// backed by a device-filesystem node (e.g. `/dev/tty0` or `/dev/pts/0`).
+    /// backed by a device-filesystem node (e.g. `/dev/tty0`).
     #[must_use]
     pub fn terminal_path(&self) -> Option<alloc::vec::Vec<u8>> {
         self.state.lock().object.terminal_path()

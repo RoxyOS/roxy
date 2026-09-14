@@ -22,6 +22,7 @@ roxy-poll.workspace = true
 roxy-pipe.workspace = true
 roxy-posix-timer.workspace = true
 roxy-process.workspace = true
+roxy-pty.workspace = true
 roxy-signal.workspace = true
 roxy-test = { workspace = true, optional = true }
 roxy-thread.workspace = true

@@ -1,0 +1,107 @@
+diff --git xterm-clean/main.c xterm-workdir/main.c
+index 53eb08e..150289c 100644
+--- xterm-clean/main.c
++++ xterm-workdir/main.c
+@@ -160,6 +160,12 @@ static GCC_NORETURN void HsSysError(int);
+ #endif
+ #endif
+ 
++#ifdef __roxy__
++/* Roxy: a pty pair is an anonymous descriptor pair and openpty() is the only way to allocate one;
++ * there is no /dev/ptmx or /dev/pts to open. */
++#include <pty.h>
++#endif
++
+ #ifdef __CYGWIN__
+ #define WTMP
+ #endif
+@@ -3115,7 +3121,7 @@ main(int argc, char *argv[]ENVP_ARG)
+     }
+ }
+ 
+-#if defined(__osf__) || (defined(__linux__) && !defined(USE_USG_PTYS)) || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__APPLE__)
++#if defined(__osf__) || (defined(__linux__) && !defined(USE_USG_PTYS)) || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__APPLE__) || defined(__roxy__)
+ #define USE_OPENPTY 1
+ static int opened_tty = -1;
+ #endif
+@@ -3135,10 +3141,12 @@ get_pty(int *pty, char *from GCC_UNUSED)
+ 
+ #if defined(USE_OPENPTY)
+     result = openpty(pty, &opened_tty, ttydev, NULL, NULL);
++#ifndef __roxy__
+     if (opened_tty >= 0) {
+ 	close(opened_tty);
+ 	opened_tty = -1;
+     }
++#endif
+ #elif defined(HAVE_POSIX_OPENPT) && defined(HAVE_PTSNAME) && defined(HAVE_GRANTPT_PTY_ISATTY)
+     if ((*pty = posix_openpt(O_RDWR)) >= 0) {
+ 	char *name = ptsname(*pty);
+@@ -3243,6 +3251,25 @@ get_pty(int *pty, char *from GCC_UNUSED)
+     return result;
+ }
+ 
++#ifdef __roxy__
++/*
++ * Roxy has no /dev/pts: a pty pair is an anonymous descriptor pair, so the slave that openpty()
++ * returned is inherited across fork() and used directly here instead of being reopened by name.
++ * TIOCSCTTY makes it this session's controlling terminal.
++ */
++static int
++roxy_open_slave(void)
++{
++    int fd = opened_tty;
++
++    if (fd >= 0) {
++	opened_tty = -1;
++	IGNORE_RC(ioctl(fd, TIOCSCTTY, 0));
++    }
++    return fd;
++}
++#endif
++
+ static void
+ set_pty_permissions(uid_t uid, unsigned gid, unsigned mode)
+ {
+@@ -4550,7 +4577,11 @@ spawnXTerm(XtermWidget xw, unsigned line_speed)
+ #ifdef CSRG_BASED
+ 		    IGNORE_RC(revoke(ttydev));
+ #endif
++#ifdef __roxy__
++		    if ((ttyfd = roxy_open_slave()) >= 0) {
++#else
+ 		    if ((ttyfd = open(ttydev, O_RDWR)) >= 0) {
++#endif
+ 			TRACE_GET_TTYSIZE(ttyfd, "after open");
+ 			TRACE_RC(i, SET_TTYSIZE(ttyfd, ts));
+ 			TRACE_GET_TTYSIZE(ttyfd, "after SET_TTYSIZE fixup");
+@@ -4577,6 +4608,14 @@ spawnXTerm(XtermWidget xw, unsigned line_speed)
+ 			break;
+ #endif /* USE_SYSV_PGRP */
+ 		    }
++#ifdef __roxy__
++		    /*
++		     * Roxy has no /dev/pts: the parent cannot hand a running child a new pty
++		     * by name, so a failed slave setup is fatal instead of a PTY_BAD retry
++		     * that could never open another pair.
++		     */
++		    SysError(ERROR_OPPTSNAME);
++#endif
+ 		    perror("open ttydev");
+ #ifdef TIOCSCTTY
+ 		    ioctl(ttyfd, TIOCSCTTY, 0);
+@@ -5438,6 +5477,14 @@ spawnXTerm(XtermWidget xw, unsigned line_speed)
+ 	    exit(ERROR_EXEC);
+ 	}
+ 	/* end if in child after fork */
++#ifdef __roxy__
++	/* The child took the openpty() slave descriptor across fork(); the parent's copy is not
++	 * needed. */
++	if (opened_tty >= 0) {
++	    close(opened_tty);
++	    opened_tty = -1;
++	}
++#endif
+ #if OPT_PTY_HANDSHAKE
+ 	if (resource.ptyHandshake) {
+ 	    /* Parent process.  Let's handle handshaked requests to our

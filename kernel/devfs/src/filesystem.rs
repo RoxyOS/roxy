@@ -46,7 +46,6 @@ impl FileSystem for DevFs {
             .registry
             .resolve(path.as_bytes())
             .ok_or(VfsError::NotFound)?;
-        let device = device.open().unwrap_or(device);
         // A session leader opening an unowned terminal acquires it as its controlling terminal
         // (Linux `tty_open` semantics). No-op for non-terminals and already-bound terminals.
         device.acquire_controlling_terminal();

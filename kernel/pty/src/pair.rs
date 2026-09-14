@@ -1,7 +1,11 @@
-use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
+use alloc::{collections::VecDeque, sync::Arc};
+use core::sync::atomic::{AtomicU32, Ordering};
 
 use roxy_arch::{Architecture, CurrentArchitectureBackend};
-use roxy_fd::{FileError, FileMetadata, FileType, IoctlError, IoctlRequest, PollEvents};
+use roxy_fd::{
+    File, FileError, FileMetadata, FileType, IoctlError, IoctlRequest, PollEvents, SeekError,
+    SeekFrom,
+};
 use roxy_poll::{PollListener, PollListeners, PollRegistration};
 use roxy_tty_core::{OutputError, TerminalInputSource, TtyCore, TtyOutput};
 use roxy_tty_types::WindowSize;
@@ -9,6 +13,9 @@ use roxy_utils::Lock;
 
 const MASTER_FILE_ID_BASE: u64 = 1000;
 const SLAVE_FILE_ID_BASE: u64 = 2000;
+
+/// The file number of the next pair, unique for the kernel lifetime.
+static NEXT_NUMBER: AtomicU32 = AtomicU32::new(0);
 
 /// The slave's output destination: the pty master's receive buffer.
 ///
@@ -61,16 +68,19 @@ impl TerminalInputSource for SlaveInputSource {
 
 /// One pseudo-terminal pair: a master the terminal emulator holds and a slave that is the
 /// controlling terminal of the program running inside it.
-pub struct PtyPair {
+///
+/// A pair is allocated only by [`crate::open_pair`]; it has no device-filesystem name, and the
+/// slave is reachable solely through the descriptor `openpty` returns.
+pub(crate) struct PtyPair {
     number: u32,
     master_output: Arc<MasterOutput>,
     slave_input: Arc<SlaveInputSource>,
     slave_core: Arc<TtyCore>,
-    locked: Lock<bool>,
 }
 
 impl PtyPair {
-    pub(crate) fn new(number: u32) -> Arc<Self> {
+    pub(crate) fn new() -> Arc<Self> {
+        let number = NEXT_NUMBER.fetch_add(1, Ordering::Relaxed);
         let master_output = Arc::new(MasterOutput {
             queue: Lock::new(VecDeque::new()),
             poll: Arc::new(PollListeners::new()),
@@ -85,16 +95,15 @@ impl PtyPair {
             master_output,
             slave_input,
             slave_core,
-            locked: Lock::new(true),
         })
     }
 }
 
-/// The master side of a pty pair, exposed through the fd opened from `/dev/ptmx`.
+/// The master side of a pty pair: a "dumb" bidirectional pipe with no line discipline.
 ///
 /// TODO(master-close-hangup): closing the last master does not yet signal EOF or `SIGHUP` to the
-/// slave, because `Device` has no per-open drop hook to detect it.
-pub struct PtyMaster {
+/// slave, because the descriptor layer has no per-open drop hook to detect it.
+pub(crate) struct PtyMaster {
     pair: Arc<PtyPair>,
 }
 
@@ -115,23 +124,39 @@ impl PtyMaster {
     }
 }
 
-impl roxy_devfs::Device for PtyMaster {
-    fn metadata(&self) -> FileMetadata {
-        FileMetadata {
+impl File for PtyMaster {
+    fn poll(&mut self) -> Result<PollEvents, FileError> {
+        Ok(PollEvents {
+            readable: !self.pair.master_output.queue.lock().is_empty(),
+            writable: true,
+            ..PollEvents::default()
+        })
+    }
+
+    fn register_poll_listener(&mut self, listener: Arc<PollListener>) -> PollRegistration {
+        self.pair.master_output.poll.register(listener)
+    }
+
+    fn is_terminal(&self) -> bool {
+        false
+    }
+
+    fn metadata(&self) -> Result<FileMetadata, FileError> {
+        Ok(FileMetadata {
             file_id: MASTER_FILE_ID_BASE + u64::from(self.pair.number),
             file_type: FileType::CharacterDevice,
             permissions: 0o600,
             size: 0,
             hard_links: 1,
-        }
+        })
     }
 
-    fn is_terminal(&self) -> bool {
-        // A pty master is a "dumb" bidirectional pipe, not a terminal.
-        false
-    }
-
-    fn read(&self, output: &mut [u8]) -> Result<usize, FileError> {
+    fn read(
+        &mut self,
+        _position: &mut u64,
+        output: &mut [u8],
+        nonblocking: bool,
+    ) -> Result<usize, FileError> {
         if output.is_empty() {
             return Ok(0);
         }
@@ -140,6 +165,10 @@ impl roxy_devfs::Device for PtyMaster {
             let count = self.drain_master(output);
             if count > 0 {
                 return Ok(count);
+            }
+
+            if nonblocking {
+                return Err(FileError::WouldBlock);
             }
 
             if roxy_process::has_pending_signal() {
@@ -151,7 +180,12 @@ impl roxy_devfs::Device for PtyMaster {
         }
     }
 
-    fn write(&self, input: &[u8]) -> Result<usize, FileError> {
+    fn write(
+        &mut self,
+        _position: &mut u64,
+        input: &[u8],
+        _nonblocking: bool,
+    ) -> Result<usize, FileError> {
         // Feed the slave's line discipline as if the user typed these bytes.
         self.pair
             .slave_input
@@ -164,42 +198,22 @@ impl roxy_devfs::Device for PtyMaster {
         Ok(input.len())
     }
 
-    fn poll(&self) -> PollEvents {
-        PollEvents {
-            readable: !self.pair.master_output.queue.lock().is_empty(),
-            writable: true,
-            ..PollEvents::default()
-        }
+    fn seek(&mut self, _current: u64, _position: SeekFrom) -> Result<u64, SeekError> {
+        Err(SeekError::NotSeekable)
     }
 
-    fn register_poll_listener(&self, listener: Arc<PollListener>) -> PollRegistration {
-        self.pair.master_output.poll.register(listener)
-    }
-
-    fn ioctl(&self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
-        match request {
-            IoctlRequest::PtyGetNumber(number) => {
-                *number = self.pair.number;
-                Ok(())
-            }
-            IoctlRequest::PtySetLock(locked) => {
-                // TODO(pty-lock): the flag is recorded but slave `open` does not yet reject a
-                // locked slave.
-                *self.pair.locked.lock() = locked;
-                Ok(())
-            }
-            _ => {
-                // TODO(pty-gptpeer): `TIOCGPTPEER` is unsupported because the syscall layer cannot
-                // return a newly allocated descriptor from ioctl; callers open `/dev/pts/N`.
-                Err(IoctlError::NotTty)
-            }
-        }
+    fn ioctl(&mut self, _request: IoctlRequest<'_>) -> Result<(), IoctlError> {
+        // The master carries no termios of its own; `openpty` applies terminal attributes to the
+        // slave descriptor.
+        Err(IoctlError::NotTty)
     }
 }
 
-/// The slave side of a pty pair, exposed through `/dev/pts/N` and the program's controlling
-/// terminal.
-pub struct PtySlave {
+/// The slave side of a pty pair: the program's controlling terminal.
+///
+/// Every operation delegates to the pair's `TtyCore`, so the slave inherits line discipline,
+/// canonical editing, termios, foreground groups, and controlling-session handling.
+pub(crate) struct PtySlave {
     pair: Arc<PtyPair>,
 }
 
@@ -209,72 +223,136 @@ impl PtySlave {
     }
 }
 
-impl roxy_devfs::Device for PtySlave {
-    fn metadata(&self) -> FileMetadata {
-        FileMetadata {
-            file_id: SLAVE_FILE_ID_BASE + u64::from(self.pair.number),
-            file_type: FileType::CharacterDevice,
-            permissions: 0o600,
-            size: 0,
-            hard_links: 1,
-        }
+impl File for PtySlave {
+    fn poll(&mut self) -> Result<PollEvents, FileError> {
+        self.pair.slave_core.poll()
+    }
+
+    fn register_poll_listener(&mut self, listener: Arc<PollListener>) -> PollRegistration {
+        self.pair.slave_core.register_poll_listener(listener)
     }
 
     fn is_terminal(&self) -> bool {
         true
     }
 
-    fn terminal_path(&self) -> Option<Vec<u8>> {
-        Some(alloc::format!("/dev/pts/{}", self.pair.number).into_bytes())
+    fn metadata(&self) -> Result<FileMetadata, FileError> {
+        Ok(FileMetadata {
+            file_id: SLAVE_FILE_ID_BASE + u64::from(self.pair.number),
+            file_type: FileType::CharacterDevice,
+            permissions: 0o600,
+            size: 0,
+            hard_links: 1,
+        })
     }
 
-    fn acquire_controlling_terminal(&self) -> bool {
-        // A session leader opening this unowned slave acquires it as its controlling terminal
-        // (Linux `tty_open`). The slave's line discipline is what the child interacts with.
-        self.pair.slave_core.try_acquire_controlling_terminal()
-    }
-
-    fn read(&self, output: &mut [u8]) -> Result<usize, FileError> {
+    fn read(
+        &mut self,
+        _position: &mut u64,
+        output: &mut [u8],
+        _nonblocking: bool,
+    ) -> Result<usize, FileError> {
         self.pair.slave_core.read(output)
     }
 
-    fn write(&self, input: &[u8]) -> Result<usize, FileError> {
+    fn write(
+        &mut self,
+        _position: &mut u64,
+        input: &[u8],
+        _nonblocking: bool,
+    ) -> Result<usize, FileError> {
         self.pair.slave_core.write(input)
     }
 
-    fn poll(&self) -> PollEvents {
-        self.pair.slave_core.poll().unwrap_or_default()
+    fn seek(&mut self, _current: u64, _position: SeekFrom) -> Result<u64, SeekError> {
+        Err(SeekError::NotSeekable)
     }
 
-    fn register_poll_listener(&self, listener: Arc<PollListener>) -> PollRegistration {
-        self.pair.slave_core.register_poll_listener(listener)
-    }
-
-    fn ioctl(&self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
+    fn ioctl(&mut self, request: IoctlRequest<'_>) -> Result<(), IoctlError> {
         self.pair.slave_core.ioctl(request)
     }
 }
 
 #[cfg(feature = "kernel-test")]
 mod tests {
-    use roxy_devfs::Device;
+    use roxy_fd::FileError;
     use roxy_test::kernel_test;
 
-    use super::{PtyMaster, PtyPair, PtySlave};
+    use crate::open_pair;
 
-    kernel_test!("roxy-pty::slave-name", names_slave_under_dev_pts, {
-        let pair = PtyPair::new(7);
-        let slave = PtySlave::new(pair);
+    kernel_test!(
+        "roxy-pty::open-pair",
+        gives_master_and_slave_distinct_files,
+        {
+            let (master, slave) = open_pair();
 
-        assert!(slave.is_terminal());
-        assert_eq!(slave.terminal_path().unwrap(), b"/dev/pts/7".to_vec());
+            assert!(!master.is_terminal());
+            assert!(slave.is_terminal());
+
+            let master_id = master.metadata().unwrap().file_id;
+            let slave_id = slave.metadata().unwrap().file_id;
+            assert_ne!(master_id, slave_id);
+        }
+    );
+
+    kernel_test!("roxy-pty::open-pair-numbers", numbers_pairs_uniquely, {
+        let (first, _) = open_pair();
+        let (second, _) = open_pair();
+
+        assert_ne!(
+            first.metadata().unwrap().file_id,
+            second.metadata().unwrap().file_id
+        );
     });
 
-    kernel_test!("roxy-pty::master-is-not-terminal", master_has_no_name, {
-        let pair = PtyPair::new(0);
-        let master = PtyMaster::new(pair);
+    kernel_test!("roxy-pty::slave-has-no-path", slave_has_no_device_name, {
+        let (_, slave) = open_pair();
 
-        assert!(!master.is_terminal());
-        assert!(master.terminal_path().is_none());
+        // The pair is reachable only through the returned descriptors, so the slave reports no
+        // reopenable device path.
+        assert!(slave.terminal_path().is_none());
     });
+
+    kernel_test!(
+        "roxy-pty::master-to-slave",
+        delivers_master_input_to_the_slave,
+        {
+            let (master, slave) = open_pair();
+
+            assert_eq!(master.write(b"hi\n"), Ok(3));
+
+            // Canonical mode commits the line at the newline, so the read does not block.
+            let mut input = [0u8; 8];
+            let count = slave.read(&mut input).unwrap();
+            assert_eq!(&input[..count], b"hi\n");
+        }
+    );
+
+    kernel_test!(
+        "roxy-pty::slave-to-master",
+        delivers_slave_output_to_the_master,
+        {
+            let (master, slave) = open_pair();
+
+            assert_eq!(slave.write(b"out"), Ok(3));
+
+            let mut output = [0u8; 8];
+            let count = master.read_with_nonblocking(&mut output, true).unwrap();
+            assert_eq!(&output[..count], b"out");
+        }
+    );
+
+    kernel_test!(
+        "roxy-pty::master-nonblocking",
+        reports_would_block_without_data,
+        {
+            let (master, _slave) = open_pair();
+
+            let mut output = [0u8; 8];
+            assert_eq!(
+                master.read_with_nonblocking(&mut output, true),
+                Err(FileError::WouldBlock)
+            );
+        }
+    );
 }

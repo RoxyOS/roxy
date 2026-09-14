@@ -39,15 +39,11 @@ open("/dev/framebuffer")
   → VfsFile → descriptor-layer File
 open("/dev/null")
   → (same path, NullDevice)
-
-open("/dev/ptmx") → registry lookup → factory open → per-pair master
-open("/dev/pts/0") → registry miss → dynamic resolvers → slave
 ```
 
-- `Device::metadata` returns the character-device metadata including a stable per-file ID; a
-  factory device's `Device::open` allocates a fresh instance per `open`, and dynamically resolved
-  devices are supplied by the registry's `DynamicDeviceResolver`s after the static table misses.
-  `Device::is_terminal` reports whether the device looks like a terminal (a pty slave).
+- `Device::metadata` returns the character-device metadata including a stable per-file ID;
+  dynamically resolved devices are supplied by the registry's `DynamicDeviceResolver`s after the
+  static table misses. `Device::is_terminal` reports whether the device looks like a terminal.
   `NullDevice` reports file ID 2, character-device type, mode 0666, and zero size.
 - `Device::ioctl` receives the same typed `IoctlRequest` the descriptor layer dispatches; the
   device returns `IoctlError` values that the syscall layer maps to errno.
@@ -61,7 +57,7 @@ open("/dev/pts/0") → registry miss → dynamic resolvers → slave
 ## Invariants and limits
 
 - Static registration is idempotent-failing: a second registration under an existing path returns
-  `AlreadyExists` and never replaces the existing device. Dynamic paths (pty slaves) are not
+  `AlreadyExists` and never replaces the existing device. Dynamic paths such as `/dev/tty` are not
   statically registered; any registered `DynamicDeviceResolver`s are consulted (in registration
   order, first match wins) after the static table misses and extend resolution without mutating the
   static table.
@@ -76,6 +72,6 @@ open("/dev/pts/0") → registry miss → dynamic resolvers → slave
   fixed at boot.
 
 `Device` also answers `terminal_path()` (default `None`) with a terminal's openable device pathname —
-the console's `/dev/tty0` and each pty slave's `/dev/pts/N`. `DeviceFile::terminal_path` forwards
+the console's `/dev/tty0`. `DeviceFile::terminal_path` forwards
 it to the device so a descriptor opened from a devfs node can be named by `ttyname`. Only terminals
 report a name; non-terminal devices return `None`.

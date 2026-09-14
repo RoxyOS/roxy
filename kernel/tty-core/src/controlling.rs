@@ -40,8 +40,8 @@ impl Device for ControlTerminal {
         true
     }
 
-    // TODO(tty-path): reporting the underlying terminal's own path (/dev/tty0, /dev/pts/N) needs
-    // the TtyCore to know it; until then ttyname() on a /dev/tty fd returns nothing.
+    // TODO(tty-path): reporting the underlying terminal's own path (/dev/tty0) needs the TtyCore
+    // to know it; until then ttyname() on a /dev/tty fd returns nothing.
     fn terminal_path(&self) -> Option<Vec<u8>> {
         None
     }

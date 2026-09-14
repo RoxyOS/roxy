@@ -44,11 +44,6 @@ pub extern "C" fn _start() -> ! {
     let device_registry = rootfs::initialize(&boot_info).expect("initialize root filesystem");
     roxy_fbdev::register(&device_registry);
     roxy_devfs::register_null(&device_registry);
-    let pty_registry = roxy_pty::registry();
-    device_registry
-        .register(b"ptmx", pty_registry.clone())
-        .expect("pty master registered exactly once");
-    device_registry.register_dynamic_resolver(pty_registry.clone());
     // `/dev/tty` resolves to the calling process's controlling terminal (see tty-core).
     device_registry.register_dynamic_resolver(alloc::sync::Arc::new(
         roxy_tty_core::ControllingTerminalResolver,

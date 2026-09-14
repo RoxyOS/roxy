@@ -2,7 +2,7 @@ use roxy_fd::{IoctlError, OpenFile, StatusFlags};
 use roxy_memory::UserAddress;
 use roxy_tty_types::ApplyWhen;
 
-use super::{framebuffer, numbers, pty, terminal};
+use super::{framebuffer, numbers, terminal};
 use crate::args::{SyscallArg, user_memory};
 use crate::errno::Errno;
 
@@ -27,8 +27,6 @@ pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> R
         terminal::TIOCSPGRP => terminal::set_foreground_pgid(file, raw_argument).map(|()| 0),
         terminal::TIOCSCTTY => terminal::set_controlling_terminal(file, raw_argument).map(|()| 0),
         terminal::TCFLSH => terminal::tcflush(file, raw_argument).map(|()| 0),
-        pty::TIOCGPTN => pty::get_pty_number(file, raw_argument).map(|()| 0),
-        pty::TIOCSPTLCK => pty::set_pty_lock(file, raw_argument).map(|()| 0),
         framebuffer::ROXY_FRAMEBUFFER_GET_INFO => {
             framebuffer::get_info(file, raw_argument).map(|()| 0)
         }

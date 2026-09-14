@@ -14,16 +14,7 @@ pub trait Device: Send + Sync {
     /// Returns metadata for the device node.
     fn metadata(&self) -> FileMetadata;
 
-    /// Returns the device instance an `open` of this node should hand out, or `None` to use `self`.
-    ///
-    /// A factory device (such as `/dev/ptmx`) overrides this so that opening the path yields a
-    /// fresh instance rather than the node itself; ordinary devices return `None` and are opened as
-    /// themselves.
-    fn open(&self) -> Option<Arc<dyn Device>> {
-        None
-    }
-
-    /// Reports whether this device is a terminal (for example a pty slave).
+    /// Reports whether this device is a terminal (for example the console).
     fn is_terminal(&self) -> bool {
         false
     }
@@ -39,11 +30,10 @@ pub trait Device: Send + Sync {
     }
 
     /// Returns this terminal's openable pathname within the device filesystem (for example
-    /// `/dev/tty0` or `/dev/pts/3`), when the device is a terminal.
+    /// `/dev/tty0`), when the device is a terminal.
     ///
-    /// The path is the one the device was registered under (or, for dynamic devices such as pty
-    /// slaves, is resolved from), so a `ttyname` consumer can reopen it. Non-terminal devices
-    /// return `None`.
+    /// The path is the one the device was registered under (or resolved from), so a `ttyname`
+    /// consumer can reopen it. Non-terminal devices return `None`.
     fn terminal_path(&self) -> Option<Vec<u8>> {
         None
     }
@@ -106,16 +96,17 @@ pub trait Device: Send + Sync {
 /// Names device drivers under the device filesystem mount point.
 pub struct DeviceRegistry {
     devices: Lock<BTreeMap<Vec<u8>, Arc<dyn Device>>>,
-    /// Resolvers for device paths created dynamically at runtime (e.g. `/dev/pts/N` pty slaves);
-    /// each resolver may own a distinct dynamic namespace, consulted in registration order.
+    /// Resolvers for device paths created dynamically at runtime (e.g. `/dev/tty`); each resolver
+    /// may own a distinct dynamic namespace, consulted in registration order.
     dynamic: Lock<Vec<Arc<dyn DynamicDeviceResolver>>>,
 }
 
 /// Resolves device paths that appear only at runtime (after registration).
 ///
 /// The static registry names devices created during initialization; a dynamic resolver supplies
-/// devices whose identity depends on runtime state, such as per-pair pty slave nodes. It is read
-/// after the static table misses and never mutates the static registry.
+/// devices whose identity depends on runtime state, such as the calling process's controlling
+/// terminal node `/dev/tty`. It is read after the static table misses and never mutates the static
+/// registry.
 pub trait DynamicDeviceResolver: Send + Sync {
     /// Returns the device for a mount-relative path, or `None` when it does not exist.
     fn resolve(&self, path: &[u8]) -> Option<Arc<dyn Device>>;

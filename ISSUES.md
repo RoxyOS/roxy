@@ -34,13 +34,19 @@ not validate that target and group share a session. Both gaps are marked with `T
 `TODO(<missing-capability>)` at its code site and described further in `kernel/pty/DESIGN.md`:
 
 - `TODO(master-close-hangup)`: closing the last pty master does not signal EOF or `SIGHUP` to the
-  slave, because `Device` has no per-open drop hook to detect it.
-- `TODO(pty-lock)`: `TIOCSPTLCK` records the lock flag but a slave `open` does not yet reject a
-  locked slave.
-- `TODO(pty-gptpeer)`: `TIOCGPTPEER` is unsupported because the syscall layer cannot return a newly
-  allocated descriptor from ioctl; callers open `/dev/pts/N` by number instead.
-- `TODO(sigwinch)`: the process model has no `SIGWINCH`; master `TIOCSWINSZ` does not yet propagate
-  to the slave.
+  slave, because the descriptor layer has no per-open drop hook to detect it.
+- `TODO(sigwinch)`: the process model has no `SIGWINCH`; a slave window-size change is not
+  propagated to the master or announced.
+
+## Pseudo-terminals have no device-filesystem interface
+
+A pty pair is allocated only by `openpty()` (`ROXY_SYS_OPENPTY`) and has no node under `/dev`.
+`/dev/ptmx` and `/dev/pts/N` do not exist, and the Unix98 interfaces built on them —
+`posix_openpt`, `grantpt`, `unlockpt`, `ptsname`, `ptsname_r`, `TIOCGPTN`, `TIOCSPTLCK` — have no
+backing. The mlibc declarations of those functions remain (they are upstream code this fork does
+not edit), but every call fails: `posix_openpt` cannot open `/dev/ptmx`, and `ptsname`/`unlockpt`
+reach an unimplemented sysdep. A pty slave reports no `terminal_path`, so `ttyname()` on it returns
+`ENOTTY` and no consumer can reopen it by name.
 
 ## xtest aborts at the VFS root-mount test before most tests run
 

@@ -28,6 +28,7 @@ mod iovec;
 mod isatty;
 mod open;
 mod open_dir;
+mod openpty;
 mod pipe;
 mod poll;
 mod read;
@@ -55,7 +56,7 @@ mod writev;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 84] = [
+pub(super) const SYSCALLS: [Syscall; 85] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -140,4 +141,5 @@ pub(super) const SYSCALLS: [Syscall; 84] = [
     get_tid::SYSCALL,
     sigtimedwait::SYSCALL,
     tgkill::SYSCALL,
+    openpty::SYSCALL,
 ];
