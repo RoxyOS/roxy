@@ -1,0 +1,19 @@
+diff --git python-clean/Modules/signalmodule.c python-workdir/Modules/signalmodule.c
+index ee27970..c6cfc64 100644
+--- python-clean/Modules/signalmodule.c
++++ python-workdir/Modules/signalmodule.c
+@@ -1134,7 +1134,14 @@ fill_siginfo(_signal_module_state *state, siginfo_t *si)
+     PyStructSequence_SET_ITEM(result, 4, PyLong_FromLong(0L));
+     PyStructSequence_SET_ITEM(result, 5, PyLong_FromLong(0L));
+ #else
++    /* Roxy's siginfo_t has no si_errno: the record carries only the fields its sources fill, so
++     * this slot is the constant zero a Linux-shaped record reports for a signal raised without
++     * an errno. */
++# ifdef __roxy__
++    PyStructSequence_SET_ITEM(result, 2, PyLong_FromLong(0L));
++# else
+     PyStructSequence_SET_ITEM(result, 2, PyLong_FromLong((long)(si->si_errno)));
++# endif
+     PyStructSequence_SET_ITEM(result, 3, PyLong_FromPid(si->si_pid));
+     PyStructSequence_SET_ITEM(result, 4, _PyLong_FromUid(si->si_uid));
+     PyStructSequence_SET_ITEM(result, 5,
