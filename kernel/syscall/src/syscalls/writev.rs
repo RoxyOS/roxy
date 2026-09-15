@@ -33,7 +33,7 @@ fn handle(fd: Fd, iovs: UserAddress, iovcnt: u32) -> SyscallResult {
         Err(FileError::BrokenPipe) => {
             let _ =
                 roxy_process::send_signal(roxy_process::current_process_id(), Signal::BrokenPipe);
-            return Err(Errno::Pipe);
+            return Err(Errno::BrokenPipe);
         }
         Err(error) => return Err(map_file_error(error)),
     };

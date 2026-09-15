@@ -159,7 +159,7 @@ fn fd_metadata(raw: u64) -> Result<StatAbi, Errno> {
         .map_err(|error| match error {
             FileError::WouldBlock => Errno::Again,
             FileError::BadOperation => unsupported("stat.fd-object", raw),
-            FileError::BrokenPipe => Errno::Pipe,
+            FileError::BrokenPipe => Errno::BrokenPipe,
             FileError::NotConnected => Errno::NotConnected,
             FileError::Io => Errno::Io,
             FileError::Interrupted => Errno::Interrupted,

@@ -275,7 +275,16 @@ success it invokes the architecture's fresh-user resume path and never returns t
 ## Errors and unsupported behavior
 
 Subsystem errors are translated to stable ABI errno values at this boundary. Invalid userspace
-addresses return `EFAULT`; size limits and format failures use their defined errno values. Missing
+addresses return `EFAULT`; size limits and format failures use their defined errno values.
+
+Errno is the one value namespace this personality does not number itself: it keeps Linux's numbers,
+so a caller's own `<errno.h>` agrees with what it receives, and this module is one hand-kept copy of
+that table against Roxy mlibc's `abi-bits/errno.h`. A registry test holds every variant to the
+number its name has, because a call site names the variant and cannot notice a wrong number — a
+condition this enum does not number is one no variant can report, which is how a closed pipe came to
+report the not-seekable descriptor's errno.
+
+Missing
 kernel functionality must emit the centralized unconditional `UNSUPPORTED` diagnostic before an
 error is returned, including operation, argument, PID/TID, and errno. The `ioctl` parser reports a
 request no handler serves the same way, separating a foreign request from an undefined one of its

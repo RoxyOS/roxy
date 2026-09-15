@@ -69,7 +69,7 @@ fn map_process_error(_: DescriptorError) -> Errno {
 
 fn map_seek_error(error: SeekError) -> Errno {
     match error {
-        SeekError::NotSeekable => Errno::Pipe,
+        SeekError::NotSeekable => Errno::InvalidSeek,
         SeekError::InvalidOffset => Errno::Invalid,
         SeekError::Overflow => Errno::Overflow,
         SeekError::Io => Errno::Io,

@@ -31,7 +31,7 @@ fn handle(fd: Fd, address: UserAddress, count: usize) -> SyscallResult {
                     roxy_process::current_process_id(),
                     Signal::BrokenPipe,
                 );
-                return Err(Errno::Pipe);
+                return Err(Errno::BrokenPipe);
             }
             Err(error) => return Err(map_file_error(error)),
         };
@@ -53,7 +53,7 @@ fn map_file_error(error: FileError) -> Errno {
     match error {
         FileError::WouldBlock => Errno::Again,
         FileError::BadOperation => Errno::BadFd,
-        FileError::BrokenPipe => Errno::Pipe,
+        FileError::BrokenPipe => Errno::BrokenPipe,
         FileError::NotConnected => Errno::NotConnected,
         FileError::Io => Errno::Io,
         FileError::Interrupted => Errno::Interrupted,
