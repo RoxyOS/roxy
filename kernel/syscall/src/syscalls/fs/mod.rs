@@ -7,8 +7,8 @@ mod stat;
 mod truncate;
 
 use bitflags::bitflags;
-use roxy_fd::FileError;
-use roxy_vfs::VfsError;
+use roxy_fd::{FileError, FileType as FdFileType};
+use roxy_vfs::{FileType as VfsFileType, VfsError};
 
 use crate::{Syscall, args::SyscallArg, errno::Errno};
 
@@ -122,6 +122,73 @@ impl SyscallArg for AtFlags {
     }
 }
 
+/// The kind of file a `stat` result or a directory entry describes.
+///
+/// A closed set whose members name alternatives rather than combinable bits: one value names one
+/// kind, and no two values describe the same file. The values are Roxy's own rather than POSIX's
+/// `S_IFMT` and `d_type` numbering, which stop at this boundary — the kernel produces the word and
+/// only the libc reads it, rendering the `st_mode` type bits and the `d_type` byte userspace
+/// compares against. Zero is reserved, so an all-zero record never describes a file.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u32)]
+pub(super) enum FileKind {
+    Regular = 1,
+    Directory = 2,
+    Symlink = 3,
+    BlockDevice = 4,
+    CharacterDevice = 5,
+    Fifo = 6,
+    Socket = 7,
+    /// A filesystem that cannot report what kind an entry describes, which POSIX spells
+    /// `DT_UNKNOWN`.
+    Unknown = 8,
+}
+
+impl FileKind {
+    /// The word a `stat` result record carries.
+    pub(super) const fn word(self) -> u32 {
+        self as u32
+    }
+
+    /// The word a directory-entry record carries, which gives a kind one byte.
+    pub(super) const fn byte(self) -> u8 {
+        self as u8
+    }
+}
+
+/// Every kind fits in the byte the directory-entry record gives it.
+const _: () = assert!(FileKind::Unknown as u32 <= u8::MAX as u32);
+
+impl From<VfsFileType> for FileKind {
+    fn from(file_type: VfsFileType) -> Self {
+        match file_type {
+            VfsFileType::Regular => Self::Regular,
+            VfsFileType::Directory => Self::Directory,
+            VfsFileType::Symlink => Self::Symlink,
+            VfsFileType::BlockDevice => Self::BlockDevice,
+            VfsFileType::CharacterDevice => Self::CharacterDevice,
+            VfsFileType::Fifo => Self::Fifo,
+            VfsFileType::Socket => Self::Socket,
+            VfsFileType::Unknown => Self::Unknown,
+        }
+    }
+}
+
+impl From<FdFileType> for FileKind {
+    fn from(file_type: FdFileType) -> Self {
+        match file_type {
+            FdFileType::Regular => Self::Regular,
+            FdFileType::Directory => Self::Directory,
+            FdFileType::Symlink => Self::Symlink,
+            FdFileType::BlockDevice => Self::BlockDevice,
+            FdFileType::CharacterDevice => Self::CharacterDevice,
+            FdFileType::Fifo => Self::Fifo,
+            FdFileType::Socket => Self::Socket,
+            FdFileType::Unknown => Self::Unknown,
+        }
+    }
+}
+
 fn map_file_error(error: FileError) -> Errno {
     match error {
         FileError::WouldBlock => Errno::Again,
@@ -170,10 +237,49 @@ fn unsupported_at_flags(operation: &str, argument: impl core::fmt::Display) -> E
 
 #[cfg(feature = "kernel-test")]
 mod tests {
+    use roxy_fd::FileType as FdFileType;
     use roxy_test::kernel_test;
+    use roxy_vfs::FileType as VfsFileType;
 
-    use super::{AT_FDCWD, AT_FLAGS_BASE, AtFlags, DirectoryFd};
+    use super::{AT_FDCWD, AT_FLAGS_BASE, AtFlags, DirectoryFd, FileKind};
     use crate::{args::SyscallArg, errno::Errno};
+
+    kernel_test!("roxy-syscall::file-kind", two_sources_agree, {
+        // The VFS and the descriptor boundary name the same eight kinds, and a record carries one
+        // word whichever boundary produced it, so the two must agree kind for kind.
+        let pairs = [
+            (VfsFileType::Regular, FdFileType::Regular, FileKind::Regular),
+            (
+                VfsFileType::Directory,
+                FdFileType::Directory,
+                FileKind::Directory,
+            ),
+            (VfsFileType::Symlink, FdFileType::Symlink, FileKind::Symlink),
+            (
+                VfsFileType::BlockDevice,
+                FdFileType::BlockDevice,
+                FileKind::BlockDevice,
+            ),
+            (
+                VfsFileType::CharacterDevice,
+                FdFileType::CharacterDevice,
+                FileKind::CharacterDevice,
+            ),
+            (VfsFileType::Fifo, FdFileType::Fifo, FileKind::Fifo),
+            (VfsFileType::Socket, FdFileType::Socket, FileKind::Socket),
+            (VfsFileType::Unknown, FdFileType::Unknown, FileKind::Unknown),
+        ];
+
+        for (vfs, fd, kind) in pairs {
+            assert_eq!(FileKind::from(vfs), kind);
+            assert_eq!(FileKind::from(fd), kind);
+        }
+
+        // Zero is reserved, so no kind is an all-zero word and the byte-packed one still fits.
+        assert_eq!(FileKind::Regular.word(), 1);
+        assert_eq!(FileKind::Unknown.word(), 8);
+        assert_eq!(FileKind::Directory.byte(), 2);
+    });
 
     kernel_test!(
         "roxy-syscall::at-fdcwd",

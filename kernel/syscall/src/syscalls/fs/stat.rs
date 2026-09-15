@@ -1,9 +1,9 @@
 use core::mem::{align_of, offset_of, size_of};
 
-use roxy_fd::{Fd, FileError, FileMetadata, FileType as FdFileType};
-use roxy_vfs::{FileType as VfsFileType, Metadata as VfsMetadata, VfsError};
+use roxy_fd::{Fd, FileError, FileMetadata};
+use roxy_vfs::{Metadata as VfsMetadata, VfsError};
 
-use super::{AtFlags, DirectoryFd, unsupported};
+use super::{AtFlags, DirectoryFd, FileKind, unsupported};
 use crate::{
     SyscallResult,
     args::{CString, Out, SyscallArg},
@@ -15,43 +15,54 @@ use crate::{
 syscall!(SyscallNumber::Stat, handle(target: StatTarget => Invalid, raw_fd: u64, path: u64, flags: AtFlags => Invalid, output: Out<StatAbi> => Fault));
 
 const BLOCK_SIZE: u32 = 4096;
-const MODE_REGULAR: u32 = 0x8000;
-const MODE_DIRECTORY: u32 = 0x4000;
-const MODE_SYMLINK: u32 = 0xa000;
-const MODE_BLOCK: u32 = 0x6000;
-const MODE_CHARACTER: u32 = 0x2000;
-const MODE_FIFO: u32 = 0x1000;
-const MODE_SOCKET: u32 = 0xc000;
 
 /// Fixed-layout stat payload copied across the userspace syscall ABI.
+///
+/// Layout per `sysdeps/roxy/sysdeps/filesystem.cpp`; offsets pinned by the assertions below.
 #[repr(C)]
 struct StatAbi {
     file_id: u64,
     size: u64,
     blocks: u64,
     hard_links: u64,
-    mode: u32,
+    /// The kind of file, one [`FileKind`] word.
+    kind: u32,
+    /// The permission bits the filesystem stores.
+    ///
+    /// These keep the POSIX `rwxrwxrwx`-plus-special-bit numbering: `chmod`, `mkdir`, and `open`
+    /// pass them and the filesystem stores them as they arrive, so the kernel holds no second
+    /// encoding to convert from.
+    /// TODO(missing-capability: no owned permission model): give the record Roxy's own rights word,
+    /// so a foreign mode word can be told apart from one of ours.
+    permissions: u32,
     block_size: u32,
+    /// Always zero. The record's eight-byte alignment leaves four bytes after `block_size`; naming
+    /// them keeps its layout free of implicit padding.
+    reserved: u32,
 }
 
-const _: () = assert!(size_of::<StatAbi>() == 40);
+const _: () = assert!(size_of::<StatAbi>() == 48);
 const _: () = assert!(align_of::<StatAbi>() == 8);
 const _: () = assert!(offset_of!(StatAbi, file_id) == 0);
 const _: () = assert!(offset_of!(StatAbi, size) == 8);
 const _: () = assert!(offset_of!(StatAbi, blocks) == 16);
 const _: () = assert!(offset_of!(StatAbi, hard_links) == 24);
-const _: () = assert!(offset_of!(StatAbi, mode) == 32);
-const _: () = assert!(offset_of!(StatAbi, block_size) == 36);
+const _: () = assert!(offset_of!(StatAbi, kind) == 32);
+const _: () = assert!(offset_of!(StatAbi, permissions) == 36);
+const _: () = assert!(offset_of!(StatAbi, block_size) == 40);
+const _: () = assert!(offset_of!(StatAbi, reserved) == 44);
 
 impl StatAbi {
-    fn new(file_id: u64, size: u64, hard_links: u32, mode: u32) -> Self {
+    fn new(file_id: u64, size: u64, hard_links: u32, kind: FileKind, permissions: u32) -> Self {
         Self {
             file_id,
             size,
             blocks: size.div_ceil(512),
             hard_links: u64::from(hard_links),
-            mode,
+            kind: kind.word(),
+            permissions,
             block_size: BLOCK_SIZE,
+            reserved: 0,
         }
     }
 }
@@ -172,7 +183,8 @@ impl From<VfsMetadata> for StatAbi {
             metadata.file_id,
             metadata.size,
             metadata.hard_links,
-            vfs_file_type(metadata.file_type) | u32::from(metadata.permissions.bits()),
+            FileKind::from(metadata.file_type),
+            u32::from(metadata.permissions.bits()),
         )
     }
 }
@@ -183,34 +195,9 @@ impl From<FileMetadata> for StatAbi {
             metadata.file_id,
             metadata.size,
             metadata.hard_links,
-            fd_file_type(metadata.file_type) | u32::from(metadata.permissions),
+            FileKind::from(metadata.file_type),
+            u32::from(metadata.permissions),
         )
-    }
-}
-
-fn vfs_file_type(file_type: VfsFileType) -> u32 {
-    match file_type {
-        VfsFileType::Regular => MODE_REGULAR,
-        VfsFileType::Directory => MODE_DIRECTORY,
-        VfsFileType::Symlink => MODE_SYMLINK,
-        VfsFileType::BlockDevice => MODE_BLOCK,
-        VfsFileType::CharacterDevice => MODE_CHARACTER,
-        VfsFileType::Fifo => MODE_FIFO,
-        VfsFileType::Socket => MODE_SOCKET,
-        VfsFileType::Unknown => 0,
-    }
-}
-
-fn fd_file_type(file_type: FdFileType) -> u32 {
-    match file_type {
-        FdFileType::Regular => MODE_REGULAR,
-        FdFileType::Directory => MODE_DIRECTORY,
-        FdFileType::Symlink => MODE_SYMLINK,
-        FdFileType::BlockDevice => MODE_BLOCK,
-        FdFileType::CharacterDevice => MODE_CHARACTER,
-        FdFileType::Fifo => MODE_FIFO,
-        FdFileType::Socket => MODE_SOCKET,
-        FdFileType::Unknown => 0,
     }
 }
 
@@ -230,8 +217,8 @@ mod tests {
     use roxy_fd::{FileMetadata, FileType};
     use roxy_test::kernel_test;
 
-    use super::super::AtFlags;
-    use super::{MODE_REGULAR, StatAbi, StatTarget};
+    use super::super::{AtFlags, FileKind};
+    use super::{StatAbi, StatTarget};
     use crate::{args::SyscallArg, errno::Errno};
 
     kernel_test!("roxy-syscall::stat-encoding", stat_encoding, {
@@ -245,7 +232,12 @@ mod tests {
 
         assert_eq!(result.file_id, 7);
         assert_eq!(result.blocks, 2);
-        assert_eq!(result.mode, MODE_REGULAR | 0o640);
+        // The kind and the permission bits are separate fields, so neither can be read as part of
+        // the other; before they shared a word, a caller testing for a permission bit could match
+        // a file kind's bits.
+        assert_eq!(result.kind, FileKind::Regular.word());
+        assert_eq!(result.permissions, 0o640);
+        assert_eq!(result.reserved, 0);
         assert_eq!(result.hard_links, 2);
     });
 

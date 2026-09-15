@@ -106,7 +106,15 @@ descriptor through the FD object boundary. The directory-selector target is serv
 `AT_FDCWD`, so `fstatat` against the working directory works while descriptor-relative resolution is
 reported as unsupported. Neither a target the word does not name nor a flag a target does not serve
 passes through unread: the descriptor target is told nothing about the path its descriptor was
-opened through, so it rejects every flag rather than dropping it.
+opened through, so it rejects every flag rather than dropping it. The record it writes carries a
+kind word and the permission bits in separate fields, so a caller testing one cannot match bits of
+the other: the kind is Roxy's own [`FileKind`] word rather than POSIX's `S_IFMT` numbering, and the
+libc renders that numbering at this boundary. The kind word is kernel-produced and follows the
+rule the value-namespace section states rather than a base of its own. The permission bits keep the
+POSIX numbering, because
+`chmod`, `mkdir`, and `open` pass them and the filesystem stores them as they arrive, so the kernel
+has no second encoding of them to convert to; owning a rights model of Roxy's own is not yet done,
+which `ISSUES.md` records.
 
 Filesystem mutation syscalls use the shared `Path` argument type, which copies the userspace
 string and rejects an empty path during argument parsing. The `dirfd` selector those handlers and
@@ -132,7 +140,9 @@ returns `0` for directly spawned or orphaned processes.
 and `WCONTINUED`. It validates a non-null status output before entering the process wait so
 `EFAULT` never consumes a zombie. The status it writes is Roxy's own flat record — a kind word
 naming the state change and a code carrying the exit code or signal number — rather than the POSIX
-wait-status word that `WIFEXITED` and its neighbours decode. The kernel already holds the change as
+wait-status word that `WIFEXITED` and its neighbours decode. The kind is a kernel-produced word, so
+it follows the rule the value-namespace section states rather than a base of its own. The kernel
+already holds the change as
 typed values (`WaitResult`, `ExitStatus`), so encoding that word is the libc's job at this
 boundary, where the POSIX bit layout stops. A successful wait returns the reaped PID, a pending
 nonblocking wait returns zero without writing the record, and absence of a matching child returns
@@ -174,8 +184,11 @@ path. The syscall layer alone translates signal numbers; `roxy-process` never de
 personality's numeric signal ABI.
 
 `open_dir` creates a descriptor backed by an opening-time VFS directory snapshot. `read_entries`
-serializes that descriptor into fixed-size Roxy x86_64 `dirent` records and advances the shared
-open-file position by entry count. A writable userspace range is validated before the position is
+serializes that descriptor into fixed-size Roxy x86_64 records that are laid out as the POSIX
+`struct dirent` their only consumer reads, byte for byte, and advances the shared open-file position
+by entry count. A record's kind is Roxy's own [`FileKind`] byte rather than POSIX's `d_type`
+numbering; because the layouts coincide, the libc renders the `d_type` userspace compares against
+in place, without a second buffer. A writable userspace range is validated before the position is
 advanced; EOF returns zero bytes, and `seek` to entry zero implements `rewinddir`.
 
 `chdir` resolves its path against the old cwd, verifies through VFS metadata that the result is a
@@ -329,6 +342,13 @@ types, the `wait` option bits, and the `PROT_*` and `MAP_*` words. Each flag wor
 its own bit above a base, and each enumeration numbers from a base plus a small index; a value
 below the base is another personality's numbering, which the handler reports as foreign, and a
 value above it that no flag or arm defines is reported as an undefined request of our own.
+
+A word the *kernel* produces and only the libc consumes is the one case that needs no base above
+another personality's numbering, because there is no caller-supplied value to tell apart: it is
+reserved at zero instead, so an all-zero record is never a value. The `wait` status kind and the
+`fs` module's file kind word — which both the `stat` record and the directory-entry record carry —
+are built that way, and each numbers its members from one upwards. A base is for a word that
+arrives from userspace.
 A selector whose modes are compared for equality may still give each mode its own bit, as
 `sigevent.sigev_notify` does: Linux's own set has that shape (0, 1, 2, 4), and consecutive indices
 would turn a combination of two modes into a third one that the handler would then honour.

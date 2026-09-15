@@ -156,6 +156,23 @@ request visible; only the origin of the value is lost. The gap is marked with
 `kernel/syscall/src/syscalls/open.rs`. A wider word, or a request record Roxy defines itself, would
 let the handler separate the two cases.
 
+## The file permission bits keep POSIX's numbering
+
+The `stat` record's file kind is Roxy's own word, but the permission bits beside it are not: they
+are the POSIX `rwxrwxrwx` bits plus setuid, setgid, and the sticky bit. `chmod`, `fchmod`, `mkdir`,
+and `open` hand those bits to the filesystem and the filesystem stores them as they arrive, so the
+kernel holds no second encoding of them to convert to, and a Roxy rights word would have to replace
+`FilePermissions` and the VFS's permission checks rather than sit beside them. Two consequences
+follow: a mode word that reaches the kernel is indistinguishable from another personality's, and
+Roxy cannot express a permission model POSIX has no bits for.
+
+Nothing is approximated — the POSIX bits are implemented as POSIX defines them — so no caller is
+misled about what a value means; what is missing is ownership of the encoding. The gap is marked
+with `TODO(missing-capability: no owned permission model)` next to the `permissions` field in
+`kernel/syscall/src/syscalls/fs/stat.rs`. Closing it means giving the VFS a rights model of Roxy's
+own and moving `FilePermissions`, `AccessMode`, `umask`, and the mode arguments of `open` and
+`mkdir` onto it.
+
 ## The timer clock and flag words keep Linux's numbering
 
 `timer_create` takes a `clockid_t` and `timer_settime` a flag word, and Roxy numbers the values it
