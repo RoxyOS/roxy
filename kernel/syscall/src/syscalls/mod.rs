@@ -27,12 +27,10 @@ mod ioctl;
 mod iovec;
 mod isatty;
 mod open;
-mod open_dir;
 mod openpty;
 mod pipe;
 mod poll;
 mod read;
-mod read_entries;
 mod seek;
 mod setpgid;
 mod setsid;
@@ -40,7 +38,6 @@ pub(crate) mod signal;
 mod sigtimedwait;
 mod sleep;
 mod socket;
-mod stat;
 mod tcb_set;
 mod tgkill;
 mod thread_create;
@@ -74,7 +71,7 @@ pub(super) const SYSCALLS: [Syscall; 84] = [
     isatty::SYSCALL,
     open::SYSCALL,
     vm::PROTECT_SYSCALL,
-    stat::SYSCALL,
+    fs::STAT_SYSCALL,
     fork::SYSCALL,
     execve::SYSCALL,
     getpid::SYSCALL,
@@ -86,8 +83,8 @@ pub(super) const SYSCALLS: [Syscall; 84] = [
     waitpid::SYSCALL,
     signal::MASK_SYSCALL,
     signal::ACTION_SYSCALL,
-    open_dir::SYSCALL,
-    read_entries::SYSCALL,
+    fs::OPEN_DIR_SYSCALL,
+    fs::READ_ENTRIES_SYSCALL,
     chdir::SYSCALL,
     ioctl::SYSCALL,
     getcwd::SYSCALL,

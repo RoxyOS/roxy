@@ -111,12 +111,12 @@ opened through, so it rejects every flag rather than dropping it.
 Filesystem mutation syscalls use the shared `Path` argument type, which copies the userspace
 string and rejects an empty path during argument parsing. The `dirfd` selector those handlers and
 `stat` carry, and the `AT_*` flag word they narrow, are one word each, owned by the `fs` module
-alongside the `*at` handlers so that a carrier cannot read the word by a numbering of its own;
-`stat` reaches both across the module boundary instead of keeping a copy. Each carrier then narrows
-the word to the flags it serves through the same check, which is also what keeps a flag Roxy defines
-but cannot serve distinct from another personality's numbering: `unlinkat` serves `AT_REMOVEDIR`, and
-`linkat` serves none of them, because the VFS links the source entry itself rather than resolving a
-final symbolic link. The `mkdirat`, `unlinkat`, `readlinkat`, `linkat`, `symlinkat`, and `renameat`
+that holds the `stat`, `open_dir`, and `read_entries` handlers beside them, so that a carrier
+cannot read the word by a numbering of its own. Each carrier then narrows the word to the flags it
+serves through the same check, which is also what keeps a flag Roxy defines but cannot serve
+distinct from another personality's numbering: `unlinkat` serves `AT_REMOVEDIR`, and `linkat`
+serves none of them, because the VFS links the source entry itself rather than resolving a final
+symbolic link. The `mkdirat`, `unlinkat`, `readlinkat`, `linkat`, `symlinkat`, and `renameat`
 handlers currently accept only `AT_FDCWD`; descriptor-relative resolution remains unsupported and is
 reported through the centralized diagnostic path. `sync` delegates to the global VFS, while `fsync`
 resolves an open file and dispatches synchronization through the FD object boundary. `ftruncate`

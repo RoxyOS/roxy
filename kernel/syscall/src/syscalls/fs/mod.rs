@@ -1,6 +1,9 @@
 mod dir;
 mod link;
 mod misc;
+mod open_dir;
+mod read_entries;
+mod stat;
 mod truncate;
 
 use bitflags::bitflags;
@@ -17,6 +20,9 @@ pub(super) const SYMLINKAT_SYSCALL: Syscall = link::SYMLINKAT_SYSCALL;
 pub(super) const RENAMEAT_SYSCALL: Syscall = link::RENAMEAT_SYSCALL;
 pub(super) const SYNC_SYSCALL: Syscall = misc::SYNC_SYSCALL;
 pub(super) const FSYNC_SYSCALL: Syscall = misc::FSYNC_SYSCALL;
+pub(super) const OPEN_DIR_SYSCALL: Syscall = open_dir::SYSCALL;
+pub(super) const READ_ENTRIES_SYSCALL: Syscall = read_entries::SYSCALL;
+pub(super) const STAT_SYSCALL: Syscall = stat::SYSCALL;
 pub(super) const FTRUNCATE_SYSCALL: Syscall = truncate::SYSCALL;
 
 /// Roxy's `dirfd` word: a descriptor plus one magic selector, not a numbered namespace.

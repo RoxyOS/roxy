@@ -3,7 +3,7 @@ use core::mem::{align_of, offset_of, size_of};
 use roxy_fd::{Fd, FileError, FileMetadata, FileType as FdFileType};
 use roxy_vfs::{FileType as VfsFileType, Metadata as VfsMetadata, VfsError};
 
-use super::fs::{AtFlags, DirectoryFd};
+use super::{AtFlags, DirectoryFd, unsupported};
 use crate::{
     SyscallResult,
     args::{CString, Out, SyscallArg},
@@ -225,16 +225,13 @@ fn map_vfs_error(error: VfsError) -> Errno {
     }
 }
 
-fn unsupported(operation: &str, argument: u64) -> Errno {
-    crate::unsupported::unsupported_argument(operation, argument, Errno::NotSupported)
-}
-
 #[cfg(feature = "kernel-test")]
 mod tests {
     use roxy_fd::{FileMetadata, FileType};
     use roxy_test::kernel_test;
 
-    use super::{AtFlags, MODE_REGULAR, StatAbi, StatTarget};
+    use super::super::AtFlags;
+    use super::{MODE_REGULAR, StatAbi, StatTarget};
     use crate::{args::SyscallArg, errno::Errno};
 
     kernel_test!("roxy-syscall::stat-encoding", stat_encoding, {
