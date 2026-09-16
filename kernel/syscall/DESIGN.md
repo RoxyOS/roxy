@@ -184,12 +184,15 @@ path. The syscall layer alone translates signal numbers; `roxy-process` never de
 personality's numeric signal ABI.
 
 `open_dir` creates a descriptor backed by an opening-time VFS directory snapshot. `read_entries`
-serializes that descriptor into fixed-size Roxy x86_64 records that are laid out as the POSIX
-`struct dirent` their only consumer reads, byte for byte, and advances the shared open-file position
-by entry count. A record's kind is Roxy's own [`FileKind`] byte rather than POSIX's `d_type`
-numbering; because the layouts coincide, the libc renders the `d_type` userspace compares against
-in place, without a second buffer. A writable userspace range is validated before the position is
-advanced; EOF returns zero bytes, and `seek` to entry zero implements `rewinddir`.
+serializes that descriptor into fixed-size Roxy records and advances the shared open-file position
+by entry count. A record carries the file an entry names, the position the directory resumes from,
+the length of its name, and Roxy's own [`FileKind`] byte; it states nothing about how a caller walks
+or renders it, having no size field and not terminating its name. The libc therefore renders the
+POSIX `struct dirent` its own consumers read, mapping the kind to the `d_type` byte they compare
+against, exactly as it renders the `stat` result and the `wait` status. A record and the entry
+rendered from it occupy the same bytes, so the libc converts each record where it already sits. A
+writable userspace range is validated before the position is advanced; EOF returns zero bytes, and
+`seek` to entry zero implements `rewinddir`.
 
 `chdir` resolves its path against the old cwd, verifies through VFS metadata that the result is a
 directory, and only then replaces the process-owned normalized absolute cwd. Failed validation
