@@ -191,9 +191,10 @@ signal can queue against a thread whose mask blocks it instead of re-routing. A 
 (`exit_current`) does not force-stop sibling threads before reaping, so a process whose main thread
 exits while secondary threads remain can only be finalized when its last thread reaps (`TODO(missing-
 capability: thread-teardown)` in `lifecycle.rs`). `execve` remains safe only from a single-threaded
-process because it replaces the whole address space. There is no `FD_CLOEXEC` state,
-so descriptors survive `execve`. ELF and existing `PT_INTERP` loading are supported; shebang
-interpretation, multi-threaded exec cleanup, credentials, asynchronous interrupt-return delivery,
+process because it replaces the whole address space. Descriptor entries carry close-on-exec state,
+and `execve` drops entries marked with it before publishing the new image. ELF and existing
+`PT_INTERP` loading are supported; shebang interpretation, multi-threaded exec cleanup, credentials,
+asynchronous interrupt-return delivery,
 and PID 1 reparenting are not. POSIX real-time signals are supported; standard-signal
 coalescing is not, so every delivery is queued and the most recent one is delivered first.
 Process groups are tracked (`pgid`/`session_id`), with `setpgid`/`getpgid`/`setsid` and

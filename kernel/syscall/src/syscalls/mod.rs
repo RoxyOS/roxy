@@ -5,11 +5,10 @@ mod chdir;
 mod chmod;
 mod clock;
 mod close;
-mod dup2;
 mod execve;
 mod exit;
 mod fchmod;
-mod fcntl;
+mod fd;
 mod fork;
 mod fs;
 mod futex_wait;
@@ -53,7 +52,7 @@ mod writev;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 84] = [
+pub(super) const SYSCALLS: [Syscall; 88] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -116,8 +115,8 @@ pub(super) const SYSCALLS: [Syscall; 84] = [
     socket::SOCKETPAIR_SYSCALL,
     signal::SIGRETURN_SYSCALL,
     pipe::SYSCALL,
-    dup2::SYSCALL,
-    fcntl::SYSCALL,
+    fd::DUP_ONTO_SYSCALL,
+    fd::DUP_SYSCALL,
     umask::SYSCALL,
     chmod::SYSCALL,
     fchmod::SYSCALL,
@@ -138,4 +137,8 @@ pub(super) const SYSCALLS: [Syscall; 84] = [
     sigtimedwait::SYSCALL,
     tgkill::SYSCALL,
     openpty::SYSCALL,
+    fd::GET_DESCRIPTOR_FLAGS_SYSCALL,
+    fd::SET_DESCRIPTOR_FLAGS_SYSCALL,
+    fd::GET_STATUS_FLAGS_SYSCALL,
+    fd::SET_STATUS_FLAGS_SYSCALL,
 ];

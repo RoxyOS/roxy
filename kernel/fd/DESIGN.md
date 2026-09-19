@@ -72,8 +72,9 @@ ABI-neutral readiness for the syscall layer; each concrete object owns its readi
 notification when readiness may have changed. The caller queries, registers, and prepares its
 block with interrupts disabled, then rechecks readiness after any wakeup. VFS files and
 directories report immediate read/write readiness, while devices such as the TTY derive it from
-their state and register their listeners with a shared device queue. Duplication syscalls and
-other per-descriptor flags remain unsupported.
+their state and register their listeners with a shared device queue. Descriptor duplication and
+the close-on-exec descriptor flag are handled by the process-owned `FdTable`; open-file status
+flags remain shared through `OpenFile` and are updated through its lock.
 
 The typed request set covers terminal attribute get/set operations with their application timing,
 terminal window-size get/set operations, and framebuffer screen-information get operations.

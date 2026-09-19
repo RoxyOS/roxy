@@ -326,13 +326,20 @@ boundary keep mlibc's layout. Requests the kernel does not implement, such as `T
 `TIOCMGET`, and the `SIOC*` socket requests, keep their generic mlibc definitions and return
 `ENOTTY`; other ioctl families remain unsupported.
 
-The `fcntl` commands form a single family with one owned space, mirrored by the Roxy mlibc
-`abi-bits/fcntl.h`. A supported command is `COMMAND_BASE` plus its index, and every command the
-kernel does not implement is pinned to one `UNSUPPORTED_COMMAND` value below that base. The base
-sits above every command number another personality uses, so a command below it can only be
-foreign, and the handler reports the header's unsupported marker and another libc's numbering as
-distinct diagnostics. All unsupported commands sharing one value is deliberate: telling them apart
-would preserve information no caller can act on.
+`fcntl` is a libc operation rather than a kernel command-multiplexing syscall. The Roxy mlibc
+keeps the POSIX command numbers in `abi-bits/fcntl.h` and translates each supported command to one
+operation-specific syscall: `dup` for `F_DUPFD` and `F_DUPFD_CLOEXEC`, descriptor-flag get/set for
+`F_GETFD` and `F_SETFD`, and open-file status-flag get/set for `F_GETFL` and `F_SETFL`. The kernel
+therefore owns separate Roxy option words for duplication and descriptor flags, while the shared
+status flags remain an ABI-neutral `roxy-fd` type until the syscall boundary translates them.
+Unsupported `fcntl` commands are diagnosed by the libc because they never cross that boundary.
+
+`dup` chooses the lowest free descriptor at or above a requested minimum. Its Roxy option word
+explicitly says whether the third argument is that minimum and whether the new descriptor closes on
+`exec`; without the minimum option the kernel searches from descriptor zero. `dup_onto` retains
+exact-descriptor duplication as a separate operation and uses the same Roxy descriptor-flag word.
+The process subsystem owns descriptor-table mutation, and the FD subsystem owns the shared
+open-file status state; neither accepts a POSIX command number or a personality-specific wire word.
 
 The `access` mode word carries the rule into a bit field. `access.rs` owns it, each right is one
 bit above `ACCESS_BASE`, and a word below the base is another personality's numbering, which the
@@ -369,8 +376,7 @@ and its carriers cannot drift apart. Note the trade-off the marker's bit test ac
 another personality that happens to set the marker's bit is reported as unsupported rather than as
 foreign. Linux cannot do so — its families stop at 46, its `SO_*` at 83, its `IPPROTO_*` at 263,
 its message flags fill bits 0-15 and 26, its socket types bits 0-3, 11, and 19, and its signal
-flags bits 1, 2, 4, and 24-31 — while `fcntl`, whose marker can collide, compares for equality
-instead. Bases
+flags bits 1, 2, 4, and 24-31. Bases
 are chosen per argument, not per family: a `dirfd` carries a descriptor plus one magic selector,
 which is negative so that no descriptor can hold it and which is not Linux's -100 so that Linux's
 selector is reported as another personality's, while the `AT_*` flags are a flag word with a base
@@ -381,6 +387,10 @@ reported. Two words cannot take a base at all and keep Linux's numbering, which 
 handlers unable to tell a Linux value from one of ours: the `open` flag word, whose width is
 upstream mlibc's `int`, and the timer clock with its `TIMER_ABSTIME` flag, which upstream mlibc's
 `options/ansi/include/time.h` defines. `ISSUES.md` records them and what closing each would take.
+
+The descriptor operations occupy syscall slots 55-56 and 84-87: `dup_onto`, `dup`, descriptor
+flag get/set, and status flag get/set. Slot 56 is no longer a command-multiplexing `fcntl` entry;
+the old slot is reused by `dup`, while the four flag operations extend the table after slot 83.
 
 `socketpair` is syscall 47 and accepts only `AF_UNIX`, `SOCK_STREAM`, and protocol zero. It asks
 `roxy-unix-socket` to create the connected files, then owns descriptor insertion and the checked

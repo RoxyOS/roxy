@@ -252,7 +252,7 @@ pub fn close_file(fd: Fd) -> Result<(), DescriptorError> {
 /// # Panics
 ///
 /// Panics when the current scheduled thread is not owned by a running process.
-pub fn dup2_current(oldfd: Fd, newfd: Fd, close_on_exec: bool) -> Result<(), DescriptorError> {
+pub fn duplicate_onto(oldfd: Fd, newfd: Fd, close_on_exec: bool) -> Result<(), DescriptorError> {
     let mut table = table::PROCESS_TABLE.lock();
     let process_id = table.current_process_id();
     let process = table.processes.get_mut(&process_id).unwrap();
@@ -272,7 +272,7 @@ pub fn dup2_current(oldfd: Fd, newfd: Fd, close_on_exec: bool) -> Result<(), Des
 /// # Panics
 ///
 /// Panics when the current scheduled thread is not owned by a running process.
-pub fn fcntl_close_on_exec(fd: Fd) -> Result<bool, DescriptorError> {
+pub fn descriptor_close_on_exec(fd: Fd) -> Result<bool, DescriptorError> {
     let table = table::PROCESS_TABLE.lock();
     let process_id = table.current_process_id();
     let process = table.processes.get(&process_id).unwrap();
@@ -289,7 +289,7 @@ pub fn fcntl_close_on_exec(fd: Fd) -> Result<bool, DescriptorError> {
 /// # Panics
 ///
 /// Panics when the current scheduled thread is not owned by a running process.
-pub fn fcntl_set_close_on_exec(fd: Fd, close_on_exec: bool) -> Result<(), DescriptorError> {
+pub fn set_descriptor_close_on_exec(fd: Fd, close_on_exec: bool) -> Result<(), DescriptorError> {
     let mut table = table::PROCESS_TABLE.lock();
     let process_id = table.current_process_id();
     let process = table.processes.get_mut(&process_id).unwrap();
@@ -312,7 +312,11 @@ pub fn fcntl_set_close_on_exec(fd: Fd, close_on_exec: bool) -> Result<(), Descri
 /// # Panics
 ///
 /// Panics when the current scheduled thread is not owned by a running process.
-pub fn fcntl_dupfd(oldfd: Fd, minimum: Fd, close_on_exec: bool) -> Result<Fd, DescriptorError> {
+pub fn duplicate_at_or_above(
+    oldfd: Fd,
+    minimum: Fd,
+    close_on_exec: bool,
+) -> Result<Fd, DescriptorError> {
     let mut table = table::PROCESS_TABLE.lock();
     let process_id = table.current_process_id();
     let process = table.processes.get_mut(&process_id).unwrap();

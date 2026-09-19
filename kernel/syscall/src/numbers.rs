@@ -65,8 +65,8 @@ pub(crate) enum SyscallNumber {
     Connect = SYSCALL_BASE + 52,
     Sigreturn = SYSCALL_BASE + 53,
     Pipe = SYSCALL_BASE + 54,
-    Dup2 = SYSCALL_BASE + 55,
-    Fcntl = SYSCALL_BASE + 56,
+    DupOnto = SYSCALL_BASE + 55,
+    Dup = SYSCALL_BASE + 56,
     Umask = SYSCALL_BASE + 57,
     Chmod = SYSCALL_BASE + 58,
     Fchmod = SYSCALL_BASE + 59,
@@ -94,6 +94,10 @@ pub(crate) enum SyscallNumber {
     Tgkill = SYSCALL_BASE + 81,
     ClockGetres = SYSCALL_BASE + 82,
     Openpty = SYSCALL_BASE + 83,
+    GetDescriptorFlags = SYSCALL_BASE + 84,
+    SetDescriptorFlags = SYSCALL_BASE + 85,
+    GetStatusFlags = SYSCALL_BASE + 86,
+    SetStatusFlags = SYSCALL_BASE + 87,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -160,8 +164,8 @@ impl TryFrom<u64> for SyscallNumber {
             52 => Ok(Self::Connect),
             53 => Ok(Self::Sigreturn),
             54 => Ok(Self::Pipe),
-            55 => Ok(Self::Dup2),
-            56 => Ok(Self::Fcntl),
+            55 => Ok(Self::DupOnto),
+            56 => Ok(Self::Dup),
             57 => Ok(Self::Umask),
             58 => Ok(Self::Chmod),
             59 => Ok(Self::Fchmod),
@@ -189,6 +193,10 @@ impl TryFrom<u64> for SyscallNumber {
             81 => Ok(Self::Tgkill),
             82 => Ok(Self::ClockGetres),
             83 => Ok(Self::Openpty),
+            84 => Ok(Self::GetDescriptorFlags),
+            85 => Ok(Self::SetDescriptorFlags),
+            86 => Ok(Self::GetStatusFlags),
+            87 => Ok(Self::SetStatusFlags),
             _ => Err(()),
         }
     }
@@ -422,11 +430,11 @@ mod tests {
         );
         assert_eq!(
             SyscallNumber::try_from(SYSCALL_BASE + 55),
-            Ok(SyscallNumber::Dup2)
+            Ok(SyscallNumber::DupOnto)
         );
         assert_eq!(
             SyscallNumber::try_from(SYSCALL_BASE + 56),
-            Ok(SyscallNumber::Fcntl)
+            Ok(SyscallNumber::Dup)
         );
         assert_eq!(
             SyscallNumber::try_from(SYSCALL_BASE + 57),
@@ -536,7 +544,23 @@ mod tests {
             SyscallNumber::try_from(SYSCALL_BASE + 83),
             Ok(SyscallNumber::Openpty)
         );
-        assert!(SyscallNumber::try_from(SYSCALL_BASE + 84).is_err());
+        assert_eq!(
+            SyscallNumber::try_from(SYSCALL_BASE + 84),
+            Ok(SyscallNumber::GetDescriptorFlags)
+        );
+        assert_eq!(
+            SyscallNumber::try_from(SYSCALL_BASE + 85),
+            Ok(SyscallNumber::SetDescriptorFlags)
+        );
+        assert_eq!(
+            SyscallNumber::try_from(SYSCALL_BASE + 86),
+            Ok(SyscallNumber::GetStatusFlags)
+        );
+        assert_eq!(
+            SyscallNumber::try_from(SYSCALL_BASE + 87),
+            Ok(SyscallNumber::SetStatusFlags)
+        );
+        assert!(SyscallNumber::try_from(SYSCALL_BASE + 88).is_err());
 
         // Below the base is another personality's numbering, which the dispatcher reports as
         // foreign. Linux x86_64's `read` is 0, `write` is 1, and `exit_group` is 231.

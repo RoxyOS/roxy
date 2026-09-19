@@ -4,7 +4,7 @@ use roxy_process::{self, DescriptorError};
 
 use crate::{SyscallResult, args::SyscallArg, errno::Errno, numbers::SyscallNumber, syscall};
 
-syscall!(SyscallNumber::Dup2, handle(
+syscall!(SyscallNumber::DupOnto, handle(
     oldfd: Fd => BadFd,
     newfd: Fd => BadFd,
     flags: DupFlags => Invalid,
@@ -13,7 +13,7 @@ syscall!(SyscallNumber::Dup2, handle(
 bitflags! {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     struct DupFlags: u64 {
-        const CLOEXEC = 0o2_000_000;
+        const CLOEXEC = 1 << 8;
     }
 }
 
@@ -21,7 +21,7 @@ impl SyscallArg for DupFlags {
     fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
         let unknown = raw & !Self::all().bits();
         if unknown != 0 {
-            return Err(unsupported("dup2.flags", unknown));
+            return Err(unsupported("dup-onto.flags", unknown));
         }
         Ok(Self::from_bits_retain(raw))
     }
@@ -34,7 +34,7 @@ fn handle(oldfd: Fd, newfd: Fd, flags: DupFlags) -> SyscallResult {
 
     let close_on_exec = flags.contains(DupFlags::CLOEXEC);
 
-    roxy_process::dup2_current(oldfd, newfd, close_on_exec).map_err(map_process_error)?;
+    roxy_process::duplicate_onto(oldfd, newfd, close_on_exec).map_err(map_process_error)?;
 
     Ok(u64::from(newfd.as_u32()))
 }
