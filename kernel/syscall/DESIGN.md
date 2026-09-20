@@ -94,9 +94,12 @@ above it; a `BrokenPipe` write delivers `SIGPIPE` and returns `EPIPE`, matching 
 `write`, a short write on one iovec stops the loop and reports the bytes written so far.
 
 Path-based `stat` and `open` copy the userspace byte string before passing it to the global VFS
-interface. The VFS leaves absolute paths independent of cwd and obtains the process-owned cwd
-through its registered provider only for relative paths. Syscall handlers do not duplicate path
-normalization or process-state lookup. `open` records `O_CLOEXEC` as a close-on-exec descriptor
+interface. `open` also copies a Roxy `roxy_open_request` record: the access selector is separate
+from the operation flags, and the record's flag and mode fields have no POSIX command layout. The
+Roxy mlibc translates POSIX `O_*` values into that record before issuing the syscall. The VFS
+leaves absolute paths independent of cwd and obtains the process-owned cwd through its registered
+provider only for relative paths. Syscall handlers do not duplicate path normalization or
+process-state lookup. `open` records the Roxy close-on-exec flag as a close-on-exec descriptor
 flag, which `execve` honors by closing those descriptors when replacing the image.
 
 `stat` carries three targets — a path, a descriptor, and a directory selector plus a path — and a
@@ -384,9 +387,11 @@ of its own. A name only another personality
 defines is removed from the Roxy headers instead of being mapped to ours: naming it is then a
 compile error, and passing its numeric value reaches the handler as an undefined bit and is
 reported. Two words cannot take a base at all and keep Linux's numbering, which leaves their
-handlers unable to tell a Linux value from one of ours: the `open` flag word, whose width is
-upstream mlibc's `int`, and the timer clock with its `TIMER_ABSTIME` flag, which upstream mlibc's
-`options/ansi/include/time.h` defines. `ISSUES.md` records them and what closing each would take.
+handlers unable to tell a Linux value from one of ours: the timer clock with its `TIMER_ABSTIME`
+flag, which upstream mlibc's `options/ansi/include/time.h` defines. The `open` flag word used to
+have the same problem, but now crosses the boundary as a Roxy-owned request record; mlibc
+translates its POSIX flags before issuing `ROXY_SYS_OPEN`. `ISSUES.md` records the remaining timer
+limitation.
 
 The descriptor operations occupy syscall slots 55-56 and 84-87: `dup_onto`, `dup`, descriptor
 flag get/set, and status flag get/set. Slot 56 is no longer a command-multiplexing `fcntl` entry;

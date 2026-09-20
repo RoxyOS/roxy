@@ -1,3 +1,5 @@
+use core::mem::{align_of, offset_of, size_of};
+
 use alloc::boxed::Box;
 
 use bitflags::bitflags;
@@ -7,46 +9,93 @@ use roxy_vfs::{CreationMode, FilePermissions, OpenAccess, OpenOptions, VfsError}
 
 use crate::{
     SyscallResult,
-    args::{CString, SyscallArg},
+    args::{CString, SyscallArg, user_memory},
     errno::Errno,
     numbers::SyscallNumber,
     syscall,
 };
 
-syscall!(SyscallNumber::Open, handle(path_address: UserAddress => Fault, flags: OpenFlags => Invalid, mode: u64));
+syscall!(SyscallNumber::Open, handle(path_address: UserAddress => Fault, request: OpenRequest => Fault));
 
-const ACCESS_MASK: u64 = 0o3;
+const OPEN_ACCESS_READ_ONLY: u32 = 0;
+const OPEN_ACCESS_WRITE_ONLY: u32 = OPEN_ACCESS_READ_ONLY + 1;
+const OPEN_ACCESS_READ_WRITE: u32 = OPEN_ACCESS_READ_ONLY + 2;
+
+const OPEN_FLAGS_BASE: u64 = 1;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     struct OpenFlags: u64 {
-        const WRITE_ONLY = 0o1;
-        const READ_WRITE = 0o2;
-        const CREATE = 0o100;
-        const EXCLUSIVE = 0o200;
-        const TRUNCATE = 0o1000;
-        const APPEND = 0o2000;
-        const NONBLOCK = 0o4000;
-        const NOFOLLOW = 0o400_000;
-        const LARGE_FILE = 0o100_000;
-        const CLOEXEC = 0o2_000_000;
+        const CREATE = OPEN_FLAGS_BASE;
+        const EXCLUSIVE = OPEN_FLAGS_BASE << 1;
+        const TRUNCATE = OPEN_FLAGS_BASE << 2;
+        const APPEND = OPEN_FLAGS_BASE << 3;
+        const NONBLOCK = OPEN_FLAGS_BASE << 4;
+        const NOFOLLOW = OPEN_FLAGS_BASE << 5;
+        const LARGE_FILE = OPEN_FLAGS_BASE << 6;
+        const CLOEXEC = OPEN_FLAGS_BASE << 7;
     }
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct OpenRequestAbi {
+    access: u32,
+    padding: u32,
+    flags: u64,
+    mode: u64,
+}
+
+const _: () = assert!(size_of::<OpenRequestAbi>() == 24);
+const _: () = assert!(align_of::<OpenRequestAbi>() == 8);
+const _: () = assert!(offset_of!(OpenRequestAbi, access) == 0);
+const _: () = assert!(offset_of!(OpenRequestAbi, padding) == 4);
+const _: () = assert!(offset_of!(OpenRequestAbi, flags) == 8);
+const _: () = assert!(offset_of!(OpenRequestAbi, mode) == 16);
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct OpenRequest {
+    access: OpenAccess,
     flags: OpenFlags,
     mode: u64,
 }
 
-impl OpenRequest {
-    const fn new(flags: OpenFlags, mode: u64) -> Self {
-        Self { flags, mode }
-    }
+impl SyscallArg for OpenRequest {
+    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
+        let address = UserAddress::parse(raw, error)?;
+        let mut abi = OpenRequestAbi {
+            access: 0,
+            padding: 0,
+            flags: 0,
+            mode: 0,
+        };
 
+        // SAFETY: OpenRequestAbi has a checked C layout, contains only integers, and accepts every
+        // bit pattern copied from userspace.
+        unsafe { user_memory::read(address, &mut abi) }?;
+
+        let access = match abi.access {
+            OPEN_ACCESS_READ_ONLY => OpenAccess::ReadOnly,
+            OPEN_ACCESS_WRITE_ONLY => OpenAccess::WriteOnly,
+            OPEN_ACCESS_READ_WRITE => OpenAccess::ReadWrite,
+            value => return Err(unsupported("open.access", u64::from(value))),
+        };
+
+        let flags = OpenFlags::from_bits(abi.flags)
+            .ok_or_else(|| unsupported("open.flags", abi.flags & !OpenFlags::all().bits()))?;
+
+        Ok(Self {
+            access,
+            flags,
+            mode: abi.mode,
+        })
+    }
+}
+
+impl OpenRequest {
     fn options(self) -> Result<OpenOptions, Errno> {
         let options = OpenOptions {
-            access: self.access()?,
+            access: self.access,
             creation: self.creation(),
             permissions: self.permissions()?,
             append: self.flags.contains(OpenFlags::APPEND),
@@ -57,17 +106,6 @@ impl OpenRequest {
         options.validate().map_err(map_vfs_error)?;
 
         Ok(options)
-    }
-
-    fn access(self) -> Result<OpenAccess, Errno> {
-        let access = match self.flags.bits() & ACCESS_MASK {
-            0 => OpenAccess::ReadOnly,
-            1 => OpenAccess::WriteOnly,
-            2 => OpenAccess::ReadWrite,
-            _ => return Err(Errno::Invalid),
-        };
-
-        Ok(access)
     }
 
     fn creation(self) -> CreationMode {
@@ -95,12 +133,10 @@ impl OpenRequest {
 
     /// Returns the file status flags this open request implies, for `fcntl(F_GETFL)`.
     fn status_flags(self) -> StatusFlags {
-        // `OpenRequest::options` already rejects an invalid access mode (3), so only 1 and 2
-        // can reach here; anything else stays read-only.
-        let access = match self.flags.bits() & ACCESS_MASK {
-            1 => StatusFlags::WRITE_ONLY.bits(),
-            2 => StatusFlags::READ_WRITE.bits(),
-            _ => 0,
+        let access = match self.access {
+            OpenAccess::ReadOnly => StatusFlags::empty().bits(),
+            OpenAccess::WriteOnly => StatusFlags::WRITE_ONLY.bits(),
+            OpenAccess::ReadWrite => StatusFlags::READ_WRITE.bits(),
         };
         let extra = self.flags.bits()
             & (StatusFlags::APPEND.bits()
@@ -111,26 +147,7 @@ impl OpenRequest {
     }
 }
 
-impl SyscallArg for OpenFlags {
-    // The word is upstream mlibc's `int` and Linux already uses its bits up to 25, so no base
-    // above Linux's range fits beside the eight flags Roxy supports: the word keeps Linux's
-    // numbering and this handler cannot tell a Linux value from one of ours.
-    // TODO(missing-capability: no owned numbering for the open flag word): widen the word, or take
-    // the flags as a record Roxy defines, so a foreign value can be reported as such.
-    fn parse(raw: u64, _error: Errno) -> Result<Self, Errno> {
-        let unknown = raw & !Self::all().bits();
-
-        if unknown != 0 {
-            return Err(unsupported("open.flags", unknown));
-        }
-
-        Ok(Self::from_bits_retain(raw))
-    }
-}
-
-fn handle(path_address: UserAddress, flags: OpenFlags, mode: u64) -> SyscallResult {
-    let request = OpenRequest::new(flags, mode);
-
+fn handle(path_address: UserAddress, request: OpenRequest) -> SyscallResult {
     let path = CString::from_address(path_address)?;
 
     if path.is_empty() {
@@ -142,7 +159,7 @@ fn handle(path_address: UserAddress, flags: OpenFlags, mode: u64) -> SyscallResu
     let file = roxy_vfs::open(path.into_inner(), options).map_err(map_vfs_error)?;
     let file = OpenFile::new(Box::new(file));
     file.set_status_flags(request.status_flags());
-    let fd = roxy_process::insert_open_file(file, flags.contains(OpenFlags::CLOEXEC));
+    let fd = roxy_process::insert_open_file(file, request.flags.contains(OpenFlags::CLOEXEC));
 
     Ok(u64::from(fd.as_u32()))
 }
@@ -178,18 +195,23 @@ mod tests {
     use roxy_vfs::{CreationMode, FilePermissions, OpenAccess};
 
     use super::{OpenFlags, OpenRequest};
+
     use crate::errno::Errno;
 
     kernel_test!(
         "roxy-syscall::open-options",
         converts_supported_open_flags,
         {
-            let flags = OpenFlags::READ_WRITE
-                | OpenFlags::CREATE
+            let flags = OpenFlags::CREATE
                 | OpenFlags::EXCLUSIVE
                 | OpenFlags::TRUNCATE
                 | OpenFlags::LARGE_FILE;
-            let options = OpenRequest::new(flags, 0o640).options().unwrap();
+            let request = OpenRequest {
+                access: OpenAccess::ReadWrite,
+                flags,
+                mode: 0o640,
+            };
+            let options = request.options().unwrap();
 
             assert_eq!(options.access, OpenAccess::ReadWrite);
             assert_eq!(options.creation, CreationMode::CreateNew);
@@ -203,25 +225,38 @@ mod tests {
         "roxy-syscall::invalid-open-options",
         rejects_invalid_open_flags,
         {
-            let invalid_access = OpenRequest::new(OpenFlags::from_bits_retain(0o3), 0);
-            let read_only_append = OpenRequest::new(OpenFlags::APPEND, 0);
-
-            assert_eq!(invalid_access.options(), Err(Errno::Invalid));
-            assert_eq!(read_only_append.options(), Err(Errno::Invalid));
+            let read_only = OpenRequest {
+                access: OpenAccess::ReadOnly,
+                flags: OpenFlags::APPEND,
+                mode: 0,
+            };
+            assert_eq!(read_only.options(), Err(Errno::Invalid));
         }
     );
 
     kernel_test!("roxy-syscall::open-status-flags", reports_open_mode, {
         use roxy_fd::StatusFlags;
 
-        let read_only = OpenRequest::new(OpenFlags::empty(), 0);
-        let write_only = OpenRequest::new(OpenFlags::WRITE_ONLY, 0);
-        let read_write = OpenRequest::new(
-            OpenFlags::READ_WRITE | OpenFlags::APPEND | OpenFlags::LARGE_FILE,
-            0,
-        );
-        let read_write_nonblocking =
-            OpenRequest::new(OpenFlags::READ_WRITE | OpenFlags::NONBLOCK, 0);
+        let read_only = OpenRequest {
+            access: OpenAccess::ReadOnly,
+            flags: OpenFlags::empty(),
+            mode: 0,
+        };
+        let write_only = OpenRequest {
+            access: OpenAccess::WriteOnly,
+            flags: OpenFlags::empty(),
+            mode: 0,
+        };
+        let read_write = OpenRequest {
+            access: OpenAccess::ReadWrite,
+            flags: OpenFlags::APPEND | OpenFlags::LARGE_FILE,
+            mode: 0,
+        };
+        let read_write_nonblocking = OpenRequest {
+            access: OpenAccess::ReadWrite,
+            flags: OpenFlags::NONBLOCK,
+            mode: 0,
+        };
 
         assert_eq!(read_only.status_flags(), StatusFlags::empty());
         assert_eq!(write_only.status_flags(), StatusFlags::WRITE_ONLY);
