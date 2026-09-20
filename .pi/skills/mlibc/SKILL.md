@@ -120,25 +120,40 @@ The mlibc recipe pins a commit and has `clean_workdirs=no` — the local clone l
 
 ### Publishing a commit and updating the recipe pin
 
-1. Commit in `distro/sources/mlibc-workdir` as one cohesive change per commit, subject form
-   `roxy: <imperative summary>`. Do not amend/squash/rewrite fork history; never force-push the
-   canonical fork.
-2. Push to the canonical `RoxyOS/mlibc` fork. The workdir is usually on a detached HEAD, where
-   `git push origin master` pushes the *local* `master` — still the previous commit — and prints
-   `Everything up-to-date`, a silent no-op. Read the branch first:
+Each mlibc recipe publication must contain exactly one new commit after the previous recipe pin.
+Local implementation commits may be split while developing, but they must be squashed before
+publication. The published commit's parent must be exactly the commit currently pinned by
+`distro/recipes/mlibc/recipe`.
+
+1. Read the previous mlibc pin from `distro/recipes/mlibc/recipe` before changing the recipe.
+2. Implement and validate all related Roxy mlibc changes in `distro/sources/mlibc-workdir`.
+3. Squash the complete publication into one commit with subject form
+   `roxy: <imperative summary>`. Do not rewrite the previous recipe pin or any unrelated
+   publication. The new commit must satisfy:
+
+   ```sh
+   test "$(git rev-parse <new-sha>^)" = "<previous-pin>"
+   test "$(git rev-list --count <previous-pin>..<new-sha>)" -eq 1
+   ```
+
+4. Push the squashed commit to the canonical `RoxyOS/mlibc` fork. The workdir is usually on a
+   detached HEAD, where `git push origin master` pushes the local `master` — still the previous
+   commit — and prints `Everything up-to-date`, a silent no-op. Read the branch first:
 
    ```sh
    git checkout master                       # or: git switch master
-   git merge --ff-only <new-sha>
-   git push origin master
-   git rev-parse HEAD origin/master          # both must print the new SHA
+   git reset --hard <new-sha>
+   git push --force-with-lease origin master
+   git rev-parse HEAD origin/master
    ```
 
-   Verify the exact commit SHA is reachable before touching the recipe. `Everything up-to-date`
-   is not evidence that the commit went out.
-3. Update `distro/recipes/mlibc/recipe` only after the commit is published: pin the immutable
-   SHA and update `version` for the publication date. The version must represent this new
-   upstream publication, not remain at the previous recipe version.
+   Force-push is permitted here because the canonical branch is intentionally maintained as one
+   publication commit per recipe pin. `--force-with-lease` protects against overwriting a remote
+   update that was not observed locally. Verify that both SHAs equal the new commit before touching
+   the recipe. `Everything up-to-date` is not evidence that the commit went out.
+5. Update `distro/recipes/mlibc/recipe` only after the squashed commit is published: pin the
+   immutable SHA and update `version` for the publication date. The version must represent this
+   new upstream publication, not remain at the previous recipe version.
 
    Use the following convention:
    - The first mlibc publication on a date uses `0.0.0.YYYYMMDD`.
@@ -148,11 +163,17 @@ The mlibc recipe pins a commit and has `clean_workdirs=no` — the local clone l
    - Keep `revision=1`.
 
    Before finishing, verify that the recipe diff changes both `version` and `commit`, while
-   leaving `revision=1`. A commit-only update is incomplete.
-4. One clean `jinx rebuild mlibc` after the version and pin change, then refresh the rootfs if
+   leaving `revision=1`. A commit-only update is incomplete. Also verify that the new recipe pin
+   is exactly one commit after the old pin:
+
+   ```sh
+   test "$(git rev-parse <new-pin>^)" = "<previous-pin>"
+   test "$(git rev-list --count <previous-pin>..<new-pin>)" -eq 1
+   ```
+6. One clean `jinx rebuild mlibc` after the version and pin change, then refresh the rootfs if
    installed behavior or the kernel ABI changed. No `revbump` of dependents — mlibc is dynamically linked
    (`libc.so`/`ld.so`), consumers pick up the new libc at runtime.
-5. ABI changes validate the kernel and mlibc contracts together: syscall numbers must match
+7. ABI changes validate the kernel and mlibc contracts together: syscall numbers must match
    `kernel/syscall/src/numbers.rs`, and result-struct layouts must match the kernel's generated
    checks.
 
@@ -161,8 +182,9 @@ The mlibc recipe pins a commit and has `clean_workdirs=no` — the local clone l
 - **A detached workdir turns the push into a no-op**: from a detached HEAD, `git push origin
   master` pushes the local `master`, which still points at the previous commit, and reports
   `Everything up-to-date` — indistinguishable from a successful push unless you compare SHAs.
-  Check out `master`, fast-forward it to the new commit, push, and confirm `git rev-parse HEAD`
-  equals `git rev-parse origin/master` before touching the recipe.
+  Check out `master`, reset it to the squashed publication commit, push with
+  `git push --force-with-lease origin master`, and confirm `git rev-parse HEAD` equals
+  `git rev-parse origin/master` before touching the recipe.
 - **Syscall ABI must match the kernel exactly**: numbers, arg order, and result struct layouts
   (that's why `syscall.h` has static_asserts — don't drop them).
 - mlibc build needs network at source-prep (`meson subprojects download` for `freestnd-c-hdrs`,
