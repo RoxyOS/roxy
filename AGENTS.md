@@ -49,6 +49,16 @@ The root `Cargo.toml` lists every Rust workspace member and makes the dependency
 trace. Crate names use the `roxy-*` prefix except for the composition binary, `kernel-main`, and the
 host-side `xtask` tool.
 
+### Syscall ABI ownership
+
+A syscall ABI record remains owned by the syscall boundary, but its C layout and constants should
+live in the narrowest implementation file that uses them. Keep a record in the shared Roxy syscall
+header only when multiple sysdep implementations or public consumers need the same declaration. A
+record used by one operation belongs in that operation's sysdep source file, typically in its
+anonymous namespace, with local size, alignment, and offset assertions. This keeps operation-
+specific wire details from becoming a global header dependency while preserving the kernel/libc
+layout contract at the actual boundary.
+
 ### Runtime Shape
 
 The durable top-level boot sequence is:
