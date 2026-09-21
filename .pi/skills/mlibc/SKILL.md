@@ -118,7 +118,18 @@ The mlibc recipe pins a commit and has `clean_workdirs=no` — the local clone l
 4. mlibc is **dynamically linked** (`libc.so`, `ld.so`, ...) — consumers pick up the new libc at
    runtime, so no `revbump` of dependents is needed.
 
-### Publishing a commit and updating the recipe pin
+### Default mlibc delivery
+
+When a task changes mlibc, the default completed result is:
+
+1. modify the mlibc workdir;
+2. commit the change to the RoxyOS/mlibc repository;
+3. update `distro/recipes/mlibc/recipe` to the new commit and version;
+4. remove any temporary `jinx-working-patch.patch`.
+
+Do not stop at a generated working patch unless the user explicitly asks for a patch-only,
+local-only, or unpublished change.
+
 
 Each mlibc recipe publication must contain exactly one new commit after the previous recipe pin.
 Local implementation commits may be split while developing, but they must be squashed before
