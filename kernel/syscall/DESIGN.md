@@ -246,13 +246,17 @@ monotonic deadline and delegates blocking to the timer-wait subsystem. Signals a
 sleep cannot be interrupted and no remaining duration is reported.
 
 `ioctl` validates and resolves the descriptor before decoding the raw request number. For terminal
-requests, the syscall layer copies the Roxy mlibc `termios` or `winsize` record between userspace
-and an initialized typed kernel value. Setters own
+requests, the syscall layer copies the Roxy terminal-attributes or `winsize` record between
+userspace and an initialized typed kernel value. The attributes record carries only the attributes
+a terminal executes — the behavior flags, the interrupt byte, and the erase byte — so a POSIX
+`termios` field with no Roxy counterpart is dropped by the library rather than reaching this
+boundary, and a flag bit outside the record's own word is reported through the centralized
+diagnostic. Setters own
 their copied value; getters borrow a typed local that the file object fills before it is copied
 back. The FD layer owns locked object dispatch, while the syscall layer maps operation errors to
 errno. Unknown requests return `ENOTTY` without a diagnostic. Consequently an invalid descriptor
 returns `EBADF` even when the request is unknown. A file object's `IoctlError::NotTty` also maps to
-`ENOTTY`; rejected unsupported terminal fields use the centralized diagnostic and `ENOTSUP` path.
+`ENOTTY`.
 
 The current process model has no stored credentials and treats every process as the root identity.
 `getuid`, `geteuid`, `getgid`, and `getegid` therefore return real and effective user and group IDs
@@ -324,8 +328,10 @@ sysdeps. Every ABI change must keep syscall numbers, private layout adapters, re
 userspace symbols in sync. The ioctl request numbers are Roxy's own rather than Linux's, allocated
 in `ioctl/numbers.rs` and mirrored by the Roxy mlibc `abi-bits/ioctls.h`; the request *names* keep
 their conventional Unix spelling so ported userspace compiles unchanged, while the values stay
-disjoint from every other personality's. The `termios` and `winsize` records copied across this
-boundary keep mlibc's layout. Requests the kernel does not implement, such as `TIOCGSID`,
+disjoint from every other personality's. The terminal-attributes and `winsize` records copied
+across this boundary are Roxy's own: the POSIX `struct termios` stays a library-visible type that
+the Roxy mlibc translates to and from the attributes record. Requests the kernel does not
+implement, such as `TIOCGSID`,
 `TIOCMGET`, and the `SIOC*` socket requests, keep their generic mlibc definitions and return
 `ENOTTY`; other ioctl families remain unsupported.
 
@@ -361,7 +367,10 @@ another personality's numbering, because there is no caller-supplied value to te
 reserved at zero instead, so an all-zero record is never a value. The `wait` status kind and the
 `fs` module's file kind word — which both the `stat` record and the directory-entry record carry —
 are built that way, and each numbers its members from one upwards. A base is for a word that
-arrives from userspace.
+arrives from userspace. A flag word inside a Roxy-owned record needs no base either, even when the
+library fills it: the record's other fields already establish it as Roxy's, another personality's
+caller is rejected by the request number or syscall before its record is read, and the `poll`
+request and terminal-attributes records take that shape.
 A selector whose modes are compared for equality may still give each mode its own bit, as
 `sigevent.sigev_notify` does: Linux's own set has that shape (0, 1, 2, 4), and consecutive indices
 would turn a combination of two modes into a third one that the handler would then honour.

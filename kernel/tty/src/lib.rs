@@ -100,7 +100,7 @@ mod test_support {
     use roxy_fd::{IoctlRequest, OpenFile};
     use roxy_keyboard_input::{KeyCode, KeyEvent, KeyState};
     use roxy_terminal::{OutputError, TerminalOutput};
-    use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
+    use roxy_tty_types::{ApplyWhen, TerminalAttributes, TerminalFlags, WindowSize};
     use spin::Mutex;
 
     use crate::Tty;
@@ -147,13 +147,14 @@ mod test_support {
 
     /// Sets the line-discipline `echo`/`canonical` flags through the ioctl path.
     pub(super) fn set_settings(tty: &Arc<Tty>, echo: bool, canonical: bool) {
-        let mut termios = Termios::default();
-        tty.ioctl(IoctlRequest::GetTermios(&mut termios)).unwrap();
-        termios.local_flags.set(LocalFlags::ECHO, echo);
-        termios.local_flags.set(LocalFlags::ICANON, canonical);
-        tty.ioctl(IoctlRequest::SetTermios {
+        let mut attributes = TerminalAttributes::default();
+        tty.ioctl(IoctlRequest::GetTerminalAttributes(&mut attributes))
+            .unwrap();
+        attributes.flags.set(TerminalFlags::ECHO, echo);
+        attributes.flags.set(TerminalFlags::ICANON, canonical);
+        tty.ioctl(IoctlRequest::SetTerminalAttributes {
             when: ApplyWhen::Immediate,
-            termios,
+            attributes,
         })
         .unwrap();
     }

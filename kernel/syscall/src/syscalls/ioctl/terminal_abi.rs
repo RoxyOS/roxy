@@ -1,43 +1,43 @@
 use core::mem::{align_of, offset_of, size_of};
 
 use roxy_memory::UserAddress;
-use roxy_tty_types::{LocalFlags, Termios, WindowSize};
+use roxy_tty_types::{TerminalAttributes, TerminalFlags, WindowSize};
 
 use crate::{
     args::{Out, SyscallArg, user_memory},
     errno::Errno,
 };
 
+/// Fixed-layout terminal-attribute payload copied across the userspace syscall ABI.
+///
+/// Layout per `sysdeps/roxy/sysdeps/ioctl.cpp`; sizes pinned by the assertions below.
 #[repr(C)]
-pub(super) struct TermiosAbi {
-    input_flags: u32,
-    output_flags: u32,
-    control_flags: u32,
-    local_flags: u32,
-    line_discipline: u8,
-    control_characters: [u8; 32],
-    padding: [u8; 3],
-    input_speed: u32,
-    output_speed: u32,
+pub(super) struct TerminalAttributesAbi {
+    /// Terminal behavior flags, one [`TerminalFlags`] bit each.
+    flags: u32,
+    /// The interrupt character (`VINTR`), conventionally Ctrl+C.
+    interrupt_byte: u8,
+    /// The erase character (`VERASE`), conventionally backspace.
+    erase_byte: u8,
+    /// Always zero; names the bytes the record's alignment leaves implicit.
+    reserved: u16,
 }
 
-const _: () = assert!(size_of::<TermiosAbi>() == 60);
-const _: () = assert!(align_of::<TermiosAbi>() == 4);
-const _: () = assert!(offset_of!(TermiosAbi, line_discipline) == 16);
-const _: () = assert!(offset_of!(TermiosAbi, control_characters) == 17);
-const _: () = assert!(offset_of!(TermiosAbi, input_speed) == 52);
-const _: () = assert!(offset_of!(TermiosAbi, output_speed) == 56);
+const _: () = assert!(size_of::<TerminalAttributesAbi>() == 8);
+const _: () = assert!(align_of::<TerminalAttributesAbi>() == 4);
+const _: () = assert!(offset_of!(TerminalAttributesAbi, flags) == 0);
+const _: () = assert!(offset_of!(TerminalAttributesAbi, interrupt_byte) == 4);
+const _: () = assert!(offset_of!(TerminalAttributesAbi, erase_byte) == 5);
+const _: () = assert!(offset_of!(TerminalAttributesAbi, reserved) == 6);
 
-impl SyscallArg for TermiosAbi {
-    fn parse(raw: u64, error: Errno) -> Result<Self, Errno> {
-        let address = UserAddress::parse(raw, error)?;
-        let mut abi = Self::zeroed();
-
-        // SAFETY: TermiosAbi's checked repr(C) layout explicitly represents all padding, contains
-        // only integers, and accepts every bit pattern.
-        unsafe { user_memory::read(address, &mut abi) }?;
-
-        Ok(abi)
+impl TerminalAttributesAbi {
+    const fn zeroed() -> Self {
+        Self {
+            flags: 0,
+            interrupt_byte: 0,
+            erase_byte: 0,
+            reserved: 0,
+        }
     }
 }
 
@@ -69,18 +69,51 @@ impl SyscallArg for WindowSizeAbi {
     }
 }
 
-pub(super) fn read_termios(address: UserAddress) -> Result<Termios, Errno> {
-    let abi = TermiosAbi::parse(address.as_u64(), Errno::Fault)?;
+pub(super) fn read_attributes(address: UserAddress) -> Result<TerminalAttributes, Errno> {
+    let mut abi = TerminalAttributesAbi::zeroed();
 
-    Ok(abi.into())
+    // SAFETY: TerminalAttributesAbi's checked repr(C) layout explicitly represents all padding,
+    // contains only integers, and accepts every bit pattern.
+    unsafe { user_memory::read(address, &mut abi) }?;
+
+    let flags = decode_flags(abi.flags)?;
+
+    Ok(TerminalAttributes {
+        flags,
+        interrupt_byte: abi.interrupt_byte,
+        erase_byte: abi.erase_byte,
+    })
 }
 
-pub(super) fn write_termios(output: Out<TermiosAbi>, termios: Termios) -> Result<(), Errno> {
-    let abi = TermiosAbi::from(termios);
+pub(super) fn write_attributes(
+    output: Out<TerminalAttributesAbi>,
+    attributes: TerminalAttributes,
+) -> Result<(), Errno> {
+    let abi = TerminalAttributesAbi {
+        flags: attributes.flags.bits(),
+        interrupt_byte: attributes.interrupt_byte,
+        erase_byte: attributes.erase_byte,
+        reserved: 0,
+    };
 
-    // SAFETY: TermiosAbi's checked repr(C) layout explicitly represents and initializes all
-    // padding and contains only integer fields.
+    // SAFETY: TerminalAttributesAbi's checked repr(C) layout explicitly represents and initializes
+    // all padding and contains only integer fields.
     unsafe { output.write(&abi) }
+}
+
+/// Decodes one record's flag word, reporting a bit that names no attribute this kernel serves.
+///
+/// The word is a field of Roxy's own record rather than a word a caller shares with another
+/// personality, so no value below a base can arrive and there is no foreign numbering to separate
+/// from ours: every bit outside [`TerminalFlags`] is undefined, and is reported as such.
+fn decode_flags(word: u32) -> Result<TerminalFlags, Errno> {
+    TerminalFlags::from_bits(word).ok_or_else(|| {
+        crate::unsupported::unsupported_argument(
+            "ioctl.tcsetattr.flags",
+            u64::from(word),
+            Errno::NotSupported,
+        )
+    })
 }
 
 pub(super) fn read_window_size(address: UserAddress) -> Result<WindowSize, Errno> {
@@ -98,53 +131,6 @@ pub(super) fn write_window_size(
     // SAFETY: WindowSizeAbi's checked repr(C) layout contains only initialized u16 fields without
     // padding.
     unsafe { output.write(&abi) }
-}
-
-impl TermiosAbi {
-    const fn zeroed() -> Self {
-        Self {
-            input_flags: 0,
-            output_flags: 0,
-            control_flags: 0,
-            local_flags: 0,
-            line_discipline: 0,
-            control_characters: [0; 32],
-            padding: [0; 3],
-            input_speed: 0,
-            output_speed: 0,
-        }
-    }
-}
-
-impl From<TermiosAbi> for Termios {
-    fn from(abi: TermiosAbi) -> Self {
-        Self {
-            input_flags: abi.input_flags,
-            output_flags: abi.output_flags,
-            control_flags: abi.control_flags,
-            local_flags: LocalFlags::from_bits_retain(abi.local_flags),
-            line_discipline: abi.line_discipline,
-            control_characters: abi.control_characters,
-            input_speed: abi.input_speed,
-            output_speed: abi.output_speed,
-        }
-    }
-}
-
-impl From<Termios> for TermiosAbi {
-    fn from(termios: Termios) -> Self {
-        Self {
-            input_flags: termios.input_flags,
-            output_flags: termios.output_flags,
-            control_flags: termios.control_flags,
-            local_flags: termios.local_flags.bits(),
-            line_discipline: termios.line_discipline,
-            control_characters: termios.control_characters,
-            padding: [0; 3],
-            input_speed: termios.input_speed,
-            output_speed: termios.output_speed,
-        }
-    }
 }
 
 impl WindowSizeAbi {
@@ -178,4 +164,36 @@ impl From<WindowSize> for WindowSizeAbi {
             pixel_height: window_size.pixel_height,
         }
     }
+}
+
+#[cfg(feature = "kernel-test")]
+mod tests {
+    use roxy_test::kernel_test;
+    use roxy_tty_types::TerminalFlags;
+
+    use super::decode_flags;
+
+    kernel_test!(
+        "roxy-syscall::terminal-attribute-flags",
+        decodes_defined_bits,
+        {
+            assert_eq!(
+                decode_flags(TerminalFlags::ECHO.bits()),
+                Ok(TerminalFlags::ECHO)
+            );
+            assert_eq!(
+                decode_flags((TerminalFlags::ISIG | TerminalFlags::OPOST).bits()),
+                Ok(TerminalFlags::ISIG | TerminalFlags::OPOST)
+            );
+        }
+    );
+
+    kernel_test!(
+        "roxy-syscall::terminal-attribute-flags",
+        rejects_undefined_bits,
+        {
+            assert!(decode_flags(1 << 8).is_err());
+            assert!(decode_flags(u32::MAX).is_err());
+        }
+    );
 }

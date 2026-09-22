@@ -173,3 +173,19 @@ accepting it silently; only the origin of the value is lost. The gaps are marked
 `TODO(missing-capability: no owned numbering for the timer flags word)` in
 `kernel/syscall/src/syscalls/timer/abi.rs`. Roxy-owned headers carrying those ids, or a `clockid_t`
 the personality defines itself, would let the handlers separate the two cases.
+
+## POSIX terminal attributes with no Roxy counterpart are dropped by the library
+
+A Roxy terminal keeps only the attributes its line discipline and output path execute: echo,
+canonical mode, `ISIG`, the interrupt and erase characters, input CR/NL translation
+(`ICRNL`/`INLCR`/`IGNCR`), and output post-processing (`OPOST`/`ONLCR`). The Roxy
+terminal-attributes record carries exactly those, so `tcsetattr` drops every other POSIX `termios`
+field — software flow control (`IXON`/`IXOFF`), parity and modem control, line speeds, and control
+characters other than `VINTR`/`VERASE` (including `VEOF`, so canonical EOF handling remains
+unimplemented) — because no Roxy field represents them. `tcgetattr` reports the values the kernel
+synthesizes for those fields rather than echoing what the caller last set, so a program that
+requires exact `struct termios` round-trip of an unimplemented field is not supported.
+
+Marked with `TODO(missing-capability: unmapped POSIX terminal attributes)` in
+`sysdeps/roxy/sysdeps/ioctl.cpp`; the kernel side has no no-op mask or control-character storage
+left to do the same.

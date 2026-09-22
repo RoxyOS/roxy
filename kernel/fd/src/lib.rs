@@ -17,8 +17,8 @@ pub use file::{
     SeekFrom, TruncateError,
 };
 pub use ioctl::{
-    ApplyWhen, FbChannel, FbInfo, IoctlError, IoctlRequest, LocalFlags, MmapError, MmapTarget,
-    Termios, WindowSize,
+    ApplyWhen, FbChannel, FbInfo, IoctlError, IoctlRequest, MmapError, MmapTarget,
+    TerminalAttributes, TerminalFlags, WindowSize,
 };
 pub use open::OpenFile;
 pub use socket::{ShutdownHow, SocketError, SocketOps, SockoptLevel, SockoptName};

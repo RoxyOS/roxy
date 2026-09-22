@@ -36,10 +36,6 @@ pub struct TtyCore {
     pub(crate) foreground_pgid: Lock<Option<ProcessGroupId>>,
     /// The session that owns this controlling terminal, when one is established.
     pub(crate) owner_session_id: Lock<Option<SessionId>>,
-    /// The termios control characters (`c_cc`), round-tripped through tcgetattr/tcsetattr. Only
-    /// VINTR (SIGINT) and VERASE are acted on by the line discipline; the rest are stored so a
-    /// cooked terminal's termios survives a read-modify-write (see `TODO(control-chars)` in ioctl).
-    pub(crate) control_characters: Lock<[u8; 32]>,
 }
 
 impl TtyCore {
@@ -68,7 +64,6 @@ impl TtyCore {
             poll_listeners: Arc::new(PollListeners::new()),
             foreground_pgid: Lock::new(None),
             owner_session_id: Lock::new(None),
-            control_characters: Lock::new(crate::ioctl::default_control_characters()),
         });
 
         live_terminals().lock().push(Arc::downgrade(&core));

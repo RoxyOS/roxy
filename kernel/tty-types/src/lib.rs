@@ -3,7 +3,7 @@
 use bitflags::bitflags;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-/// Controls when a termios update takes effect.
+/// Controls when a terminal-attributes update takes effect.
 pub enum ApplyWhen {
     /// Applies settings immediately.
     Immediate,
@@ -14,24 +14,36 @@ pub enum ApplyWhen {
 }
 
 bitflags! {
+    /// The terminal behavior flags a terminal applies to its input and output paths.
+    ///
+    /// Each flag owns one bit. The word is a field of Roxy's own terminal-attributes record
+    /// rather than a word a caller shares with another personality, so it needs no base above a
+    /// foreign numbering: every bit outside this type is undefined, and the syscall boundary
+    /// reports it instead of dropping it.
     #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-    pub struct LocalFlags: u32 {
-        const ISIG = 0o1;
-        const ICANON = 0o2;
-        const ECHO = 0o10;
+    pub struct TerminalFlags: u32 {
+        const ISIG = 1 << 0;
+        const ICANON = 1 << 1;
+        const ECHO = 1 << 2;
+        const OPOST = 1 << 3;
+        const ONLCR = 1 << 4;
+        const ICRNL = 1 << 5;
+        const INLCR = 1 << 6;
+        const IGNCR = 1 << 7;
     }
 }
 
+/// The terminal attributes a terminal applies to its input and output paths.
+///
+/// Only attributes with a real effect are represented: `flags` carries the behavior flags the
+/// line discipline and output path execute, and the two bytes are the only control characters a
+/// terminal acts on. Attributes another personality's `termios` carries but this kernel does not
+/// execute have no field here.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct Termios {
-    pub input_flags: u32,
-    pub output_flags: u32,
-    pub control_flags: u32,
-    pub local_flags: LocalFlags,
-    pub line_discipline: u8,
-    pub control_characters: [u8; 32],
-    pub input_speed: u32,
-    pub output_speed: u32,
+pub struct TerminalAttributes {
+    pub flags: TerminalFlags,
+    pub interrupt_byte: u8,
+    pub erase_byte: u8,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

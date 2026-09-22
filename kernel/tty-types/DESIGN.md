@@ -27,10 +27,11 @@ or raw userspace pointers belong here. Adding another syscall personality should
 translation under `roxy-syscall`, not change the representation in this crate unless the kernel
 domain itself changes.
 
-`LocalFlags` models the known terminal local-mode bits while retaining unknown bits from an ABI
-decoder. The syscall layer must use `from_bits_retain` and `bits` for conversion; the concrete
-TTY decides which bits it supports and reports unsupported values through its ioctl error path.
-
-`Termios` is the complete TTY ioctl value. It is distinct from
-`roxy-line-discipline::LineDisciplineSettings`, which contains only the input-policy settings the
-line discipline can execute.
+`TerminalAttributes` is the complete TTY ioctl value: a `TerminalFlags` word plus the terminal's
+interrupt and erase bytes. It carries only attributes a terminal executes, which is what lets the
+syscall boundary reject a bit outside `TerminalFlags` instead of the terminal deciding which bits
+it supports. It is distinct from `roxy-line-discipline::LineDisciplineSettings`, which contains
+only the input-policy settings the line discipline can execute; the terminal core converts between
+the two because it owns both. The record another personality's `termios` carries but this kernel
+does not execute — flow control, parity, line speeds, and control characters other than the two —
+has no field here and is dropped by the library.

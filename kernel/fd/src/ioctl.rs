@@ -3,14 +3,14 @@ use alloc::vec::Vec;
 use crate::OpenFile;
 
 pub use roxy_fb_types::{FbChannel, FbInfo};
-pub use roxy_tty_types::{ApplyWhen, LocalFlags, Termios, WindowSize};
+pub use roxy_tty_types::{ApplyWhen, TerminalAttributes, TerminalFlags, WindowSize};
 
 #[derive(Debug)]
 pub enum IoctlRequest<'a> {
-    GetTermios(&'a mut Termios),
-    SetTermios {
+    GetTerminalAttributes(&'a mut TerminalAttributes),
+    SetTerminalAttributes {
         when: ApplyWhen,
-        termios: Termios,
+        attributes: TerminalAttributes,
     },
     GetWindowSize(&'a mut WindowSize),
     SetWindowSize(WindowSize),

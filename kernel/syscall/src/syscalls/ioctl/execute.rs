@@ -11,15 +11,15 @@ pub(super) const FIONBIO: u64 = numbers::DESCRIPTION_BASE;
 
 pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> Result<u64, Errno> {
     match raw_request {
-        terminal::TCGETS => terminal::get_termios(file, raw_argument).map(|()| 0),
+        terminal::TCGETS => terminal::get_terminal_attributes(file, raw_argument).map(|()| 0),
         terminal::TCSETS => {
-            terminal::set_termios(file, ApplyWhen::Immediate, raw_argument).map(|()| 0)
+            terminal::set_terminal_attributes(file, ApplyWhen::Immediate, raw_argument).map(|()| 0)
         }
         terminal::TCSETSW => {
-            terminal::set_termios(file, ApplyWhen::Drain, raw_argument).map(|()| 0)
+            terminal::set_terminal_attributes(file, ApplyWhen::Drain, raw_argument).map(|()| 0)
         }
         terminal::TCSETSF => {
-            terminal::set_termios(file, ApplyWhen::Flush, raw_argument).map(|()| 0)
+            terminal::set_terminal_attributes(file, ApplyWhen::Flush, raw_argument).map(|()| 0)
         }
         terminal::TIOCGWINSZ => terminal::get_window_size(file, raw_argument).map(|()| 0),
         terminal::TIOCSWINSZ => terminal::set_window_size(file, raw_argument).map(|()| 0),

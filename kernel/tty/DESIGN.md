@@ -7,7 +7,7 @@ raw key events into bytes (a bounded pending key-event queue, the US 104-key lay
 the escape-sequence encoder) and feeds those bytes to a shared `TtyCore`, which owns the line
 discipline, buffering, blocking reads, terminal ioctls, and foreground-group/session semantics.
 `roxy-tty` keeps only the keyboard input bridge, the console singleton, controlling-terminal
-binding, and the initial fd0/1/2 descriptors. It does not own termios semantics, the line
+binding, and the initial fd0/1/2 descriptors. It does not own terminal-attribute semantics, the line
 discipline, or the foreground-process-group machinery — a pty slave shares all of that through the
 same core (see `roxy-tty-core/DESIGN.md` and `roxy-pty/DESIGN.md`).
 
@@ -46,7 +46,8 @@ arrives at the line discipline as `\x03` and can trigger `ISIG`/`VINTR`.
 
 These all delegate to `TtyCore`. `Tty::read`, `write`, `poll`, `register_poll_listener`, and
 `ioctl` are pass-throughs; the shared semantics (blocking reads, `SIGTTIN`, canonical commit,
-echo, termios/window-size/foreground-group ioctls, `TIOCSCTTY`) and the `TCSAFLUSH` pending-input
+echo, terminal-attribute/window-size/foreground-group ioctls, `TIOCSCTTY`) and the `TCSAFLUSH`
+pending-input
 flush are described in `roxy-tty-core/DESIGN.md`. `TtyFile::is_terminal` returns true for the
 console.
 
@@ -60,9 +61,9 @@ path a pty slave uses; there is no console-specific exit handler.
 ## Limits
 
 The layout decoder is fixed to the US 104-key layout (`Us104Key`); layout selection and switching
-are outside the current scope. Remaining terminal limits (unsupported `termios` fields, control
-characters, job control, `SIGWINCH`) live in `roxy-tty-core/DESIGN.md` and apply to the console
-exactly as to a pty slave.
+are outside the current scope. Remaining terminal limits (dropped POSIX attributes, unimplemented
+control characters, job control, `SIGWINCH`) live in `roxy-tty-core/DESIGN.md` and apply to the
+console exactly as to a pty slave.
 ### Terminal name and `/dev/tty0`
 
 The console exposes its openable device path through its `TtyCore`'s terminal pathname, which the

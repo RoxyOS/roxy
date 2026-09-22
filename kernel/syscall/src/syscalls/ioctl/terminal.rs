@@ -3,7 +3,7 @@ use core::mem::{align_of, offset_of, size_of};
 
 use roxy_fd::{IoctlRequest, OpenFile};
 use roxy_memory::UserAddress;
-use roxy_tty_types::{ApplyWhen, Termios, WindowSize};
+use roxy_tty_types::{ApplyWhen, TerminalAttributes, WindowSize};
 
 use super::{numbers, terminal_abi};
 use crate::{
@@ -74,26 +74,26 @@ pub(super) fn get_terminal_name(file: &OpenFile, raw_argument: u64) -> Result<()
     Ok(())
 }
 
-pub(super) fn get_termios(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
+pub(super) fn get_terminal_attributes(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
     let address = UserAddress::parse(raw_argument, Errno::Fault)?;
-    let output = Out::<terminal_abi::TermiosAbi>::parse(address.as_u64(), Errno::Fault)?;
+    let output = Out::<terminal_abi::TerminalAttributesAbi>::parse(address.as_u64(), Errno::Fault)?;
     output.validate()?;
-    let mut termios = Termios::default();
+    let mut attributes = TerminalAttributes::default();
 
-    file.ioctl(IoctlRequest::GetTermios(&mut termios))
+    file.ioctl(IoctlRequest::GetTerminalAttributes(&mut attributes))
         .map_err(super::execute::map_ioctl_error)?;
-    terminal_abi::write_termios(output, termios)
+    terminal_abi::write_attributes(output, attributes)
 }
 
-pub(super) fn set_termios(
+pub(super) fn set_terminal_attributes(
     file: &OpenFile,
     when: ApplyWhen,
     raw_argument: u64,
 ) -> Result<(), Errno> {
     let address = UserAddress::parse(raw_argument, Errno::Fault)?;
-    let termios = terminal_abi::read_termios(address)?;
+    let attributes = terminal_abi::read_attributes(address)?;
 
-    file.ioctl(IoctlRequest::SetTermios { when, termios })
+    file.ioctl(IoctlRequest::SetTerminalAttributes { when, attributes })
         .map_err(super::execute::map_ioctl_error)
 }
 

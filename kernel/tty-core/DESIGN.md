@@ -111,8 +111,10 @@ moved into the readable buffer, matching the prior TTY behavior.
 ## Limits
 
 Input transformations are limited to `ICRNL`/`INLCR`/`IGNCR` and output post-processing to
-`OPOST`/`ONLCR`; the remaining `termios` flag bits are accepted as no-ops (with in-place `TODO`
-markers) and the control characters are round-tripped, so a cooked terminal can configure itself.
+`OPOST`/`ONLCR`. A terminal acts on only the interrupt and erase control characters, so the
+`TerminalAttributes` record the ioctl path carries has a field for exactly those and no others; a
+POSIX attribute with no field is dropped by the library before it reaches this boundary (see
+`ISSUES.md`).
 `VMIN`/`VTIME` combinations, timeout-based noncanonical reads, job-control stop/continue, and
 `SIGWINCH` remain unsupported. The session model is shared with `roxy-process`'s minimal
 `setsid`/`setpgid` checks. The registry keeps a weak set of all live cores rather than a

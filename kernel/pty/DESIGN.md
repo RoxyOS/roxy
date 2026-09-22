@@ -83,10 +83,10 @@ does). This differs from a devfs terminal, which acquires on open.
   size change is not propagated or announced.
 - A slave has no device path, so `ptsname`-style naming and any other reopen-by-name consumer cannot
   work. `ttyname()` on a slave reports `ENOTTY`.
-- Termios fields outside the implemented subset (`ICRNL`/`INLCR`/`IGNCR`, `OPOST`/`ONLCR`,
-  `ISIG`/`ICANON`/`ECHO`, and the round-tripped control characters) are accepted as no-ops instead
-  of rejected, so a cooked terminal can configure itself (see the `TODO` markers in
-  `validate_termios`).
+- Attributes outside the implemented subset (`ICRNL`/`INLCR`/`IGNCR`, `OPOST`/`ONLCR`,
+  `ISIG`/`ICANON`/`ECHO`, and the interrupt and erase characters) have no field in the terminal
+  record, so the library drops them and a cooked terminal can still configure itself (see
+  `ISSUES.md`).
 
 ## Rejected alternatives
 
