@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use crate::OpenFile;
 
 pub use roxy_fb_types::{FbChannel, FbInfo};
@@ -14,6 +16,9 @@ pub enum IoctlRequest<'a> {
     SetWindowSize(WindowSize),
     GetForegroundPgid(&'a mut u32),
     SetForegroundPgid(u32),
+    /// Returns the openable device pathname of a terminal, including its NUL terminator.
+    GetTerminalName(&'a mut Vec<u8>),
+
     /// Flushes queued terminal input/output (`TCFLSH`). `which` is `TCIFLUSH`/`TCOFLUSH`/`TCIOFLUSH`.
     Tcflush(u32),
     /// Makes the calling session leader's session the terminal's controlling session

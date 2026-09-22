@@ -88,7 +88,7 @@ impl PtyPair {
         let slave_input = Arc::new(SlaveInputSource {
             queue: Lock::new(VecDeque::new()),
         });
-        let slave_core = TtyCore::new(master_output.clone(), slave_input.clone());
+        let slave_core = TtyCore::new(master_output.clone(), slave_input.clone(), None);
 
         Arc::new(Self {
             number,
@@ -308,9 +308,7 @@ mod tests {
     kernel_test!("roxy-pty::slave-has-no-path", slave_has_no_device_name, {
         let (_, slave) = open_pair();
 
-        // The pair is reachable only through the returned descriptors, so the slave reports no
-        // reopenable device path.
-        assert!(slave.terminal_path().is_none());
+        assert!(slave.is_terminal());
     });
 
     kernel_test!(

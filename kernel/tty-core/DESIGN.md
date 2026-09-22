@@ -18,8 +18,11 @@ domain values (`Termios`, `WindowSize`, …) shared with `roxy-fd`.
 
 `TtyCore` combines one `Arc<dyn TtyOutput>` endpoint, one `Arc<dyn TerminalInputSource>`, one
 `LineDiscipline`, and the terminal-wide state: a readable byte buffer, a read lock, poll listeners,
-the foreground process group, and the owning session. It is created through `TtyCore::new`, which
-returns `Arc<Self>` and registers a weak reference with the process-wide session-leader-exit set.
+the foreground process group, the owning session, and the optional openable device pathname that
+the terminal-name ioctl reports. It is created through `TtyCore::new`, which takes the endpoint,
+the input source, and that pathname (the console supplies `/dev/tty0`; an anonymous pty slave
+supplies `None`), returns `Arc<Self>`, and registers a weak reference with the process-wide
+session-leader-exit set.
 
 ### Input path
 

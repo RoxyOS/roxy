@@ -50,7 +50,8 @@ Both ends are `roxy_fd::File` objects wrapped directly in `OpenFile`; they are n
 - `PtySlave` is a terminal: `is_terminal` is true. Its `read`/`write`/`poll`/
   `register_poll_listener`/`ioctl` delegate directly to the `TtyCore`, so the slave inherits line
   discipline, canonical editing, termios, foreground groups, and controlling-session handling. It
-  reports no `terminal_path`, so `ttyname()` on a slave fails with `ENOTTY`.
+  reports no terminal pathname, so the terminal-name ioctl on a slave fails with `ENOTTY` and
+  `ttyname()` cannot name it.
 
 ## Allocation and numbering
 

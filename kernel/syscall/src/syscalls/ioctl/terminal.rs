@@ -1,10 +1,13 @@
+use alloc::vec::Vec;
+use core::mem::{align_of, offset_of, size_of};
+
 use roxy_fd::{IoctlRequest, OpenFile};
 use roxy_memory::UserAddress;
 use roxy_tty_types::{ApplyWhen, Termios, WindowSize};
 
 use super::{numbers, terminal_abi};
 use crate::{
-    args::{Out, SyscallArg, user_memory},
+    args::{Out, Slice, SyscallArg, user_memory},
     errno::Errno,
 };
 
@@ -19,6 +22,57 @@ pub(super) const TIOCGPGRP: u64 = numbers::TERMINAL_BASE + 6;
 pub(super) const TIOCSPGRP: u64 = numbers::TERMINAL_BASE + 7;
 pub(super) const TIOCSCTTY: u64 = numbers::TERMINAL_BASE + 8;
 pub(super) const TCFLSH: u64 = numbers::TERMINAL_BASE + 9;
+pub(super) const TIOCGNAME: u64 = numbers::TERMINAL_BASE + 10;
+
+/// User ABI for querying the openable path of a terminal.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct TerminalNameRequestAbi {
+    buffer: u64,
+    capacity: u64,
+    required: u64,
+}
+
+const _: () = assert!(size_of::<TerminalNameRequestAbi>() == 24);
+const _: () = assert!(align_of::<TerminalNameRequestAbi>() == 8);
+const _: () = assert!(offset_of!(TerminalNameRequestAbi, buffer) == 0);
+const _: () = assert!(offset_of!(TerminalNameRequestAbi, capacity) == 8);
+const _: () = assert!(offset_of!(TerminalNameRequestAbi, required) == 16);
+
+pub(super) fn get_terminal_name(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
+    let request_address = UserAddress::parse(raw_argument, Errno::Fault)?;
+    let mut request = TerminalNameRequestAbi {
+        buffer: 0,
+        capacity: 0,
+        required: 0,
+    };
+    // SAFETY: TerminalNameRequestAbi has a stable C layout, no padding, and accepts every byte
+    // pattern because all fields are integers.
+    unsafe { user_memory::read(request_address, &mut request) }?;
+
+    let mut encoded = Vec::new();
+    file.ioctl(IoctlRequest::GetTerminalName(&mut encoded))
+        .map_err(super::execute::map_ioctl_error)?;
+
+    let required = encoded.len();
+    let capacity = usize::try_from(request.capacity).map_err(|_| Errno::Range)?;
+    if capacity < required {
+        return Err(Errno::Range);
+    }
+
+    let output_address = UserAddress::parse(request.buffer, Errno::Fault)?;
+    let output = Slice::<u8>::new(output_address, required);
+    output.validate()?;
+
+    // SAFETY: u8 has no padding and the ioctl supplied initialized bytes.
+    unsafe { output.write(&encoded) }?;
+
+    request.required = u64::try_from(required).map_err(|_| Errno::Overflow)?;
+    // SAFETY: request is initialized and its layout has no implicit padding.
+    unsafe { user_memory::write(request_address, &request) }?;
+
+    Ok(())
+}
 
 pub(super) fn get_termios(file: &OpenFile, raw_argument: u64) -> Result<(), Errno> {
     let address = UserAddress::parse(raw_argument, Errno::Fault)?;

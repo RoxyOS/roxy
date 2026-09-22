@@ -129,6 +129,14 @@ impl TtyCore {
                 Ok(())
             }
             IoctlRequest::SetControllingTerminal { force } => self.set_controlling_terminal(force),
+            IoctlRequest::GetTerminalName(output) => {
+                let Some(path) = self.terminal_path else {
+                    return Err(IoctlError::NotTty);
+                };
+                output.extend_from_slice(path);
+                output.push(0);
+                Ok(())
+            }
             IoctlRequest::FbGetInfo(_)
             | IoctlRequest::FbTakeControl
             | IoctlRequest::FbReleaseControl => Err(IoctlError::NotTty),

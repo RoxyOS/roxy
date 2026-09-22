@@ -428,16 +428,19 @@ neither handler carries its own copy. Both accept `CLOCK_REALTIME` and `CLOCK_MO
 the centralized diagnostic, so a caller such as Xorg's `GetTimeInMillis` that probes a coarse clock
 first falls back to `CLOCK_MONOTONIC` instead of failing.
 
-### `TTYNAME`
+### `TIOCGNAME`
 
-`ROXY_SYS_TTYNAME(fd, buf, size)` (71) writes the NUL-terminated openable pathname of the terminal
-backing `fd` into a user buffer. The name is owned by the terminal object — the descriptor layer's
-ABI-neutral `File::terminal_path` — not synthesized here, so each terminal reports its own path
-(`/dev/tty0` for the console). Errors: `ENOTTY` when `fd` is not a terminal or is a terminal with
-no device-filesystem name (a pty slave), `ERANGE` when the buffer cannot hold the name plus its
-terminator, `EBADF` for an invalid
-descriptor. No structured ABI record is involved; the payload is a plain null-terminated byte
-string like `getcwd`.
+`TIOCGNAME` (terminal ioctl request `TERMINAL_BASE + 10`) writes the NUL-terminated openable
+pathname of the terminal backing the descriptor into a `roxy_tty_name_request` record, whose fields
+are a userspace buffer address, its capacity, and the required byte count including the terminator.
+The request travels through the opened file's typed ioctl path: the terminal object owns the
+pathname and returns it through its own ioctl implementation, so the syscall layer copies bytes and
+maps errors without querying a separate pathname capability. A terminal with no reopenable device
+node (an anonymous pty slave) and a non-terminal descriptor both report `ENOTTY`; a capacity that
+cannot hold the name plus its terminator reports `ERANGE`, and an invalid request or output range
+reports `EFAULT`. POSIX `ttyname` is implemented by mlibc through this ioctl; the former
+`ROXY_SYS_TTYNAME` number was removed and the syscalls after it were compacted by one, so the next
+syscall is `TimerCreate` at `SYSCALL_BASE + 71`.
 
 ## Pseudo-terminals
 

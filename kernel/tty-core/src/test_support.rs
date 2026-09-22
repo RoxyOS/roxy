@@ -131,7 +131,7 @@ pub(crate) fn open_with(output: Arc<dyn TtyOutput>) -> (Arc<TtyCore>, Arc<ByteQu
     let source = Arc::new(ByteQueue {
         queue: Mutex::new(alloc::vec::Vec::new()),
     });
-    let core = TtyCore::new(output, source.clone());
+    let core = TtyCore::new(output, source.clone(), None);
 
     (core, source)
 }

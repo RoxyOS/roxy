@@ -90,6 +90,7 @@ mod tests {
                 terminal::TIOCSPGRP,
                 terminal::TIOCSCTTY,
                 terminal::TCFLSH,
+                terminal::TIOCGNAME,
             ],
         ),
         (
@@ -107,7 +108,7 @@ mod tests {
         "roxy-syscall::ioctl-request-space",
         requests_stay_in_their_block,
         {
-            let mut seen = [0u64; 14];
+            let mut seen = [0u64; 15];
             let mut count = 0;
 
             for (base, requests) in BLOCKS {

@@ -27,6 +27,7 @@ pub(super) fn execute(file: &OpenFile, raw_request: u64, raw_argument: u64) -> R
         terminal::TIOCSPGRP => terminal::set_foreground_pgid(file, raw_argument).map(|()| 0),
         terminal::TIOCSCTTY => terminal::set_controlling_terminal(file, raw_argument).map(|()| 0),
         terminal::TCFLSH => terminal::tcflush(file, raw_argument).map(|()| 0),
+        terminal::TIOCGNAME => terminal::get_terminal_name(file, raw_argument).map(|()| 0),
         framebuffer::ROXY_FRAMEBUFFER_GET_INFO => {
             framebuffer::get_info(file, raw_argument).map(|()| 0)
         }

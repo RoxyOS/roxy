@@ -12,9 +12,9 @@ use crate::encoder::encode_decoded;
 
 pub(crate) const PENDING_CAPACITY: usize = 256;
 
-/// The console terminal's openable device path, reported by `terminal_path` for `ttyname`. It must
-/// match the devfs node `CONSOLE_NODE` is registered under, so a `ttyname` consumer can reopen it.
-/// There is a single console, so the path is a crate constant rather than a per-terminal field.
+/// The console terminal's openable device path, carried by the console `TtyCore` and returned by
+/// the terminal-name ioctl. It must match the devfs node `CONSOLE_NODE` is registered under, so a
+/// `ttyname` consumer can reopen it.
 pub(crate) const CONSOLE_PATH: &[u8] = b"/dev/tty0";
 
 /// The mount-relative devfs node name the console is registered under (devfs is mounted at `/dev`,
@@ -105,7 +105,11 @@ pub struct Tty {
 impl Tty {
     pub(super) fn new(output: Arc<dyn TerminalOutput>) -> Self {
         let input = Arc::new(ConsoleInputSource::new());
-        let core = TtyCore::new(Arc::new(OutputAdapter { output }), input.clone());
+        let core = TtyCore::new(
+            Arc::new(OutputAdapter { output }),
+            input.clone(),
+            Some(CONSOLE_PATH),
+        );
 
         Self { core, input }
     }
@@ -159,7 +163,7 @@ impl Tty {
         self.core.ioctl(request)
     }
 
-    /// Returns the console's openable device path for `ttyname`.
+    /// Returns the console's openable device pathname.
     pub(super) fn terminal_path() -> &'static [u8] {
         CONSOLE_PATH
     }

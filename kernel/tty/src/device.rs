@@ -15,8 +15,7 @@ const CONSOLE_FILE_ID: u64 = 6;
 ///
 /// The console's initial process descriptors (fd 0/1/2) are `TtyFile`s handed out directly; this
 /// device lets userspace reopen the same single terminal through the device filesystem. Both share
-/// one `Arc<Tty>`, so the node's path (`CONSOLE_PATH`) equals the path `TtyFile::terminal_path`
-/// reports — the contract `ttyname` relies on.
+/// one `Arc<Tty>`, whose `TtyCore` carries the console's `CONSOLE_PATH` as its terminal pathname.
 pub struct TtyDevice {
     tty: Arc<Tty>,
 }

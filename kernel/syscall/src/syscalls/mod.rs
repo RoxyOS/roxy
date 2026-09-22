@@ -42,7 +42,6 @@ mod tgkill;
 mod thread_create;
 mod thread_exit;
 mod timer;
-mod ttyname;
 mod umask;
 mod uname;
 mod vm;
@@ -52,7 +51,7 @@ mod writev;
 
 use crate::Syscall;
 
-pub(super) const SYSCALLS: [Syscall; 88] = [
+pub(super) const SYSCALLS: [Syscall; 87] = [
     exit::SYSCALL,
     read::SYSCALL,
     write::SYSCALL,
@@ -125,7 +124,6 @@ pub(super) const SYSCALLS: [Syscall; 88] = [
     getpgid::SYSCALL,
     setsid::SYSCALL,
     writev::SYSCALL,
-    ttyname::SYSCALL,
     timer::CREATE_SYSCALL,
     timer::SETTIME_SYSCALL,
     timer::GETTIME_SYSCALL,

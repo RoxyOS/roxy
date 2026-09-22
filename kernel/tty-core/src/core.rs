@@ -16,9 +16,12 @@ use crate::output::{OutputError, TtyOutput};
 /// One instance drives the line discipline, input buffering, blocking reads, output, ioctls, and
 /// foreground-process-group/session semantics for **any** terminal — a console terminal or a pty
 /// slave alike. (The core itself is not pty-specific; it is the terminal engine both kinds share.)
-/// The only per-terminal differences — where bytes come from and where output/echo go — are
-/// injected through [`TerminalInputSource`] and [`TtyOutput`].
+/// The only per-terminal differences — where bytes come from, where output/echo go, and the
+/// openable device pathname the terminal reports — are injected through [`TerminalInputSource`],
+/// [`TtyOutput`], and the constructor's pathname argument.
 pub struct TtyCore {
+    /// Openable device pathname for this terminal, when it has one.
+    pub(crate) terminal_path: Option<&'static [u8]>,
     /// Where processed output and echoed input are delivered.
     pub(crate) output: Arc<dyn TtyOutput>,
     /// Where line-discipline input bytes come from.
@@ -40,17 +43,22 @@ pub struct TtyCore {
 }
 
 impl TtyCore {
-    /// Builds a terminal core around the given output endpoint and input source and registers it
-    /// with the process's session-leader-exit handling so a controlling-session leader's exit
-    /// releases the terminal and hangs up its foreground group.
+    /// Builds a terminal core around the given output endpoint, input source, and optional openable
+    /// device pathname, and registers it with the process's session-leader-exit handling so a
+    /// controlling-session leader's exit releases the terminal and hangs up its foreground group.
+    ///
+    /// `terminal_path` is the pathname (without terminator) the terminal-name ioctl reports; a
+    /// terminal with no reopenable device node (an anonymous pty slave) passes `None`.
     #[must_use]
     pub fn new(
         output: Arc<dyn TtyOutput>,
         input_source: Arc<dyn TerminalInputSource>,
+        terminal_path: Option<&'static [u8]>,
     ) -> Arc<Self> {
         ensure_exit_handler();
 
         let core = Arc::new(Self {
+            terminal_path,
             window_size: Lock::new(output.window_size()),
             output,
             input_source,

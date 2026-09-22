@@ -81,23 +81,22 @@ pub(crate) enum SyscallNumber {
     GetPgid = SYSCALL_BASE + 68,
     SetSid = SYSCALL_BASE + 69,
     Writev = SYSCALL_BASE + 70,
-    Ttyname = SYSCALL_BASE + 71,
-    TimerCreate = SYSCALL_BASE + 72,
-    TimerSettime = SYSCALL_BASE + 73,
-    TimerGettime = SYSCALL_BASE + 74,
-    TimerGetoverrun = SYSCALL_BASE + 75,
-    TimerDelete = SYSCALL_BASE + 76,
-    ThreadCreate = SYSCALL_BASE + 77,
-    ThreadExit = SYSCALL_BASE + 78,
-    GetTid = SYSCALL_BASE + 79,
-    SigtimedWait = SYSCALL_BASE + 80,
-    Tgkill = SYSCALL_BASE + 81,
-    ClockGetres = SYSCALL_BASE + 82,
-    Openpty = SYSCALL_BASE + 83,
-    GetDescriptorFlags = SYSCALL_BASE + 84,
-    SetDescriptorFlags = SYSCALL_BASE + 85,
-    GetStatusFlags = SYSCALL_BASE + 86,
-    SetStatusFlags = SYSCALL_BASE + 87,
+    TimerCreate = SYSCALL_BASE + 71,
+    TimerSettime = SYSCALL_BASE + 72,
+    TimerGettime = SYSCALL_BASE + 73,
+    TimerGetoverrun = SYSCALL_BASE + 74,
+    TimerDelete = SYSCALL_BASE + 75,
+    ThreadCreate = SYSCALL_BASE + 76,
+    ThreadExit = SYSCALL_BASE + 77,
+    GetTid = SYSCALL_BASE + 78,
+    SigtimedWait = SYSCALL_BASE + 79,
+    Tgkill = SYSCALL_BASE + 80,
+    ClockGetres = SYSCALL_BASE + 81,
+    Openpty = SYSCALL_BASE + 82,
+    GetDescriptorFlags = SYSCALL_BASE + 83,
+    SetDescriptorFlags = SYSCALL_BASE + 84,
+    GetStatusFlags = SYSCALL_BASE + 85,
+    SetStatusFlags = SYSCALL_BASE + 86,
 }
 
 impl TryFrom<u64> for SyscallNumber {
@@ -180,23 +179,22 @@ impl TryFrom<u64> for SyscallNumber {
             68 => Ok(Self::GetPgid),
             69 => Ok(Self::SetSid),
             70 => Ok(Self::Writev),
-            71 => Ok(Self::Ttyname),
-            72 => Ok(Self::TimerCreate),
-            73 => Ok(Self::TimerSettime),
-            74 => Ok(Self::TimerGettime),
-            75 => Ok(Self::TimerGetoverrun),
-            76 => Ok(Self::TimerDelete),
-            77 => Ok(Self::ThreadCreate),
-            78 => Ok(Self::ThreadExit),
-            79 => Ok(Self::GetTid),
-            80 => Ok(Self::SigtimedWait),
-            81 => Ok(Self::Tgkill),
-            82 => Ok(Self::ClockGetres),
-            83 => Ok(Self::Openpty),
-            84 => Ok(Self::GetDescriptorFlags),
-            85 => Ok(Self::SetDescriptorFlags),
-            86 => Ok(Self::GetStatusFlags),
-            87 => Ok(Self::SetStatusFlags),
+            71 => Ok(Self::TimerCreate),
+            72 => Ok(Self::TimerSettime),
+            73 => Ok(Self::TimerGettime),
+            74 => Ok(Self::TimerGetoverrun),
+            75 => Ok(Self::TimerDelete),
+            76 => Ok(Self::ThreadCreate),
+            77 => Ok(Self::ThreadExit),
+            78 => Ok(Self::GetTid),
+            79 => Ok(Self::SigtimedWait),
+            80 => Ok(Self::Tgkill),
+            81 => Ok(Self::ClockGetres),
+            82 => Ok(Self::Openpty),
+            83 => Ok(Self::GetDescriptorFlags),
+            84 => Ok(Self::SetDescriptorFlags),
+            85 => Ok(Self::GetStatusFlags),
+            86 => Ok(Self::SetStatusFlags),
             _ => Err(()),
         }
     }
@@ -494,73 +492,69 @@ mod tests {
         );
         assert_eq!(
             SyscallNumber::try_from(SYSCALL_BASE + 71),
-            Ok(SyscallNumber::Ttyname)
-        );
-        assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 72),
             Ok(SyscallNumber::TimerCreate)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 73),
+            SyscallNumber::try_from(SYSCALL_BASE + 72),
             Ok(SyscallNumber::TimerSettime)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 74),
+            SyscallNumber::try_from(SYSCALL_BASE + 73),
             Ok(SyscallNumber::TimerGettime)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 75),
+            SyscallNumber::try_from(SYSCALL_BASE + 74),
             Ok(SyscallNumber::TimerGetoverrun)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 76),
+            SyscallNumber::try_from(SYSCALL_BASE + 75),
             Ok(SyscallNumber::TimerDelete)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 77),
+            SyscallNumber::try_from(SYSCALL_BASE + 76),
             Ok(SyscallNumber::ThreadCreate)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 78),
+            SyscallNumber::try_from(SYSCALL_BASE + 77),
             Ok(SyscallNumber::ThreadExit)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 79),
+            SyscallNumber::try_from(SYSCALL_BASE + 78),
             Ok(SyscallNumber::GetTid)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 80),
+            SyscallNumber::try_from(SYSCALL_BASE + 79),
             Ok(SyscallNumber::SigtimedWait)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 81),
+            SyscallNumber::try_from(SYSCALL_BASE + 80),
             Ok(SyscallNumber::Tgkill)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 82),
+            SyscallNumber::try_from(SYSCALL_BASE + 81),
             Ok(SyscallNumber::ClockGetres)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 83),
+            SyscallNumber::try_from(SYSCALL_BASE + 82),
             Ok(SyscallNumber::Openpty)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 84),
+            SyscallNumber::try_from(SYSCALL_BASE + 83),
             Ok(SyscallNumber::GetDescriptorFlags)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 85),
+            SyscallNumber::try_from(SYSCALL_BASE + 84),
             Ok(SyscallNumber::SetDescriptorFlags)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 86),
+            SyscallNumber::try_from(SYSCALL_BASE + 85),
             Ok(SyscallNumber::GetStatusFlags)
         );
         assert_eq!(
-            SyscallNumber::try_from(SYSCALL_BASE + 87),
+            SyscallNumber::try_from(SYSCALL_BASE + 86),
             Ok(SyscallNumber::SetStatusFlags)
         );
-        assert!(SyscallNumber::try_from(SYSCALL_BASE + 88).is_err());
+        assert!(SyscallNumber::try_from(SYSCALL_BASE + 87).is_err());
 
         // Below the base is another personality's numbering, which the dispatcher reports as
         // foreign. Linux x86_64's `read` is 0, `write` is 1, and `exit_group` is 231.
