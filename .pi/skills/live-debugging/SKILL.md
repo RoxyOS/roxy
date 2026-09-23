@@ -25,6 +25,9 @@ kill "$(cat target/roxy/agent-debug/qemu.pid)"   # SIGTERM; escalate to SIGKILL 
 
 Confirm `tcp:1234` is free before relaunching (a stale instance holds it).
 
+When waiting for the VM to reach a state — boot, a program running, the screen changing — poll at
+most every 5 seconds; never sleep longer.
+
 ## Speaking QMP and HMP
 
 QMP is newline-delimited JSON over a unix socket. Every connection must first send
