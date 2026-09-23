@@ -22,7 +22,20 @@ Types a key including its release — simplest for words:
 <skill-dir>/scripts/hmc.sh 'sendkey l s ret'    # space-separated list
 ```
 
-## Common `qcode` names
+## Text input
+
+Use `type-text.sh` to send a string as one QMP keyboard-event batch. It supports ASCII letters,
+digits, spaces, and US-layout punctuation; `--enter` appends Enter. Unsupported characters are
+rejected before any events are sent.
+
+```sh
+<skill-dir>/scripts/type-text.sh --enter 'X -retro'
+```
+
+This injects actual key down/up events through the guest keyboard stack. It does not write to the
+serial console or bypass the guest input system.
+
+## Common qcodes
 
 Letters/digits `a`…`z`, `0`…`9`; `ret`, `spc`, `tab`, `esc`, `backspace`, `delete`; `shift`,
 `ctrl`, `alt`; arrows/`home`/`end`/`pgup`/`pgdn`; keypad `kp_enter`…; `minus`, `equal`,

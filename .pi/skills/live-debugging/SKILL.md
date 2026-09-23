@@ -47,9 +47,9 @@ overrides the default socket):
 <skill-dir>/scripts/hmc.sh 'sendkey ret'                    # type Enter
 ```
 
-For rapid key/mouse sequences, batch multiple requests in one `nc -U` stream instead of one
-script call per event (the `\n` after each JSON object is required either way). Do not type into
-`serial.log` — the framebuffer shell's input comes from injected keyboard events only.
+For literal text, use `<skill-dir>/scripts/type-text.sh [--enter] 'text'` to send an ASCII string
+as one QMP key-event batch. This is preferable to building HMP `sendkey` sequences by hand. Do not
+type into `serial.log` — the framebuffer shell's input comes from injected keyboard events only.
 
 QMP event types (all strings, verified against QEMU 11):
 
