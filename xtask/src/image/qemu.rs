@@ -3,7 +3,9 @@ use std::{
     net::TcpListener,
     path::Path,
     path::PathBuf,
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Result, bail, ensure};
@@ -81,19 +83,44 @@ pub(super) fn debug(
         .arg("-D")
         .arg(dir.join("cpu-reset.log"));
 
-    // Fully detach: the agent never reads QEMU's own stdout, and QEMU stderr goes to a
-    // log file so a failed launch leaves diagnostics behind instead of dying silently.
-    command.stdout(Stdio::null());
+    // Keep a small supervisor as the recorded process so the detached VM's final status can be
+    // written after xtask exits. The supervisor also forwards termination to its QEMU child.
+    let qemu_program = command.get_program().to_owned();
+    let qemu_args: Vec<_> = command.get_args().map(|arg| arg.to_owned()).collect();
+    let supervisor_script = write_supervisor_script(dir)?;
+    let exit_status = dir.join("exit-status");
     let qemu_log = fs::File::create(dir.join("qemu.log"))?;
-    command.stderr(Stdio::from(qemu_log));
+    let mut supervisor = Command::new("sh");
+    supervisor
+        .arg(&supervisor_script)
+        .arg(qemu_program)
+        .args(qemu_args)
+        .env("ROXY_EXIT_STATUS", &exit_status)
+        .stdout(Stdio::null())
+        .stderr(Stdio::from(qemu_log));
 
-    let mut child = command.spawn()?;
+    let mut child = supervisor.spawn()?;
     let pid = child.id();
     fs::write(dir.join("qemu.pid"), pid.to_string())?;
-    write_manifest(dir, pid, gdb_port, profile, image, kernel, rootfs)?;
+    write_manifest(
+        dir,
+        pid,
+        gdb_port,
+        profile,
+        image,
+        kernel,
+        rootfs,
+        &exit_status,
+        &supervisor_script,
+    )?;
 
     if let Some(status) = child.try_wait()? {
-        bail!("QEMU exited during launch with status {status}");
+        bail!("QEMU supervisor exited during launch with status {status}");
+    }
+    if let Err(error) = wait_for_qmp_socket(&mut child, &dir.join("qmp.sock")) {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(error);
     }
 
     println!("==> session: {}", dir.display());
@@ -112,6 +139,29 @@ pub(super) fn debug(
     Ok(())
 }
 
+fn wait_for_qmp_socket(child: &mut Child, socket: &Path) -> Result<()> {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while !socket.exists() {
+        if let Some(status) = child.try_wait()? {
+            bail!("QEMU supervisor exited before QMP startup with status {status}");
+        }
+        if Instant::now() >= deadline {
+            bail!("QMP socket did not appear: {}", socket.display());
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    Ok(())
+}
+
+fn write_supervisor_script(dir: &Path) -> Result<PathBuf> {
+    let path = dir.join("supervisor.sh");
+    fs::write(
+        &path,
+        "#!/bin/sh\nset -u\n\"$@\" &\nchild=$!\ntrap 'kill \"$child\" 2>/dev/null || true' TERM INT HUP\nset +e\nwait \"$child\"\nstatus=$?\nset -e\nprintf 'exit_code=%s\\n' \"$status\" > \"$ROXY_EXIT_STATUS\"\nexit \"$status\"\n",
+    )?;
+    Ok(path)
+}
+
 fn free_tcp_port() -> Result<u16> {
     let listener = TcpListener::bind(("127.0.0.1", 0))?;
     Ok(listener.local_addr()?.port())
@@ -125,6 +175,8 @@ fn write_manifest(
     image: &Path,
     kernel: &Path,
     rootfs: &Path,
+    exit_status: &Path,
+    supervisor: &Path,
 ) -> Result<()> {
     let manifest = format!(
         r#"{{
@@ -137,7 +189,9 @@ fn write_manifest(
   "qmp": "{}",
   "monitor": "{}",
   "serial": "{}",
-  "cpu_reset_log": "{}"
+  "cpu_reset_log": "{}",
+  "exit_status": "{}",
+  "supervisor": "{}"
 }}
 "#,
         profile.name(),
@@ -148,6 +202,8 @@ fn write_manifest(
         json_path(&dir.join("monitor.sock")),
         json_path(&dir.join("serial.log")),
         json_path(&dir.join("cpu-reset.log")),
+        json_path(exit_status),
+        json_path(supervisor),
     );
     fs::write(dir.join("manifest.json"), manifest)?;
     Ok(())
