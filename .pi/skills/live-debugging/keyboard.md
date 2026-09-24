@@ -24,12 +24,12 @@ Types a key including its release — simplest for words:
 
 ## Text input
 
-Use `type-text.sh` to send a string as one QMP keyboard-event batch. It supports ASCII letters,
-digits, spaces, and US-layout punctuation; `--enter` appends Enter. Unsupported characters are
-rejected before any events are sent.
+Use `type-text.sh` to send a string over one persistent QMP connection. It supports ASCII letters,
+digits, spaces, and US-layout punctuation; `--enter` appends Enter and `--delay seconds` controls
+the interval between characters. Unsupported characters are rejected before any events are sent.
 
 ```sh
-<skill-dir>/scripts/type-text.sh --enter 'X -retro'
+<skill-dir>/scripts/type-text.sh --enter --delay 0.05 'X -retro'
 ```
 
 This injects actual key down/up events through the guest keyboard stack. It does not write to the
