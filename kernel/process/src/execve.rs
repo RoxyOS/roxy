@@ -27,14 +27,18 @@ pub fn execve_current(
 
     CurrentArchitectureBackend::without_interrupts(|| {
         let thread_id = scheduler::current_thread_id();
-        {
+        let previous = {
             let mut table = PROCESS_TABLE.lock();
-            let _previous = table.replace_addrspace(thread_id, image.addrspace.clone());
+            let previous = table.replace_addrspace(thread_id, image.addrspace.clone());
             table.drop_close_on_exec_fds(thread_id);
             table.clear_signal_actions(thread_id);
-        }
+            previous
+        };
 
+        // Keep the old hierarchy alive until CR3 points at the replacement. Debug builds poison
+        // freed frames, so dropping it while it is still active can corrupt the running page table.
         image.addrspace.activate();
+        drop(previous);
     });
 
     Ok((entry, stack_pointer))
