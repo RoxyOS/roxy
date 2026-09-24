@@ -88,7 +88,11 @@ pub(super) fn debug(
     // Keep a small supervisor as the recorded process so the detached VM's final status can be
     // written after xtask exits. The supervisor also forwards termination to its QEMU child.
     let qemu_program = command.get_program().to_owned();
-    let qemu_args: Vec<_> = command.get_args().map(|arg| arg.to_owned()).collect();
+    let qemu_args: Vec<_> = command
+        .get_args()
+        .map(std::borrow::ToOwned::to_owned)
+        .collect();
+
     let supervisor_script = write_supervisor_script(dir)?;
     let exit_status = dir.join("exit-status");
     let qemu_log = fs::File::create(dir.join("qemu.log"))?;
@@ -104,17 +108,7 @@ pub(super) fn debug(
     let mut child = supervisor.spawn()?;
     let pid = child.id();
     fs::write(dir.join("qemu.pid"), pid.to_string())?;
-    write_manifest(
-        dir,
-        pid,
-        gdb_port,
-        profile,
-        image,
-        kernel,
-        rootfs,
-        &exit_status,
-        &supervisor_script,
-    )?;
+    write_manifest(dir, pid, gdb_port, profile, image, kernel, rootfs)?;
 
     if let Some(status) = child.try_wait()? {
         bail!("QEMU supervisor exited during launch with status {status}");
@@ -177,8 +171,6 @@ fn write_manifest(
     image: &Path,
     kernel: &Path,
     rootfs: &Path,
-    exit_status: &Path,
-    supervisor: &Path,
 ) -> Result<()> {
     let manifest = format!(
         r#"{{
@@ -204,8 +196,8 @@ fn write_manifest(
         json_path(&dir.join("monitor.sock")),
         json_path(&dir.join("serial.log")),
         json_path(&dir.join("cpu-reset.log")),
-        json_path(exit_status),
-        json_path(supervisor),
+        json_path(&dir.join("exit-status")),
+        json_path(&dir.join("supervisor.sh")),
     );
     fs::write(dir.join("manifest.json"), manifest)?;
     Ok(())
@@ -257,21 +249,6 @@ fn common_command(image: &Path, arch: Arch) -> Result<Command> {
     Ok(command)
 }
 
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use super::json_path;
-
-    #[test]
-    fn json_path_escapes_json_string_characters() {
-        assert_eq!(
-            json_path(Path::new("a\\b\"\n\r\t\u{08}\u{0c}\u{01}")),
-            "a\\\\b\\\"\\n\\r\\t\\b\\f\\u0001"
-        );
-    }
-}
-
 fn firmware(arch: Arch) -> Result<PathBuf> {
     match arch {
         Arch::X86_64 => {
@@ -288,5 +265,20 @@ fn firmware(arch: Arch) -> Result<PathBuf> {
         Arch::Aarch64 => {
             bail!("aarch64 boot is not yet wired: the runner has no firmware/EFI path for aarch64")
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::json_path;
+
+    #[test]
+    fn json_path_escapes_json_string_characters() {
+        assert_eq!(
+            json_path(Path::new("a\\b\"\n\r\t\u{08}\u{0c}\u{01}")),
+            "a\\\\b\\\"\\n\\r\\t\\b\\f\\u0001"
+        );
     }
 }
