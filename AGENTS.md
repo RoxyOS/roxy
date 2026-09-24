@@ -157,6 +157,7 @@ procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`
 
 ### Userspace Debugging
 
+- Live VM debugging is enabled by default: when debugging userspace or kernel behavior, use the running QEMU VM and the live-debugging workflow when that is useful. Only restrict debugging to static inspection when the user explicitly requests static-only debugging.
 - When debugging userspace software, locate and inspect the relevant version of its source code as
   needed. Do not guess at its behavior or attempt to infer it from the binary alone when source is
   available; use disassembly or other binary analysis only when the source is unavailable or the
