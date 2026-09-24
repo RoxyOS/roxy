@@ -42,9 +42,10 @@ The helper scripts accept `QMP_SOCK` to select the session's QMP socket. The GDB
 When waiting for the VM to reach a state — boot, a program running, the screen changing — poll at
 most every 5 seconds; never sleep longer.
 
-When a VM disappears unexpectedly, inspect its session's `qemu.log`, `serial.log`, and QMP status
-before starting another run. A missing QMP socket alone does not distinguish QEMU startup failure,
-guest reset, and guest shutdown.
+When a VM disappears unexpectedly, inspect its session's `qemu.log`, `cpu-reset.log`, `serial.log`,
+and QMP status before starting another run. `cpu-reset.log` is the QEMU CPU-reset diagnostic named
+in the manifest. A missing QMP socket alone does not distinguish QEMU startup failure, guest reset,
+and guest shutdown.
 
 QMP is newline-delimited JSON over a unix socket. Every connection must first send
 `qmp_capabilities`, then the requests, each ending with `\n`. HMP commands are wrapped as QMP
