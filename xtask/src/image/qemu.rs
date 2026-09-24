@@ -1,5 +1,7 @@
 use std::{
-    env, fs,
+    env,
+    fmt::Write,
+    fs,
     net::TcpListener,
     path::Path,
     path::PathBuf,
@@ -210,9 +212,23 @@ fn write_manifest(
 }
 
 fn json_path(path: &Path) -> String {
-    path.to_string_lossy()
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
+    let mut escaped = String::new();
+    for character in path.to_string_lossy().chars() {
+        match character {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            '\u{08}' => escaped.push_str("\\b"),
+            '\u{0c}' => escaped.push_str("\\f"),
+            character if character.is_control() => {
+                write!(escaped, "\\u{:04x}", character as u32).unwrap();
+            }
+            character => escaped.push(character),
+        }
+    }
+    escaped
 }
 
 /// The shared machine definition for every launch mode: machine model, accelerator, OVMF
@@ -239,6 +255,21 @@ fn common_command(image: &Path, arch: Arch) -> Result<Command> {
         .args(["-m", "4G", "-smp", "16", "-no-reboot"]);
 
     Ok(command)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::json_path;
+
+    #[test]
+    fn json_path_escapes_json_string_characters() {
+        assert_eq!(
+            json_path(Path::new("a\\b\"\n\r\t\u{08}\u{0c}\u{01}")),
+            "a\\\\b\\\"\\n\\r\\t\\b\\f\\u0001"
+        );
+    }
 }
 
 fn firmware(arch: Arch) -> Result<PathBuf> {

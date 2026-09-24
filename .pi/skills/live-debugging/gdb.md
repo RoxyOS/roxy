@@ -10,8 +10,8 @@ and source lines; `release` builds provide symbols without source-level debug in
 
 ```sh
 session=target/roxy/agent-debug/run-<id>
-gdb -q "$(jq -r .kernel "$session/manifest.json")"
-(gdb) target remote "$(jq -r .gdb "$session/manifest.json")"
+gdb -q "$(jq -r .kernel "$session/manifest.json")" \
+  -ex "target remote $(jq -r .gdb "$session/manifest.json")"
 ```
 
 ## Attaching

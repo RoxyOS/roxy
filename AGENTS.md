@@ -91,8 +91,8 @@ The standard commands are:
 - `cargo xagent-debug --profile dev`: build the kernel with DWARF debug info (use `release` for
   the optimized build) and launch Roxy OS in QEMU detached. Each run gets a unique session
   directory under `target/roxy/agent-debug/`, a dynamically allocated GDB port, and a
-  `manifest.json` recording the matching PID, profile, kernel, ISO, rootfs, QMP, monitor, and
-  serial paths. See `.pi/skills/live-debugging/SKILL.md`.
+  `manifest.json` recording the matching PID, profile, kernel, ISO, rootfs, QMP, monitor, serial, and
+  exit-status paths. See `.pi/skills/live-debugging/SKILL.md`.
 - `cargo xtask image`: create `target/roxy/roxy.iso` without launching QEMU.
 - `cargo rootfs`: rebuild the Jinx `base` package staging tree and
   `target/roxy/rootfs-x86_64.img` from userspace inputs.
