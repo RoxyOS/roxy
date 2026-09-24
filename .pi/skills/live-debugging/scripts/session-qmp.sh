@@ -13,7 +13,7 @@ if [ -n "${ROXY_DEBUG_SESSION:-}" ]; then
     exit 0
 fi
 
-session_root="$script_dir/../../../../target/roxy/agent-debug"
+session_root=$(CDPATH= cd "$script_dir/../../../../target/roxy/agent-debug" && pwd)
 latest=$(ls -dt "$session_root"/run-* 2>/dev/null | head -n 1 || true)
 if [ -n "$latest" ]; then
     printf '%s/qmp.sock\n' "$latest"
