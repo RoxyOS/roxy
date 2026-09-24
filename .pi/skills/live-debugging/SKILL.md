@@ -20,15 +20,31 @@ cargo xagent-debug --profile release  # optimized, symbols only
 after start (below) before attaching GDB.
 
 ```sh
-kill "$(cat target/roxy/agent-debug/qemu.pid)"   # SIGTERM; escalate to SIGKILL if needed
+session=target/roxy/agent-debug/run-<id>
+kill "$(cat "$session/qemu.pid")"   # SIGTERM; escalate to SIGKILL if needed
 ```
 
-Confirm `tcp:1234` is free before relaunching (a stale instance holds it).
+Confirm the session identity before attaching tools. `cargo xagent-debug` prints the session directory
+and GDB port, and writes `manifest.json` there; use those values instead of assuming a fixed
+`target/roxy/agent-debug/` path or port. Verify the manifest's PID command line, profile, ISO, and
+kernel all refer to the same VM. A session's QMP socket and serial log are under that session
+directory, for example:
+
+```sh
+session=target/roxy/agent-debug/run-<id>
+jq . "$session/manifest.json"
+ps -p "$(jq -r .pid "$session/manifest.json")" -o pid=,args=
+```
+
+The helper scripts accept `QMP_SOCK` to select the session's QMP socket. The GDB port is the
+`gdb` value in the manifest, and the ELF must match its `profile`.
 
 When waiting for the VM to reach a state — boot, a program running, the screen changing — poll at
 most every 5 seconds; never sleep longer.
 
-## Speaking QMP and HMP
+When a VM disappears unexpectedly, inspect its session's `qemu.log`, `serial.log`, and QMP status
+before starting another run. A missing QMP socket alone does not distinguish QEMU startup failure,
+guest reset, and guest shutdown.
 
 QMP is newline-delimited JSON over a unix socket. Every connection must first send
 `qmp_capabilities`, then the requests, each ending with `\n`. HMP commands are wrapped as QMP
@@ -37,7 +53,8 @@ QMP is newline-delimited JSON over a unix socket. Every connection must first se
 Two scripts in this directory cover both (both live next to the skill docs; QMP_SOCK
 overrides the default socket):
 
-- `<skill-dir>/scripts/qmp.sh '<JSON request>'` — one raw QMP request
+- `<skill-dir>/scripts/qmp.sh '<JSON request>'` — one raw QMP request; selects the latest session
+  unless `QMP_SOCK` or `ROXY_DEBUG_SESSION` is set
 - `<skill-dir>/scripts/hmc.sh '<HMP command line>'` — one HMP command line through QMP
 
 ```sh
@@ -47,9 +64,10 @@ overrides the default socket):
 <skill-dir>/scripts/hmc.sh 'sendkey ret'                    # type Enter
 ```
 
-For literal text, use `<skill-dir>/scripts/type-text.sh [--enter] 'text'` to send an ASCII string
-as one QMP key-event batch. This is preferable to building HMP `sendkey` sequences by hand. Do not
-type into `serial.log` — the framebuffer shell's input comes from injected keyboard events only.
+For literal text, use `<skill-dir>/scripts/type-text.sh [--enter] [--delay seconds] 'text'` to
+send an ASCII string over one persistent QMP connection. This is preferable to building HMP
+`sendkey` sequences by hand. Do not type into `serial.log` — the framebuffer shell's input comes
+from injected keyboard events only.
 
 QMP event types (all strings, verified against QEMU 11):
 
@@ -69,12 +87,12 @@ HMP input equivalents (`<skill-dir>/scripts/hmc.sh`): `sendkey`, `mouse_move dx 
   `sendkey`; guest path is PS/2 → `roxy-keyboard-input` → tty.
 - **Mouse**: [`mouse.md`](mouse.md) — QMP relative/button events or HMP `mouse_move`/`mouse_button`;
   relative motion only, track the cursor yourself.
-- **GDB**: [`gdb.md`](gdb.md) — attach to `tcp:1234` with the ELF matching the `--profile` you
-  launched.
+- **GDB**: [`gdb.md`](gdb.md) — attach to the endpoint in the session manifest with the ELF
+  matching the recorded `profile`.
 
 ## Troubleshooting
 
-- **`tcp:1234` busy**: a previous instance is still running; kill via pidfile or
-  `pgrep -af qemu-system`.
+- **GDB port busy or wrong VM**: read the session `manifest.json`; it contains the dynamically
+  allocated endpoint and the PID/paths that must match the QEMU command line.
 - **QEMU died at start**: check `qemu.log` and that `OVMF_CODE` is set in the dev shell.
 - **Screenshot garbage/absent**: guest hasn't set a framebuffer mode yet; wait for boot.

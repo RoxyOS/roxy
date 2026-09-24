@@ -43,7 +43,8 @@ request numbers, or calling conventions.
   files apply within their owning subsystem.
 - `ISSUES.md`: known correctness limitations that must not be mistaken for newly introduced bugs.
 - `target/roxy` and `target/jinx`: generated images, staging trees, caches, and Jinx build state;
-  these are artifacts rather than source.
+  these are artifacts rather than source. The rootfs image used by x86_64 tasks is
+  `target/roxy/rootfs-x86_64.img`.
 
 The root `Cargo.toml` lists every Rust workspace member and makes the dependency graph easy to
 trace. Crate names use the `roxy-*` prefix except for the composition binary, `kernel-main`, and the
@@ -88,17 +89,22 @@ The standard commands are:
 - `cargo xrun`: build the normal kernel and run Roxy OS in QEMU with graphical framebuffer output
   and serial attached to the invoking terminal.
 - `cargo xagent-debug --profile dev`: build the kernel with DWARF debug info (use `release` for
-  the optimized build) and launch Roxy OS in QEMU detached, exposing a serial log, QMP and
-  monitor sockets under `target/roxy/agent-debug/`, and a GDB stub on `tcp:127.0.0.1:1234` for
-  live debugging. See `.pi/skills/live-debugging/SKILL.md`.
+  the optimized build) and launch Roxy OS in QEMU detached. Each run gets a unique session
+  directory under `target/roxy/agent-debug/`, a dynamically allocated GDB port, and a
+  `manifest.json` recording the matching PID, profile, kernel, ISO, rootfs, QMP, monitor, and
+  serial paths. See `.pi/skills/live-debugging/SKILL.md`.
 - `cargo xtask image`: create `target/roxy/roxy.iso` without launching QEMU.
 - `cargo rootfs`: rebuild the Jinx `base` package staging tree and
-  `target/roxy/rootfs.img` from userspace inputs.
+  `target/roxy/rootfs-x86_64.img` from userspace inputs.
 
 Image, run, and test commands reuse an existing structurally valid rootfs image. They do not infer
 that a distro or mlibc edit made the cache stale, so rebuild it explicitly after userspace changes.
 Kernel-only iteration should reuse the cached rootfs. Package and mlibc work has additional
 procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`).
+
+When using live debugging, never draw runtime conclusions until the QEMU command line, PID,
+profile, ISO, kernel ELF, GDB endpoint, and QMP socket have been verified to refer to the same
+session manifest.
 
 ## Rules
 

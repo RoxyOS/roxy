@@ -1,26 +1,25 @@
 # GDB Attach to the Running Roxy Kernel
 
-`cargo xagent-debug` starts a GDB stub on `tcp:127.0.0.1:1234`. Connect GDB to debug the *live*
-kernel — registers, breakpoints, single-step, memory.
+`cargo xagent-debug` writes the GDB endpoint to the session `manifest.json`; use that port rather
+than assuming `1234`. Connect the ELF matching the `profile` recorded in the manifest.
 
 ## Which ELF
 
-Connect the ELF matching the `--profile` you launched — GDB must symbolize the exact running
-build:
-
-- `--profile dev` → `target/x86_64-unknown-none/debug/kernel-main` (DWARF, source lines work).
-- `--profile release` → `target/x86_64-unknown-none/release/kernel-main` (symbols only, mangled
-  names, no source lines).
+The manifest records the exact kernel ELF and profile used by the VM. `dev` builds include DWARF
+and source lines; `release` builds provide symbols without source-level debug information.
 
 ```sh
-gdb -q target/x86_64-unknown-none/debug/kernel-main
-(gdb) target remote 127.0.0.1:1234
+session=target/roxy/agent-debug/run-<id>
+gdb -q "$(jq -r .kernel "$session/manifest.json")"
+(gdb) target remote "$(jq -r .gdb "$session/manifest.json")"
 ```
 
 ## Attaching
 
-- `target remote` **pauses** the VM immediately.
+- `target remote` pauses the VM immediately.
 - The VM boots on its own; pause it right after start (QMP `stop`) to catch early boot.
+- Verify the manifest's `profile` and kernel path before attaching; never mix a `dev` VM with a
+  `release` ELF or another session's endpoint.
 
 ## SMP
 
@@ -29,6 +28,6 @@ gdb -q target/x86_64-unknown-none/debug/kernel-main
 
 ## Finishing
 
-Do **not** leave the VM paused: send `continue` before `detach`, then stop via the pidfile.
-If breakpoints don't hit, the code already ran past them (attached mid-boot); re-pause, set
-breakpoints, continue — or restart and attach earlier.
+Do **not** leave the VM paused: send `continue` before `detach`, then stop via the PID in the
+session manifest. If breakpoints don't hit, the code already ran past them (attached mid-boot);
+re-pause, set breakpoints, continue — or restart and attach earlier.
