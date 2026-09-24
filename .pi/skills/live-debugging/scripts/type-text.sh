@@ -37,6 +37,10 @@ if [[ $# != 1 ]]; then
     exit 2
 fi
 text=$1
+if [[ ! $delay =~ ^(0|[1-9][0-9]*)(\.[0-9]+)?$ ]]; then
+    echo "type-text.sh: --delay must be a non-negative number: $delay" >&2
+    exit 2
+fi
 qmp_sock=${QMP_SOCK:-$("$(dirname "$0")/session-qmp.sh")}
 
 map_char() {
@@ -128,4 +132,19 @@ if [[ ! -S $qmp_sock ]]; then
     exit 1
 fi
 
-emit_requests | socat - UNIX-CONNECT:"$qmp_sock" >/dev/null
+response_file=$(mktemp)
+trap 'rm -f "$response_file"' EXIT
+if ! emit_requests | socat - UNIX-CONNECT:"$qmp_sock" >"$response_file"; then
+    echo "type-text.sh: QMP connection failed: $qmp_sock" >&2
+    exit 1
+fi
+
+if ! jq -s -e 'all(.[]; type == "object")' "$response_file" >/dev/null; then
+    echo "type-text.sh: invalid QMP response" >&2
+    exit 1
+fi
+errors=$(jq -s -r '[.[] | select(.error) | "\(.error.class): \(.error.desc)"] | .[]?' "$response_file")
+if [[ -n $errors ]]; then
+    printf 'type-text.sh: QMP error: %s\n' "$errors" >&2
+    exit 1
+fi
