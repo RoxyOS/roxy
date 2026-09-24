@@ -75,7 +75,11 @@ pub(super) fn debug(
         .arg(format!(
             "unix:{},server,nowait",
             dir.join("qmp.sock").display()
-        ));
+        ))
+        .arg("-d")
+        .arg("cpu_reset")
+        .arg("-D")
+        .arg(dir.join("cpu-reset.log"));
 
     // Fully detach: the agent never reads QEMU's own stdout, and QEMU stderr goes to a
     // log file so a failed launch leaves diagnostics behind instead of dying silently.
@@ -132,7 +136,8 @@ fn write_manifest(
   "rootfs": "{}",
   "qmp": "{}",
   "monitor": "{}",
-  "serial": "{}"
+  "serial": "{}",
+  "cpu_reset_log": "{}"
 }}
 "#,
         profile.name(),
@@ -142,6 +147,7 @@ fn write_manifest(
         json_path(&dir.join("qmp.sock")),
         json_path(&dir.join("monitor.sock")),
         json_path(&dir.join("serial.log")),
+        json_path(&dir.join("cpu-reset.log")),
     );
     fs::write(dir.join("manifest.json"), manifest)?;
     Ok(())
