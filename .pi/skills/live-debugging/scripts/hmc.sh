@@ -4,5 +4,6 @@
 # The socket defaults to target/roxy/agent-debug/qmp.sock; override with QMP_SOCK.
 set -eu
 command_line="${1:?usage: <skill-dir>/scripts/hmc.sh '<HMP command line>'}"
-export _HMC_COMMAND="$command_line"
-exec "$(dirname "$0")/qmp.sh" "$(printf '{"execute":"human-monitor-command","arguments":{"command-line":"%s"}}' "$_HMC_COMMAND")"
+request=$(jq -cn --arg command_line "$command_line" \
+    '{execute:"human-monitor-command",arguments:{"command-line":$command_line}}')
+exec "$(dirname "$0")/qmp.sh" "$request"
