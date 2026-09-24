@@ -143,6 +143,15 @@ if ! jq -s -e 'all(.[]; type == "object")' "$response_file" >/dev/null; then
     echo "type-text.sh: invalid QMP response" >&2
     exit 1
 fi
+minimum_responses=$(( ${#text} + 2 ))
+if $enter; then
+    ((minimum_responses++))
+fi
+response_count=$(jq -s 'length' "$response_file")
+if (( response_count < minimum_responses )); then
+    echo "type-text.sh: incomplete QMP response" >&2
+    exit 1
+fi
 errors=$(jq -s -r '[.[] | select(.error) | "\(.error.class): \(.error.desc)"] | .[]?' "$response_file")
 if [[ -n $errors ]]; then
     printf 'type-text.sh: QMP error: %s\n' "$errors" >&2
