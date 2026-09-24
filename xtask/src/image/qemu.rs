@@ -1,5 +1,6 @@
 use std::{
     env, fs,
+    net::TcpListener,
     path::Path,
     path::PathBuf,
     process::{Command, Stdio},
@@ -7,7 +8,7 @@ use std::{
 
 use anyhow::{Result, bail, ensure};
 
-use crate::arch::Arch;
+use crate::{arch::Arch, cli::Profile};
 
 /// Launch the normal VM in the foreground, showing a graphical window and the serial
 /// console on the invoking terminal.
@@ -43,20 +44,25 @@ pub(super) fn test(image: &Path, arch: Arch) -> Result<()> {
 }
 
 /// Launch the VM detached with every control channel exposed for agent-driven live
-/// debugging: a unix socket for the human monitor, a unix socket for QMP, a serial log
-/// file, and a GDB stub on a fixed TCP port. See
+/// debugging: unix sockets for the human monitor and QMP, a serial log file, and a GDB stub.
+/// Each invocation receives its own directory and an automatically selected GDB port. See
 /// `.pi/skills/live-debugging/SKILL.md` for the matching interaction workflow.
-pub(super) fn debug(image: &Path, arch: Arch, dir: &Path) -> Result<()> {
+pub(super) fn debug(
+    image: &Path,
+    kernel: &Path,
+    rootfs: &Path,
+    arch: Arch,
+    profile: Profile,
+    dir: &Path,
+) -> Result<()> {
     println!("==> Starting agent-debug virtual machine (detached)");
 
-    // A stale socket path makes QEMU's `server,nowait` fail, so clean any leftovers from
-    // a previous session before launching.
-    for name in ["monitor.sock", "qmp.sock"] {
-        fs::remove_file(dir.join(name)).ok();
-    }
-
+    let gdb_port = free_tcp_port()?;
     let mut command = common_command(image, arch)?;
-    command.args(["-display", "none", "-gdb", "tcp:127.0.0.1:1234"]);
+    command
+        .args(["-display", "none"])
+        .arg("-gdb")
+        .arg(format!("tcp:127.0.0.1:{gdb_port}"));
     command
         .arg("-serial")
         .arg(format!("file:{}", dir.join("serial.log").display()))
@@ -77,9 +83,16 @@ pub(super) fn debug(image: &Path, arch: Arch, dir: &Path) -> Result<()> {
     let qemu_log = fs::File::create(dir.join("qemu.log"))?;
     command.stderr(Stdio::from(qemu_log));
 
-    let child = command.spawn()?;
-    fs::write(dir.join("qemu.pid"), child.id().to_string())?;
+    let mut child = command.spawn()?;
+    let pid = child.id();
+    fs::write(dir.join("qemu.pid"), pid.to_string())?;
+    write_manifest(dir, pid, gdb_port, profile, image, kernel, rootfs)?;
 
+    if let Some(status) = child.try_wait()? {
+        bail!("QEMU exited during launch with status {status}");
+    }
+
+    println!("==> session: {}", dir.display());
     println!(
         "==> channels: monitor   {}",
         dir.join("monitor.sock").display()
@@ -89,10 +102,55 @@ pub(super) fn debug(image: &Path, arch: Arch, dir: &Path) -> Result<()> {
         "==> channels: serial    {}",
         dir.join("serial.log").display()
     );
-    println!("==> channels: gdb      tcp::1234");
-    println!("==> pid: {}", child.id());
+    println!("==> channels: gdb       tcp:127.0.0.1:{gdb_port}");
+    println!("==> pid: {pid}");
 
     Ok(())
+}
+
+fn free_tcp_port() -> Result<u16> {
+    let listener = TcpListener::bind(("127.0.0.1", 0))?;
+    Ok(listener.local_addr()?.port())
+}
+
+fn write_manifest(
+    dir: &Path,
+    pid: u32,
+    gdb_port: u16,
+    profile: Profile,
+    image: &Path,
+    kernel: &Path,
+    rootfs: &Path,
+) -> Result<()> {
+    let manifest = format!(
+        r#"{{
+  "pid": {pid},
+  "profile": "{}",
+  "gdb": "tcp:127.0.0.1:{gdb_port}",
+  "iso": "{}",
+  "kernel": "{}",
+  "rootfs": "{}",
+  "qmp": "{}",
+  "monitor": "{}",
+  "serial": "{}"
+}}
+"#,
+        profile.name(),
+        json_path(image),
+        json_path(kernel),
+        json_path(rootfs),
+        json_path(&dir.join("qmp.sock")),
+        json_path(&dir.join("monitor.sock")),
+        json_path(&dir.join("serial.log")),
+    );
+    fs::write(dir.join("manifest.json"), manifest)?;
+    Ok(())
+}
+
+fn json_path(path: &Path) -> String {
+    path.to_string_lossy()
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
 }
 
 /// The shared machine definition for every launch mode: machine model, accelerator, OVMF

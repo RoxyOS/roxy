@@ -33,5 +33,5 @@ pub(crate) fn debug(arch: Arch, profile: Profile) -> Result<()> {
     let rootfs = rootfs::get_or_build(arch)?;
     let kernel = build_kernel(arch, profile)?;
 
-    image::debug(&kernel, &rootfs, arch)
+    image::debug(&kernel, &rootfs, arch, profile)
 }

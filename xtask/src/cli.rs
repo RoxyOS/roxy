@@ -10,6 +10,15 @@ pub(crate) enum Profile {
     Release,
 }
 
+impl Profile {
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            Self::Dev => "dev",
+            Self::Release => "release",
+        }
+    }
+}
+
 #[derive(Debug, Parser)]
 #[command(name = "xtask", about = "Roxy OS development tasks")]
 pub(crate) struct Cli {
