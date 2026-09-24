@@ -37,7 +37,7 @@ if [[ $# != 1 ]]; then
     exit 2
 fi
 text=$1
-qmp_sock=${QMP_SOCK:-target/roxy/agent-debug/qmp.sock}
+qmp_sock=${QMP_SOCK:-$("$(dirname "$0")/session-qmp.sh")}
 
 map_char() {
     local char=$1
