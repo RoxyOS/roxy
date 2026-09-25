@@ -102,10 +102,6 @@ that a distro or mlibc edit made the cache stale, so rebuild it explicitly after
 Kernel-only iteration should reuse the cached rootfs. Package and mlibc work has additional
 procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`).
 
-When using live debugging, never draw runtime conclusions until the QEMU command line, PID,
-profile, ISO, kernel ELF, GDB endpoint, and QMP socket have been verified to refer to the same
-session manifest.
-
 ## Rules
 
 ### Instruction Hierarchy
@@ -161,13 +157,18 @@ session manifest.
   enough: it reads as intended design rather than as debt. Substantial gaps are also recorded in
   `ISSUES.md` in the same style as the existing ext4 `FIXME` entries.
 
-### Userspace Debugging
+### Debugging
 
-- Live VM debugging is enabled by default: when debugging userspace or kernel behavior, use the running QEMU VM and the live-debugging workflow when that is useful. Only restrict debugging to static inspection when the user explicitly requests static-only debugging.
-- When debugging userspace software, locate and inspect the relevant version of its source code as
-  needed. Do not guess at its behavior or attempt to infer it from the binary alone when source is
-  available; use disassembly or other binary analysis only when the source is unavailable or the
-  investigation specifically requires it.
+- Before diagnosing a bug, reproduce it and record the symptoms it actually shows.
+- Live VM debugging is the default for userspace and kernel behavior. Use the running QEMU VM
+  and `.pi/skills/live-debugging/SKILL.md` when that is useful. Restrict debugging to static
+  inspection only when the user explicitly requests static-only debugging.
+- When debugging userspace software, inspect the source of the version actually running. Do not
+  infer behavior from the binary when that source is available. Use disassembly only when the
+  source is unavailable or the investigation specifically requires it.
+- When observation is not enough, patch the target program with temporary diagnostics such as
+  `printf`, rebuild, and rerun. Keep the patch in the worktree, keep it out of any commit, and
+  remove it when the investigation ends.
 
 ### Hardware Drivers and Spec Compliance
 
