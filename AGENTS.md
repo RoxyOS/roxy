@@ -160,6 +160,7 @@ procedures in the jinx and mlibc skills (`.pi/skills/jinx/`, `.pi/skills/mlibc/`
 ### Debugging
 
 - Before diagnosing a bug, reproduce it and record the symptoms it actually shows.
+- Do not diagnose from an earlier VM session. A previous session's serial log or other records are not evidence for the current tree or bug.
 - Live VM debugging is the default for userspace and kernel behavior. Use the running QEMU VM
   and `.pi/skills/live-debugging/SKILL.md` when that is useful. Restrict debugging to static
   inspection only when the user explicitly requests static-only debugging.
