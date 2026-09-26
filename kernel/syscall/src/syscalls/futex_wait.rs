@@ -11,7 +11,11 @@ fn handle(address: UserAddress, expected: u32, timeout: u64) -> SyscallResult {
     }
 
     if timeout != 0 {
-        return Err(Errno::NotSupported);
+        return Err(crate::unsupported::unsupported_argument(
+            "futex_wait.timeout",
+            timeout,
+            Errno::NotSupported,
+        ));
     }
 
     let addrspace = roxy_process::current_addrspace().map_err(|_| Errno::Fault)?;
